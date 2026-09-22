@@ -91,7 +91,9 @@
     }
 
     .input-field {
-      @apply w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 text-sm focus:outline-none focus:border-fiber-500 transition-all duration-200;
+      @apply w-full px-4 py-2.5 border border-gray-300 rounded-xl placeholder-gray-500 text-sm focus:outline-none transition-all duration-200 shadow-sm;
+      background-color: #ffffff !important;
+      color: #000000 !important;
     }
 
     .input-field:focus {
@@ -103,8 +105,8 @@
     input:-webkit-autofill:hover, 
     input:-webkit-autofill:focus, 
     input:-webkit-autofill:active{
-        -webkit-box-shadow: 0 0 0 30px #222429 inset !important;
-        -webkit-text-fill-color: white !important;
+        -webkit-box-shadow: 0 0 0 30px #ffffff inset !important;
+        -webkit-text-fill-color: #000000 !important;
         border-radius: 0.75rem; /* keep the rounded-xl look */
     }
 
