@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FibreGems CRM — Login</title>
+  <meta name="description" content="FibreGems CRM login portal for ISP channel partner agents and administrators.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { 'inter': ['Inter', 'sans-serif'] },
+          colors: {
+            navy: { 50: '#e8edf4', 100: '#c5d1e3', 200: '#9eb3d0', 300: '#7695bd', 400: '#587faf', 500: '#3a69a1', 600: '#2d5483', 700: '#1f3f65', 800: '#1a3a5c', 900: '#0e2240' },
+            gem: { 50: '#fff8e6', 100: '#ffecb3', 200: '#ffe080', 300: '#ffd44d', 400: '#ffca26', 500: '#f7a600', 600: '#e09500', 700: '#c98500', 800: '#b37500', 900: '#8c5c00' },
+            fiber: { 50: '#e0f7fa', 100: '#b2ebf2', 200: '#80deea', 300: '#4dd0e1', 400: '#26c6da', 500: '#00b4d8', 600: '#0097b2', 700: '#007a8c', 800: '#005d66', 900: '#004040' },
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    * { font-family: 'Inter', sans-serif; }
+    
+    @keyframes slide-in { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    @keyframes slide-out { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }
+    @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-20px); } }
+    @keyframes pulse-ring { 0% { transform: scale(0.8); opacity: 1; } 100% { transform: scale(2.5); opacity: 0; } }
+    @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+    @keyframes gradient-shift { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+    
+    .animate-slide-in { animation: slide-in 0.3s ease-out; }
+    .animate-slide-out { animation: slide-out 0.3s ease-in; }
+    .animate-float { animation: float 6s ease-in-out infinite; }
+    .animate-gradient { animation: gradient-shift 8s ease infinite; background-size: 200% 200%; }
+    
+    .login-bg {
+      background: linear-gradient(135deg, #0e2240 0%, #1a3a5c 25%, #005d66 50%, #007a8c 75%, #0e2240 100%);
+      animation: gradient-shift 15s ease infinite;
+      background-size: 400% 400%;
+    }
+
+    .glass-card {
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .input-glow:focus {
+      box-shadow: 0 0 0 3px rgba(0, 180, 216, 0.3);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #00b4d8 0%, #0097b2 100%);
+      transition: all 0.3s ease;
+    }
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #26c6da 0%, #00b4d8 100%);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(0, 180, 216, 0.35);
+    }
+    .btn-primary:active {
+      transform: translateY(0);
+    }
+
+    /* Animated fiber optic particles */
+    .particle {
+      position: absolute;
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: rgba(0, 180, 216, 0.5);
+      animation: float 8s ease-in-out infinite;
+    }
+
+    .loader-overlay {
+      background: rgba(14, 34, 64, 0.85);
+      backdrop-filter: blur(8px);
+    }
+
+    .spinner {
+      width: 48px;
+      height: 48px;
+      border: 4px solid rgba(0, 180, 216, 0.2);
+      border-top-color: #00b4d8;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body class="login-bg min-h-screen flex items-center justify-center p-4 font-inter overflow-hidden relative">
+
+  <!-- Decorative particles -->
+  <div class="particle" style="top: 10%; left: 15%; animation-delay: 0s; width: 6px; height: 6px; background: rgba(247, 166, 0, 0.3);"></div>
+  <div class="particle" style="top: 20%; right: 20%; animation-delay: 2s;"></div>
+  <div class="particle" style="bottom: 30%; left: 10%; animation-delay: 4s; width: 8px; height: 8px;"></div>
+  <div class="particle" style="top: 60%; right: 15%; animation-delay: 1s; background: rgba(247, 166, 0, 0.4);"></div>
+  <div class="particle" style="bottom: 15%; right: 30%; animation-delay: 3s;"></div>
+  <div class="particle" style="top: 40%; left: 5%; animation-delay: 5s; width: 5px; height: 5px;"></div>
+
+  <!-- Toast container -->
+  <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-3"></div>
+
+  <!-- Loader overlay -->
+  <div id="loader" class="hidden fixed inset-0 z-40 loader-overlay flex items-center justify-center">
+    <div class="text-center">
+      <div class="spinner mx-auto mb-4"></div>
+      <p class="text-fiber-300 text-sm font-medium animate-pulse">Authenticating...</p>
+    </div>
+  </div>
+
+  <!-- Login Card -->
+  <div class="w-full max-w-md relative z-10">
+    <!-- Logo / Brand -->
+    <div class="text-center mb-8 animate-float">
+      <div class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-fiber-500 to-fiber-700 shadow-lg shadow-fiber-500/30 mb-4">
+        <svg class="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+        </svg>
+      </div>
+      <h1 class="text-3xl font-bold text-white tracking-tight">Fibre<span class="text-gem-400">Gems</span></h1>
+      <p class="text-fiber-200/60 text-sm mt-1 font-medium">Channel Partner CRM</p>
+    </div>
+
+    <!-- Card -->
+    <div class="glass-card rounded-2xl p-8 shadow-2xl">
+      <div class="mb-6">
+        <h2 class="text-xl font-semibold text-white">Welcome back</h2>
+        <p class="text-sm text-gray-400 mt-1">Sign in to your agent portal</p>
+      </div>
+
+      <form id="login-form" onsubmit="event.preventDefault(); login();" class="space-y-5">
+        <!-- Email -->
+        <div>
+          <label for="l-email" class="block text-sm font-medium text-gray-300 mb-1.5">Email Address</label>
+          <div class="relative">
+            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+              <svg class="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+              </svg>
+            </div>
+            <input type="email" id="l-email" required autocomplete="email" placeholder="agent@fibregems.co.za"
+              class="input-glow w-full pl-11 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 text-sm focus:outline-none focus:border-fiber-500 transition-all duration-200">
+          </div>
+        </div>
+
+        <!-- Password -->
+        <div>
+          <label for="l-pass" class="block text-sm font-medium text-gray-300 mb-1.5">Password</label>
+          <div class="relative">
+            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+              <svg class="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+              </svg>
+            </div>
+            <input type="password" id="l-pass" required autocomplete="current-password" placeholder="••••••••"
+              class="input-glow w-full pl-11 pr-12 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 text-sm focus:outline-none focus:border-fiber-500 transition-all duration-200">
+            <button type="button" onclick="togglePassword()" class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-500 hover:text-gray-300 transition-colors">
+              <svg id="eye-icon" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Submit -->
+        <button type="submit" id="login-btn"
+          class="btn-primary w-full py-3.5 rounded-xl text-white font-semibold text-sm tracking-wide shadow-lg">
+          Sign In
+        </button>
+      </form>
+
+      <!-- Footer -->
+      <div class="mt-6 pt-6 border-t border-white/10 text-center">
+        <p class="text-xs text-gray-500">
+          Secure zero-footprint session · <span class="text-fiber-400/60">Powered by FibreGems</span>
+        </p>
+      </div>
+    </div>
+
+    <!-- Bottom hint -->
+    <p class="text-center text-xs text-gray-500/50 mt-6">
+      Session tokens are volatile — closing this tab will log you out.
+    </p>
+  </div>
+
+  <!-- Scripts — order matters: api.js defines callBackend, auth.js defines login/session -->
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    function togglePassword() {
+      const input = document.getElementById('l-pass');
+      const icon = document.getElementById('eye-icon');
+      if (input.type === 'password') {
+        input.type = 'text';
+        icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />';
+      } else {
+        input.type = 'password';
+        icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />';
+      }
+    }
+  </script>
+</body>
+</html>
