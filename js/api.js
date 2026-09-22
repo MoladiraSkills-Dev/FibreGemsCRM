@@ -5,8 +5,34 @@
 
 const API_URL = "https://script.google.com/macros/s/AKfycbyn0YWvIPLiVnY8Jt6nk-3nqbByDrjbH4P0v70W0DfUiGsivfR7QvJkuDdEnaIV0tvf/exec"; // Replace with your Web App URL
 
-// Volatile session — lives only in JS memory. Refresh = logout.
+// Volatile session — stored in sessionStorage (survives navigation, clears on tab close).
+// This is still zero-footprint: nothing persists after the browser tab is closed.
 let session = null;
+
+// Rehydrate session from sessionStorage on every page load
+(function restoreSession() {
+  try {
+    const stored = sessionStorage.getItem('fg_session');
+    if (stored) session = JSON.parse(stored);
+  } catch (e) {
+    session = null;
+  }
+})();
+
+/** Save session to sessionStorage (called after login). */
+function persistSession(data) {
+  session = data;
+  try {
+    sessionStorage.setItem('fg_session', JSON.stringify(data));
+  } catch (e) { /* private browsing may block storage */ }
+}
+
+/** Clear session from memory and sessionStorage (called on logout). */
+function clearSession() {
+  session = null;
+  try { sessionStorage.removeItem('fg_session'); } catch (e) {}
+}
+
 
 /**
  * Universal fetch wrapper for the doPost router.

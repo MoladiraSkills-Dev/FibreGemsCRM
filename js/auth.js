@@ -1,7 +1,7 @@
 /**
  * FibreGems CRM — Auth & Session Management
- * Zero-footprint volatile sessions: token in JS memory only.
- * Page refresh = instant logout. No localStorage, no cookies.
+ * Zero-footprint volatile sessions via sessionStorage.
+ * Survives page navigation, clears when the tab/window is closed.
  */
 
 // ── Session Guards ───────────────────────────────────────────
@@ -46,7 +46,8 @@ async function login() {
     }
 
     // Calls 'handleLogin' via the doPost router in Code.gs
-    session = await callBackend('handleLogin', { email, password });
+    const loginData = await callBackend('handleLogin', { email, password });
+    persistSession(loginData);  // Save to sessionStorage so it survives navigation
 
     hide('loader');
     routeView();
@@ -72,7 +73,7 @@ function routeView() {
  * Destroy session and redirect to login.
  */
 function logout() {
-  session = null;
+  clearSession();  // Wipe sessionStorage + memory
   window.location.href = 'index.html';
 }
 
