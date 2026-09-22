@@ -25,6 +25,9 @@ function doPost(e) {
       case 'getAgentWorklist':
         result = getAgentWorklist(token, payload.offset, payload.limit);
         break;
+      case 'getAgentActivityLog':
+        result = getAgentActivityLog(token, payload.offset, payload.limit);
+        break;
       case 'quickUpdateSalesData':
         result = quickUpdateSalesData(payload.customerId, payload.data, token);
         break;
@@ -36,6 +39,21 @@ function doPost(e) {
         break;
       case 'runAgilitySync':
         result = runAgilitySync(token);
+        break;
+      case 'getAgentList':
+        result = getAgentList(token);
+        break;
+      case 'createAgent':
+        result = createAgent(token, payload);
+        break;
+      case 'updateAgent':
+        result = updateAgent(token, payload);
+        break;
+      case 'setAgentTempPassword':
+        result = setAgentTempPassword(token, payload);
+        break;
+      case 'deleteAgent':
+        result = deleteAgent(token, payload.agentId);
         break;
       default:
         throw new Error("Invalid API action requested.");
@@ -155,16 +173,102 @@ function handleAgentLeadUpdate(existingIdOverride, formData, token) {
 function getAgentWorklist(token, offset, limit) {
   const session = getSessionUser(token);
   const custData = ss.getSheetByName('CUSTOMERS').getDataRange().getValues();
+  const actData  = ss.getSheetByName('ACTIVITY_LOG').getDataRange().getValues();
+
+  // Build a map of agentId → { customerId → latest activity row }
+  // Only include activity rows where THIS agent is the logger (col 4 = Agent_ID or col 16 = Logged_By_Agent_ID)
+  const agentActivityMap = {}; // customerId → latest activity row for this agent
+  for (let i = 1; i < actData.length; i++) {
+    const row = actData[i];
+    const rowAgentId      = String(row[4]  || '').trim();
+    const rowLoggedById   = String(row[16] || '').trim();
+    const customerId      = String(row[2]  || '').trim();
+    if (!customerId) continue;
+    if (rowAgentId !== session.agentId && rowLoggedById !== session.agentId) continue;
+    // Keep the most recent entry per customer (rows are appended chronologically)
+    agentActivityMap[customerId] = row;
+  }
+
   let worklist = [];
   for (let i = 1; i < custData.length; i++) {
-    if (custData[i][30] === session.agentId && custData[i][1] !== 'Archived') {
-       let naDate = custData[i][34];
-       if (naDate && naDate instanceof Date) naDate = Utilities.formatDate(naDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
-       worklist.push({ customerId: custData[i][0], name: custData[i][7], package: custData[i][13], status: custData[i][32], nextAction: custData[i][33] || '', nextActionDate: naDate || '' });
+    const row = custData[i];
+    const custId    = String(row[0] || '').trim();
+    const assignedAgent = String(row[30] || '').trim();
+    if (custData[i][1] === 'Archived') continue;
+
+    // Include customer if assigned to this agent OR if this agent has any activity logged for them
+    const ownsCustomer   = assignedAgent === session.agentId;
+    const hasActivity    = !!agentActivityMap[custId];
+    if (!ownsCustomer && !hasActivity) continue;
+
+    let naDate = row[34];
+    if (naDate && naDate instanceof Date) {
+      naDate = Utilities.formatDate(naDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
     }
+
+    // Enrich with the agent's latest activity for this customer
+    const lastAct = agentActivityMap[custId];
+    let lastContactDate = '';
+    let lastActionType  = '';
+    let lastOutcome     = '';
+    if (lastAct) {
+      let actDate = lastAct[1];
+      if (actDate && actDate instanceof Date) {
+        lastContactDate = Utilities.formatDate(actDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+      } else if (actDate) {
+        lastContactDate = String(actDate).slice(0, 10);
+      }
+      lastActionType = String(lastAct[5] || '').trim();
+      lastOutcome    = String(lastAct[7] || '').trim();
+    }
+
+    worklist.push({
+      customerId:      custId,
+      name:            row[7],
+      package:         row[13],
+      status:          row[32],
+      nextAction:      row[33] || '',
+      nextActionDate:  naDate  || '',
+      lastContactDate: lastContactDate,
+      lastActionType:  lastActionType,
+      lastOutcome:     lastOutcome
+    });
   }
   worklist.reverse();
   return { data: worklist.slice(offset, offset + limit), total: worklist.length };
+}
+
+// Returns paginated ACTIVITY_LOG rows for the logged-in agent only
+function getAgentActivityLog(token, offset, limit) {
+  const session  = getSessionUser(token);
+  const actData  = ss.getSheetByName('ACTIVITY_LOG').getDataRange().getValues();
+  const headers  = actData[0];
+  let rows = [];
+  for (let i = 1; i < actData.length; i++) {
+    const row = actData[i];
+    const rowAgentId    = String(row[4]  || '').trim();
+    const rowLoggedById = String(row[16] || '').trim();
+    if (rowAgentId !== session.agentId && rowLoggedById !== session.agentId) continue;
+    let actDate = row[1];
+    if (actDate && actDate instanceof Date) {
+      actDate = Utilities.formatDate(actDate, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm');
+    }
+    rows.push({
+      activityId:    String(row[0]  || ''),
+      dateTime:      actDate         || '',
+      customerId:    String(row[2]  || ''),
+      customerName:  String(row[3]  || ''),
+      actionType:    String(row[5]  || ''),
+      contactMethod: String(row[6]  || ''),
+      outcome:       String(row[7]  || ''),
+      statusAfter:   String(row[8]  || ''),
+      nextAction:    String(row[10] || ''),
+      nextActionDate:String(row[11] || ''),
+      notes:         String(row[15] || '')
+    });
+  }
+  rows.reverse(); // newest first
+  return { data: rows.slice(offset, offset + limit), total: rows.length };
 }
 
 // ============================================================
@@ -339,4 +443,117 @@ function runAgilitySync(token) {
   if(newAct.length > 0) ss.getSheetByName('ACTIVATIONS').getRange(ss.getSheetByName('ACTIVATIONS').getLastRow() + 1, 1, newAct.length, newAct[0].length).setValues(newAct);
   agilitySheet.getRange(1, SYNC_COL_INDEX + 1, syncStatusArray.length, 1).setValues(syncStatusArray);
   return { success: true, newLeads, updatedLeads };
+}
+
+// ============================================================
+// 9. AGENT CRUD (Admin only)
+// ============================================================
+
+function requireAdmin_(token) {
+  const s = getSessionUser(token);
+  if (s.role !== 'Admin') throw new Error('Admin privileges required.');
+  return s;
+}
+
+/** Returns all users from the Users sheet (safe fields only). */
+function getAgentList(token) {
+  requireAdmin_(token);
+  const sheet = ss.getSheetByName('Users');
+  const data  = sheet.getDataRange().getValues();
+  const agents = [];
+  for (let i = 1; i < data.length; i++) {
+    if (!data[i][0]) continue;
+    agents.push({
+      agentId:  String(data[i][0]),
+      name:     String(data[i][1] || ''),
+      email:    String(data[i][2] || ''),
+      role:     String(data[i][5] || 'Agent'),
+      status:   String(data[i][6] || 'Pending'),
+      tempPass: String(data[i][7] || '')   // temp password (plain-text, shown once)
+    });
+  }
+  return { agents };
+}
+
+/** Creates a new agent account with a hashed password. */
+function createAgent(token, payload) {
+  requireAdmin_(token);
+  const { name, email, password, role } = payload;
+  if (!name || !email || !password) throw new Error('Name, email and password are required.');
+
+  const sheet = ss.getSheetByName('Users');
+  const data  = sheet.getDataRange().getValues();
+
+  // Duplicate email check
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][2]).toLowerCase().trim() === email.toLowerCase().trim()) {
+      throw new Error('An account with this email already exists.');
+    }
+  }
+
+  const agentId  = 'AGT-' + Utilities.getUuid().slice(0, 8).toUpperCase();
+  const salt     = Utilities.getUuid();
+  const hash     = hashPassword(password, salt);
+  const created  = new Date().toISOString();
+
+  // Columns: Agent_ID | Name | Email | PasswordHash | Salt | Role | Status | TempPassword | CreatedAt
+  sheet.appendRow([agentId, name.trim(), email.trim().toLowerCase(), hash, salt, role || 'Agent', 'Verified', '', created]);
+  return { success: true, agentId };
+}
+
+/** Updates an existing agent's name, email, role or status. */
+function updateAgent(token, payload) {
+  requireAdmin_(token);
+  const { agentId, name, email, role, status } = payload;
+  if (!agentId) throw new Error('agentId is required.');
+
+  const sheet = ss.getSheetByName('Users');
+  const data  = sheet.getDataRange().getValues();
+  const rowIdx = data.findIndex(r => String(r[0]) === String(agentId));
+  if (rowIdx < 1) throw new Error('Agent not found.');
+
+  const sheetRow = rowIdx + 1;
+  if (name)   sheet.getRange(sheetRow, 2).setValue(name.trim());
+  if (email)  sheet.getRange(sheetRow, 3).setValue(email.trim().toLowerCase());
+  if (role)   sheet.getRange(sheetRow, 6).setValue(role);
+  if (status) sheet.getRange(sheetRow, 7).setValue(status);
+
+  return { success: true };
+}
+
+/** Sets a temporary plain-text password (also stores hash). Admin can read it once. */
+function setAgentTempPassword(token, payload) {
+  requireAdmin_(token);
+  const { agentId, tempPassword } = payload;
+  if (!agentId || !tempPassword) throw new Error('agentId and tempPassword are required.');
+
+  const sheet  = ss.getSheetByName('Users');
+  const data   = sheet.getDataRange().getValues();
+  const rowIdx = data.findIndex(r => String(r[0]) === String(agentId));
+  if (rowIdx < 1) throw new Error('Agent not found.');
+
+  const sheetRow = rowIdx + 1;
+  const salt     = Utilities.getUuid();
+  const hash     = hashPassword(tempPassword, salt);
+
+  sheet.getRange(sheetRow, 4).setValue(hash);          // PasswordHash
+  sheet.getRange(sheetRow, 5).setValue(salt);          // Salt
+  sheet.getRange(sheetRow, 8).setValue(tempPassword);  // TempPassword (plain, col H)
+  sheet.getRange(sheetRow, 7).setValue('Verified');    // Ensure account is active
+
+  return { success: true, tempPassword };
+}
+
+/** Deactivates (soft-deletes) an agent — sets status to Inactive. */
+function deleteAgent(token, agentId) {
+  requireAdmin_(token);
+  if (!agentId) throw new Error('agentId is required.');
+
+  const sheet  = ss.getSheetByName('Users');
+  const data   = sheet.getDataRange().getValues();
+  const rowIdx = data.findIndex(r => String(r[0]) === String(agentId));
+  if (rowIdx < 1) throw new Error('Agent not found.');
+
+  sheet.getRange(rowIdx + 1, 7).setValue('Inactive');
+  return { success: true };
 }

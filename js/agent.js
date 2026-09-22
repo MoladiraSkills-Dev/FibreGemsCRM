@@ -86,8 +86,17 @@ async function loadWorklist() {
         </td>
         <td class="px-4 py-3.5 text-sm text-gray-300">${escHtml(c.package || '—')}</td>
         <td class="px-4 py-3.5">${statusBadge(c.status)}</td>
-        <td class="px-4 py-3.5 text-sm text-gray-300">${escHtml(c.nextAction || '—')}</td>
-        <td class="px-4 py-3.5 text-sm text-gray-400">${escHtml(c.nextActionDate || '—')}</td>
+        <td class="px-4 py-3.5">
+          <p class="text-sm text-gray-300">${escHtml(c.nextAction || '—')}</p>
+          ${c.nextActionDate ? `<p class="text-xs text-gray-500 mt-0.5">${escHtml(c.nextActionDate)}</p>` : ''}
+        </td>
+        <td class="px-4 py-3.5">
+          ${c.lastContactDate
+            ? `<p class="text-sm text-gray-300">${escHtml(c.lastContactDate)}</p>
+               ${c.lastActionType ? `<p class="text-xs text-gray-500 mt-0.5">${escHtml(c.lastActionType)}</p>` : ''}`
+            : `<span class="text-gray-600 text-sm">—</span>`}
+        </td>
+        <td class="px-4 py-3.5 text-sm text-gray-400 max-w-[160px] truncate" title="${escHtml(c.lastOutcome)}">${escHtml(c.lastOutcome || '—')}</td>
         <td class="px-4 py-3.5">
           <button onclick="openQuickEdit('${escHtml(c.customerId)}', '${escJs(c.name)}', '${escJs(c.package || '')}', '${escJs(c.status || '')}', '${escJs(c.nextAction || '')}', '${escJs(c.nextActionDate || '')}')"
             class="opacity-0 group-hover:opacity-100 px-3 py-1.5 bg-fiber-500/10 text-fiber-400 rounded-lg text-xs font-medium hover:bg-fiber-500/20 transition-all">
