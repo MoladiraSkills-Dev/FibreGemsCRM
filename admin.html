@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FibreGems CRM — Admin Command Centre</title>
+  <meta name="description" content="FibreGems CRM admin command centre for pipeline management, agent monitoring, and Agility sync.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { 'inter': ['Inter', 'sans-serif'] },
+          colors: {
+            navy: { 50: '#e8edf4', 100: '#c5d1e3', 200: '#9eb3d0', 300: '#7695bd', 400: '#587faf', 500: '#3a69a1', 600: '#2d5483', 700: '#1f3f65', 800: '#1a3a5c', 900: '#0e2240' },
+            gem: { 50: '#fff8e6', 100: '#ffecb3', 200: '#ffe080', 300: '#ffd44d', 400: '#ffca26', 500: '#f7a600', 600: '#e09500', 700: '#c98500', 800: '#b37500', 900: '#8c5c00' },
+            fiber: { 50: '#e0f7fa', 100: '#b2ebf2', 200: '#80deea', 300: '#4dd0e1', 400: '#26c6da', 500: '#00b4d8', 600: '#0097b2', 700: '#007a8c', 800: '#005d66', 900: '#004040' },
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    * { font-family: 'Inter', sans-serif; }
+    @keyframes slide-in { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    @keyframes slide-out { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }
+    .animate-slide-in { animation: slide-in 0.3s ease-out; }
+    .animate-slide-out { animation: slide-out 0.3s ease-in; }
+    .spinner { width: 32px; height: 32px; border: 3px solid rgba(0,180,216,0.2); border-top-color: #00b4d8; border-radius: 50%; animation: spin 0.8s linear infinite; }
+    .spinner-sm { width: 20px; height: 20px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .sidebar-transition { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+    .stat-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      transition: all 0.3s ease;
+    }
+    .stat-card:hover {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 255, 255, 0.1);
+      transform: translateY(-2px);
+    }
+  </style>
+</head>
+<body class="bg-navy-900 min-h-screen font-inter text-white">
+
+  <!-- Toast container -->
+  <div id="toast-container" class="fixed top-4 right-4 z-[60] flex flex-col gap-3"></div>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- Mobile Header                                              -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <header class="lg:hidden fixed top-0 left-0 right-0 z-30 bg-navy-900/95 backdrop-blur-lg border-b border-white/5 px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <button onclick="toggleAdminSidebar()" class="p-2 rounded-lg hover:bg-white/5 transition-colors">
+        <svg class="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+        </svg>
+      </button>
+      <h1 class="text-lg font-bold">Fibre<span class="text-gem-400">Gems</span> <span class="text-xs text-gray-500 font-normal">Admin</span></h1>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- Sidebar                                                     -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <aside id="admin-sidebar" class="fixed top-0 left-0 bottom-0 w-64 bg-navy-800/50 backdrop-blur-xl border-r border-white/5 z-40 sidebar-transition -translate-x-full lg:translate-x-0">
+    <!-- Brand -->
+    <div class="px-6 py-6 border-b border-white/5">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-gem-500 to-gem-700 flex items-center justify-center shadow-lg shadow-gem-500/20">
+          <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold tracking-tight">Fibre<span class="text-gem-400">Gems</span></h1>
+          <p class="text-xs text-gray-500">Command Centre</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Admin Info -->
+    <div class="px-6 py-4 border-b border-white/5">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-full bg-gradient-to-br from-gem-500 to-gem-700 flex items-center justify-center text-sm font-bold text-white">
+          <span id="admin-avatar">A</span>
+        </div>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-medium text-white truncate" id="admin-name">Admin</p>
+          <p class="text-xs text-gem-400 font-medium" id="admin-role">Admin</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="px-3 py-4 space-y-1">
+      <button onclick="switchAdminView('dashboard')" data-admin-nav="dashboard"
+        class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 border-l-2 bg-fiber-500/20 text-fiber-300 border-fiber-500">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5m.75-9l3-3 2.148 2.148A12.061 12.061 0 0116.5 7.605" />
+        </svg>
+        Dashboard
+      </button>
+      <button onclick="switchAdminView('grid')" data-admin-nav="grid"
+        class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 border-l-2 border-transparent text-gray-400 hover:text-white hover:bg-white/5">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 01-1.125-1.125M3.375 19.5h7.5c.621 0 1.125-.504 1.125-1.125m-9.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-7.5A1.125 1.125 0 0112 18.375m9.75-12.75c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125m19.5 0v1.5c0 .621-.504 1.125-1.125 1.125M2.25 5.625v1.5c0 .621.504 1.125 1.125 1.125m0 0h17.25m-17.25 0h7.5c.621 0 1.125.504 1.125 1.125M3.375 8.25c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m17.25-3.75h-7.5c-.621 0-1.125.504-1.125 1.125m8.625-1.125c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-17.25 0h7.5m-7.5 0c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125M12 10.875v-1.5m0 1.5c0 .621-.504 1.125-1.125 1.125M12 10.875c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125M13.125 12h7.5m-7.5 0c-.621 0-1.125.504-1.125 1.125M20.625 12c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-17.25 0h7.5M12 14.625v-1.5m0 1.5c0 .621-.504 1.125-1.125 1.125M12 14.625c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125m0 0v.375" />
+        </svg>
+        Master Grid
+      </button>
+      <button onclick="switchAdminView('sync')" data-admin-nav="sync"
+        class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 border-l-2 border-transparent text-gray-400 hover:text-white hover:bg-white/5">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" />
+        </svg>
+        Agility Sync
+      </button>
+    </nav>
+
+    <!-- Logout -->
+    <div class="absolute bottom-0 left-0 right-0 p-4 border-t border-white/5">
+      <button onclick="logout()" class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-red-400/70 hover:text-red-400 hover:bg-red-500/10 transition-all">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+        </svg>
+        Sign Out
+      </button>
+    </div>
+  </aside>
+
+  <!-- Sidebar overlay for mobile -->
+  <div id="admin-sidebar-overlay" onclick="toggleAdminSidebar()" class="hidden fixed inset-0 bg-black/50 z-30 lg:hidden"></div>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- Main Content                                                -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <main class="lg:ml-64 pt-16 lg:pt-0 min-h-screen">
+
+    <!-- ─── DASHBOARD VIEW ─────────────────────────────────── -->
+    <div id="view-dashboard">
+      <!-- Header -->
+      <div class="px-6 lg:px-8 py-6 border-b border-white/5">
+        <h2 class="text-xl font-bold text-white">Command Centre</h2>
+        <p class="text-sm text-gray-500 mt-0.5">Real-time overview of today's operations</p>
+      </div>
+
+      <!-- Stat Cards -->
+      <div class="px-6 lg:px-8 py-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <!-- Active Agents -->
+        <div class="stat-card rounded-2xl p-5">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="w-10 h-10 rounded-xl bg-fiber-500/15 flex items-center justify-center">
+              <svg class="w-5 h-5 text-fiber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+              </svg>
+            </div>
+            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Active Agents</p>
+          </div>
+          <p class="text-3xl font-bold text-white" id="stat-active-agents">—</p>
+          <p class="text-xs text-gray-500 mt-1">agents working today</p>
+        </div>
+
+        <!-- Total Customers -->
+        <div class="stat-card rounded-2xl p-5">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="w-10 h-10 rounded-xl bg-gem-500/15 flex items-center justify-center">
+              <svg class="w-5 h-5 text-gem-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375" />
+              </svg>
+            </div>
+            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Customers</p>
+          </div>
+          <p class="text-3xl font-bold text-white" id="stat-total-customers">—</p>
+          <p class="text-xs text-gray-500 mt-1">in the pipeline</p>
+        </div>
+
+        <!-- Today's Touches -->
+        <div class="stat-card rounded-2xl p-5">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="w-10 h-10 rounded-xl bg-emerald-500/15 flex items-center justify-center">
+              <svg class="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+              </svg>
+            </div>
+            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Today's Touches</p>
+          </div>
+          <p class="text-3xl font-bold text-white" id="stat-today-touches">—</p>
+          <p class="text-xs text-gray-500 mt-1">customer interactions</p>
+        </div>
+      </div>
+
+      <!-- Two-column: Agent Activity + Status Chart -->
+      <div class="px-6 lg:px-8 pb-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Agent Activity -->
+        <div class="lg:col-span-2 bg-white/[0.02] border border-white/5 rounded-2xl overflow-hidden">
+          <div class="px-5 py-4 border-b border-white/5 flex items-center justify-between">
+            <div>
+              <h3 class="text-sm font-semibold text-white">Agent Activity</h3>
+              <p class="text-xs text-gray-500 mt-0.5">Today's active agents and their touch count</p>
+            </div>
+            <button onclick="loadDashboard()" class="p-2 rounded-lg hover:bg-white/5 text-gray-500 hover:text-white transition-colors" title="Refresh">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" />
+              </svg>
+            </button>
+          </div>
+          <table class="w-full">
+            <thead>
+              <tr class="border-b border-white/10">
+                <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Agent</th>
+                <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Touches</th>
+                <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Last Active</th>
+                <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-10">Live</th>
+              </tr>
+            </thead>
+            <tbody id="agent-activity-body"></tbody>
+          </table>
+        </div>
+
+        <!-- Status Chart -->
+        <div class="bg-white/[0.02] border border-white/5 rounded-2xl p-5">
+          <h3 class="text-sm font-semibold text-white mb-1">Pipeline Status</h3>
+          <p class="text-xs text-gray-500 mb-5">Customer distribution by status</p>
+          
+          <div class="flex justify-center mb-6">
+            <canvas id="status-chart" width="200" height="200"></canvas>
+          </div>
+          
+          <div id="status-stats" class="space-y-3">
+            <p class="text-center text-gray-600 text-sm">Loading...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── MASTER GRID VIEW ───────────────────────────────── -->
+    <div id="view-grid" class="hidden">
+      <div class="px-6 lg:px-8 py-6 border-b border-white/5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h2 class="text-xl font-bold text-white">Master Grid</h2>
+          <p class="text-sm text-gray-500 mt-0.5"><span id="grid-count">0 records</span></p>
+        </div>
+        <button onclick="loadMasterGrid()" class="inline-flex items-center gap-2 px-4 py-2.5 bg-white/5 text-gray-400 rounded-xl text-sm font-medium hover:bg-white/10 transition-colors">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" />
+          </svg>
+          Refresh
+        </button>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full">
+          <thead>
+            <tr class="border-b border-white/10">
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Customer</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Agent</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Payment</th>
+            </tr>
+          </thead>
+          <tbody id="grid-body"></tbody>
+        </table>
+      </div>
+
+      <div id="grid-pagination" class="px-6 py-4 flex items-center justify-center gap-4 border-t border-white/5"></div>
+    </div>
+
+    <!-- ─── AGILITY SYNC VIEW ──────────────────────────────── -->
+    <div id="view-sync" class="hidden">
+      <div class="px-6 lg:px-8 py-6 border-b border-white/5">
+        <h2 class="text-xl font-bold text-white">Agility Sync Engine</h2>
+        <p class="text-sm text-gray-500 mt-0.5">Bulk import from Agility REPORT to CRM pipeline</p>
+      </div>
+
+      <div class="px-6 lg:px-8 py-8 max-w-2xl">
+        <!-- Info card -->
+        <div class="bg-white/[0.03] border border-white/5 rounded-2xl p-6 mb-6">
+          <div class="flex items-start gap-4">
+            <div class="w-12 h-12 rounded-xl bg-fiber-500/15 flex items-center justify-center flex-shrink-0">
+              <svg class="w-6 h-6 text-fiber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-base font-semibold text-white mb-2">How it works</h3>
+              <ul class="space-y-2 text-sm text-gray-400">
+                <li class="flex items-start gap-2">
+                  <span class="text-fiber-400 mt-0.5">1.</span>
+                  Scans the <span class="text-white font-medium">Agility REPORT</span> sheet for rows without a <span class="font-mono text-xs text-fiber-300 bg-fiber-500/10 px-1.5 py-0.5 rounded">Sync_Status</span>
+                </li>
+                <li class="flex items-start gap-2">
+                  <span class="text-fiber-400 mt-0.5">2.</span>
+                  Extracts <span class="font-mono text-xs text-gem-300 bg-gem-500/10 px-1.5 py-0.5 rounded">OVR</span> / <span class="font-mono text-xs text-gem-300 bg-gem-500/10 px-1.5 py-0.5 rounded">OVK</span> numbers from description field
+                </li>
+                <li class="flex items-start gap-2">
+                  <span class="text-fiber-400 mt-0.5">3.</span>
+                  Matches against existing ORDERS records, or creates new customer shells
+                </li>
+                <li class="flex items-start gap-2">
+                  <span class="text-fiber-400 mt-0.5">4.</span>
+                  Maps products (e.g. FTTR-20-10 → Vuma Reach 20Mbps/10Mbps) and splits names
+                </li>
+                <li class="flex items-start gap-2">
+                  <span class="text-fiber-400 mt-0.5">5.</span>
+                  Inserts into <span class="text-white font-medium">CUSTOMERS</span>, <span class="text-white font-medium">ORDERS</span>, <span class="text-white font-medium">PAYMENTS</span>, and <span class="text-white font-medium">ACTIVATIONS</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Warning -->
+        <div class="bg-amber-500/5 border border-amber-500/20 rounded-xl p-4 mb-6 flex items-start gap-3">
+          <svg class="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+          </svg>
+          <p class="text-sm text-amber-300/80">
+            This operation processes all unsynced rows in bulk. Ensure the Agility REPORT data is up to date before running.
+          </p>
+        </div>
+
+        <!-- Sync button -->
+        <button onclick="triggerAgilitySync()" id="sync-btn"
+          class="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-fiber-500 to-fiber-600 text-white rounded-xl text-sm font-semibold hover:shadow-lg hover:shadow-fiber-500/25 transition-all hover:-translate-y-0.5">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" />
+          </svg>
+          Run Agility Sync
+        </button>
+
+        <!-- Result box -->
+        <div id="sync-result" class="hidden mt-6 bg-white/[0.03] border border-white/5 rounded-2xl p-6"></div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Scripts -->
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/admin.js"></script>
+  <script>
+    function toggleAdminSidebar() {
+      const sidebar = document.getElementById('admin-sidebar');
+      const overlay = document.getElementById('admin-sidebar-overlay');
+      sidebar.classList.toggle('-translate-x-full');
+      overlay.classList.toggle('hidden');
+    }
+  </script>
+</body>
+</html>
