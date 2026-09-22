@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,37 +8,103 @@
   <meta name="description" content="FibreGems CRM agent dashboard for field lead capture and customer management.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
       theme: {
         extend: {
-          fontFamily: { 'inter': ['Inter', 'sans-serif'] },
+          fontFamily: { 'inter': ['Montserrat', 'sans-serif'] },
           colors: {
-            navy: { 50: '#e8edf4', 100: '#c5d1e3', 200: '#9eb3d0', 300: '#7695bd', 400: '#587faf', 500: '#3a69a1', 600: '#2d5483', 700: '#1f3f65', 800: '#1a3a5c', 900: '#0e2240' },
-            gem: { 50: '#fff8e6', 100: '#ffecb3', 200: '#ffe080', 300: '#ffd44d', 400: '#ffca26', 500: '#f7a600', 600: '#e09500', 700: '#c98500', 800: '#b37500', 900: '#8c5c00' },
-            fiber: { 50: '#e0f7fa', 100: '#b2ebf2', 200: '#80deea', 300: '#4dd0e1', 400: '#26c6da', 500: '#00b4d8', 600: '#0097b2', 700: '#007a8c', 800: '#005d66', 900: '#004040' },
+            navy: { 50: '#F3F1F1', 100: '#e0e0e0', 200: '#cccccc', 300: '#a3a3a3', 400: '#686a6f', 500: '#4a4a4a', 600: '#333333', 700: '#222429', 800: '#1A1A1A', 900: '#000000' },
+            gem: { 50: '#fffcf0', 100: '#fdf1c2', 200: '#fae390', 300: '#f7d359', 400: '#F5B021', 500: '#ffaa17', 600: '#F1A328', 700: '#d98b16', 800: '#b07112', 900: '#8c590e' },
+            fiber: { 50: '#fef1ec', 100: '#fcdcd2', 200: '#fac0b0', 300: '#f69d85', 400: '#F1A328', 500: '#E07C2A', 600: '#CE5926', 700: '#D44B2E', 800: '#94311f', 900: '#7a2b1d' },
           }
         }
       }
     }
   </script>
   <style>
-    * { font-family: 'Inter', sans-serif; }
-    @keyframes slide-in { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-    @keyframes slide-out { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }
-    .animate-slide-in { animation: slide-in 0.3s ease-out; }
-    .animate-slide-out { animation: slide-out 0.3s ease-in; }
-    .spinner { width: 32px; height: 32px; border: 3px solid rgba(0,180,216,0.2); border-top-color: #00b4d8; border-radius: 50%; animation: spin 0.8s linear infinite; }
-    .spinner-sm { width: 20px; height: 20px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .sidebar-transition { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-    .input-field { @apply w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 text-sm focus:outline-none focus:border-fiber-500 transition-all duration-200; }
-    .input-field:focus { box-shadow: 0 0 0 3px rgba(0, 180, 216, 0.2); }
-    .modal-overlay { background: rgba(14, 34, 64, 0.7); backdrop-filter: blur(4px); }
+    * {
+      font-family: 'Montserrat', sans-serif;
+    }
+
+    @keyframes slide-in {
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    @keyframes slide-out {
+      from {
+        transform: translateX(0);
+        opacity: 1;
+      }
+
+      to {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+    }
+
+    .animate-slide-in {
+      animation: slide-in 0.3s ease-out;
+    }
+
+    .animate-slide-out {
+      animation: slide-out 0.3s ease-in;
+    }
+
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid rgba(0, 180, 216, 0.2);
+      border-top-color: #00b4d8;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    .spinner-sm {
+      width: 20px;
+      height: 20px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .sidebar-transition {
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .input-field {
+      @apply w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 text-sm focus:outline-none focus:border-fiber-500 transition-all duration-200;
+    }
+
+    .input-field:focus {
+      box-shadow: 0 0 0 3px rgba(0, 180, 216, 0.2);
+    }
+
+    .modal-overlay {
+      background: rgba(14, 34, 64, 0.7);
+      backdrop-filter: blur(4px);
+    }
   </style>
 </head>
+
 <body class="bg-navy-900 min-h-screen font-inter text-white">
 
   <!-- Toast container -->
@@ -46,14 +113,17 @@
   <!-- ═══════════════════════════════════════════════════════════ -->
   <!-- Mobile Header                                              -->
   <!-- ═══════════════════════════════════════════════════════════ -->
-  <header class="lg:hidden fixed top-0 left-0 right-0 z-30 bg-navy-900/95 backdrop-blur-lg border-b border-white/5 px-4 py-3 flex items-center justify-between">
+  <header
+    class="lg:hidden fixed top-0 left-0 right-0 z-30 bg-navy-900/95 backdrop-blur-lg border-b border-white/5 px-4 py-3 flex items-center justify-between">
     <div class="flex items-center gap-3">
       <button onclick="toggleSidebar()" id="menu-toggle" class="p-2 rounded-lg hover:bg-white/5 transition-colors">
         <svg class="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
           <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
         </svg>
       </button>
-      <h1 class="text-lg font-bold">Fibre<span class="text-gem-400">Gems</span></h1>
+      <div class="bg-white rounded px-2 py-1 flex items-center shadow">
+        <img src="images/logo.png" alt="FibreGems" class="h-5 object-contain">
+      </div>
     </div>
     <div class="flex items-center gap-2">
       <span class="text-xs text-gray-400" id="agent-name-mobile"></span>
@@ -63,26 +133,23 @@
   <!-- ═══════════════════════════════════════════════════════════ -->
   <!-- Sidebar                                                     -->
   <!-- ═══════════════════════════════════════════════════════════ -->
-  <aside id="sidebar" class="fixed top-0 left-0 bottom-0 w-64 bg-navy-800/50 backdrop-blur-xl border-r border-white/5 z-40 sidebar-transition -translate-x-full lg:translate-x-0">
+  <aside id="sidebar"
+    class="fixed top-0 left-0 bottom-0 w-64 bg-navy-800/50 backdrop-blur-xl border-r border-white/5 z-40 sidebar-transition -translate-x-full lg:translate-x-0">
     <!-- Brand -->
     <div class="px-6 py-6 border-b border-white/5">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-fiber-500 to-fiber-700 flex items-center justify-center shadow-lg shadow-fiber-500/20">
-          <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
-          </svg>
+      <div class="flex flex-col gap-2">
+        <div class="bg-white rounded-lg p-2 inline-block shadow-lg">
+          <img src="images/logo.png" alt="FibreGems" class="h-8 object-contain">
         </div>
-        <div>
-          <h1 class="text-lg font-bold tracking-tight">Fibre<span class="text-gem-400">Gems</span></h1>
-          <p class="text-xs text-gray-500">Agent Portal</p>
-        </div>
+        <p class="text-xs text-gray-500 font-medium">Agent Portal</p>
       </div>
     </div>
 
     <!-- Agent Info -->
     <div class="px-6 py-4 border-b border-white/5">
       <div class="flex items-center gap-3">
-        <div class="w-9 h-9 rounded-full bg-gradient-to-br from-gem-500 to-gem-700 flex items-center justify-center text-sm font-bold text-white">
+        <div
+          class="w-9 h-9 rounded-full bg-gradient-to-br from-gem-500 to-gem-700 flex items-center justify-center text-sm font-bold text-white">
           <span id="agent-avatar">A</span>
         </div>
         <div class="flex-1 min-w-0">
@@ -97,14 +164,16 @@
       <button onclick="switchView('worklist')" data-nav="worklist"
         class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 border-l-2 bg-fiber-500/20 text-fiber-300 border-fiber-500">
         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
         </svg>
         My Worklist
       </button>
       <button onclick="switchView('newlead')" data-nav="newlead"
         class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 border-l-2 border-transparent text-gray-400 hover:text-white hover:bg-white/5">
         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M19 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM4 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 0110.374 21c-2.331 0-4.512-.645-6.374-1.766z" />
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M19 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM4 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 0110.374 21c-2.331 0-4.512-.645-6.374-1.766z" />
         </svg>
         New Lead
       </button>
@@ -112,9 +181,11 @@
 
     <!-- Logout -->
     <div class="absolute bottom-0 left-0 right-0 p-4 border-t border-white/5">
-      <button onclick="logout()" class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-red-400/70 hover:text-red-400 hover:bg-red-500/10 transition-all">
+      <button onclick="logout()"
+        class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-red-400/70 hover:text-red-400 hover:bg-red-500/10 transition-all">
         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
         </svg>
         Sign Out
       </button>
@@ -132,12 +203,14 @@
     <!-- ─── WORKLIST VIEW ──────────────────────────────────── -->
     <div id="view-worklist">
       <!-- Header bar -->
-      <div class="px-6 lg:px-8 py-6 border-b border-white/5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div
+        class="px-6 lg:px-8 py-6 border-b border-white/5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 class="text-xl font-bold text-white">My Worklist</h2>
           <p class="text-sm text-gray-500 mt-0.5"><span id="worklist-count">0 customers</span> assigned to you</p>
         </div>
-        <button onclick="switchView('newlead')" class="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-fiber-500 to-fiber-600 text-white rounded-xl text-sm font-semibold hover:shadow-lg hover:shadow-fiber-500/25 transition-all hover:-translate-y-0.5">
+        <button onclick="switchView('newlead')"
+          class="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-fiber-500 to-fiber-600 text-white rounded-xl text-sm font-semibold hover:shadow-lg hover:shadow-fiber-500/25 transition-all hover:-translate-y-0.5">
           <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
           </svg>
@@ -153,8 +226,10 @@
               <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Customer</th>
               <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Package</th>
               <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Next Action</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Action Date</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Next Action
+              </th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Action Date
+              </th>
               <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider"></th>
             </tr>
           </thead>
@@ -186,7 +261,10 @@
         <!-- Personal Info -->
         <fieldset class="mb-8">
           <legend class="text-sm font-semibold text-fiber-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0" /></svg>
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round"
+                d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0" />
+            </svg>
             Personal Information
           </legend>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -216,7 +294,11 @@
         <!-- Address -->
         <fieldset class="mb-8">
           <legend class="text-sm font-semibold text-fiber-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" /></svg>
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path stroke-linecap="round" stroke-linejoin="round"
+                d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+            </svg>
             Address
           </legend>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -234,7 +316,10 @@
         <!-- Product & Sales -->
         <fieldset class="mb-8">
           <legend class="text-sm font-semibold text-fiber-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375" /></svg>
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round"
+                d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375" />
+            </svg>
             Product & Sales
           </legend>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -264,7 +349,8 @@
               <input type="date" id="nf-order-date" class="input-field">
             </div>
             <div>
-              <label for="nf-promised-pay-date" class="block text-xs font-medium text-gray-400 mb-1.5">Promised Payment Date</label>
+              <label for="nf-promised-pay-date" class="block text-xs font-medium text-gray-400 mb-1.5">Promised Payment
+                Date</label>
               <input type="date" id="nf-promised-pay-date" class="input-field">
             </div>
           </div>
@@ -273,7 +359,10 @@
         <!-- Status & Actions -->
         <fieldset class="mb-8">
           <legend class="text-sm font-semibold text-fiber-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round"
+                d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
             Status & Next Steps
           </legend>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -291,7 +380,8 @@
               </select>
             </div>
             <div>
-              <label for="nf-outcome" class="block text-xs font-medium text-gray-400 mb-1.5">Last Contact Outcome</label>
+              <label for="nf-outcome" class="block text-xs font-medium text-gray-400 mb-1.5">Last Contact
+                Outcome</label>
               <input type="text" id="nf-outcome" placeholder="e.g. Voicemail left" class="input-field">
             </div>
             <div>
@@ -306,7 +396,8 @@
               </select>
             </div>
             <div>
-              <label for="nf-next-action-date" class="block text-xs font-medium text-gray-400 mb-1.5">Next Action Date</label>
+              <label for="nf-next-action-date" class="block text-xs font-medium text-gray-400 mb-1.5">Next Action
+                Date</label>
               <input type="date" id="nf-next-action-date" class="input-field">
             </div>
           </div>
@@ -338,8 +429,11 @@
           <h3 class="text-lg font-semibold text-white">Quick Edit</h3>
           <p class="text-sm text-gray-500" id="qe-customer-name">Customer</p>
         </div>
-        <button onclick="closeQuickEdit()" class="p-2 rounded-lg hover:bg-white/5 text-gray-500 hover:text-white transition-colors">
-          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+        <button onclick="closeQuickEdit()"
+          class="p-2 rounded-lg hover:bg-white/5 text-gray-500 hover:text-white transition-colors">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
         </button>
       </div>
       <input type="hidden" id="qe-customer-id">
@@ -385,10 +479,12 @@
         </div>
       </div>
       <div class="flex items-center gap-3 mt-6 pt-4 border-t border-white/5">
-        <button onclick="submitQuickEdit()" id="qe-submit-btn" class="flex-1 py-2.5 bg-gradient-to-r from-fiber-500 to-fiber-600 text-white rounded-xl text-sm font-semibold hover:shadow-lg transition-all">
+        <button onclick="submitQuickEdit()" id="qe-submit-btn"
+          class="flex-1 py-2.5 bg-gradient-to-r from-fiber-500 to-fiber-600 text-white rounded-xl text-sm font-semibold hover:shadow-lg transition-all">
           Save Changes
         </button>
-        <button onclick="closeQuickEdit()" class="px-4 py-2.5 bg-white/5 text-gray-400 rounded-xl text-sm font-medium hover:bg-white/10 transition-colors">
+        <button onclick="closeQuickEdit()"
+          class="px-4 py-2.5 bg-white/5 text-gray-400 rounded-xl text-sm font-medium hover:bg-white/10 transition-colors">
           Cancel
         </button>
       </div>
@@ -404,22 +500,26 @@
       <div class="flex items-start gap-4 mb-5">
         <div class="w-12 h-12 rounded-xl bg-amber-500/15 flex items-center justify-center flex-shrink-0">
           <svg class="w-6 h-6 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+            <path stroke-linecap="round" stroke-linejoin="round"
+              d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
           </svg>
         </div>
         <div>
           <h3 class="text-lg font-semibold text-amber-300">Duplicate Detected</h3>
           <p class="text-sm text-gray-400 mt-1">
-            This cell number is already linked to <span class="text-white font-medium" id="dup-name"></span> (<span class="text-fiber-400 font-mono text-xs" id="dup-id"></span>).
+            This cell number is already linked to <span class="text-white font-medium" id="dup-name"></span> (<span
+              class="text-fiber-400 font-mono text-xs" id="dup-id"></span>).
           </p>
           <p class="text-sm text-gray-500 mt-2">Would you like to update the existing record instead?</p>
         </div>
       </div>
       <div class="flex items-center gap-3">
-        <button id="dup-override-btn" class="flex-1 py-2.5 bg-amber-500 text-navy-900 rounded-xl text-sm font-semibold hover:bg-amber-400 transition-colors">
+        <button id="dup-override-btn"
+          class="flex-1 py-2.5 bg-amber-500 text-navy-900 rounded-xl text-sm font-semibold hover:bg-amber-400 transition-colors">
           Update Existing
         </button>
-        <button onclick="closeDuplicate()" class="px-4 py-2.5 bg-white/5 text-gray-400 rounded-xl text-sm font-medium hover:bg-white/10 transition-colors">
+        <button onclick="closeDuplicate()"
+          class="px-4 py-2.5 bg-white/5 text-gray-400 rounded-xl text-sm font-medium hover:bg-white/10 transition-colors">
           Cancel
         </button>
       </div>
@@ -449,4 +549,5 @@
     });
   </script>
 </body>
+
 </html>
