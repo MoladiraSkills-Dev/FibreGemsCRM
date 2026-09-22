@@ -95,7 +95,17 @@
     }
 
     .input-field:focus {
-      box-shadow: 0 0 0 3px rgba(0, 180, 216, 0.2);
+      box-shadow: 0 0 0 3px rgba(224, 124, 42, 0.2);
+    }
+
+    /* Fix unreadable text on browser auto-fill in dark mode */
+    input:-webkit-autofill,
+    input:-webkit-autofill:hover, 
+    input:-webkit-autofill:focus, 
+    input:-webkit-autofill:active{
+        -webkit-box-shadow: 0 0 0 30px #222429 inset !important;
+        -webkit-text-fill-color: white !important;
+        border-radius: 0.75rem; /* keep the rounded-xl look */
     }
 
     .modal-overlay {
