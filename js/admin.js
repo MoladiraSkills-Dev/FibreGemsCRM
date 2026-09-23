@@ -67,7 +67,7 @@ function formatTime(isoOrDate) {
 // ── Initialization ───────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   if (!requireAdmin()) return;
-
+  
   document.getElementById('admin-name').textContent = session.name || 'Admin';
   document.getElementById('admin-role').textContent = session.role || 'Admin';
   const avatarEl = document.getElementById('admin-avatar');
@@ -75,7 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const picker = document.getElementById('admin-report-date-picker');
   if (picker) picker.value = currentReportDate;
-
+  
   loadDashboard();
   checkMissedCallbacksBadge();
 });
@@ -83,7 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // ── View Switching ───────────────────────────────────────────
 function switchAdminView(view) {
   currentAdminView = view;
-
+  
   document.querySelectorAll('[data-admin-nav]').forEach(el => {
     el.classList.remove('bg-fiber-500/20', 'text-fiber-300', 'border-fiber-500', 'border-l-4');
     el.classList.add('text-gray-400', 'hover:text-white', 'hover:bg-white/5', 'border-transparent', 'border-l-4');
@@ -93,13 +93,13 @@ function switchAdminView(view) {
     activeNav.classList.add('bg-fiber-500/20', 'text-fiber-300', 'border-fiber-500');
     activeNav.classList.remove('text-gray-400', 'hover:text-white', 'hover:bg-white/5', 'border-transparent');
   }
-
+  
   document.getElementById('view-dashboard').classList.toggle('hidden', view !== 'dashboard');
   document.getElementById('view-callbacks').classList.toggle('hidden', view !== 'callbacks');
   document.getElementById('view-grid').classList.toggle('hidden', view !== 'grid');
   document.getElementById('view-sync').classList.toggle('hidden', view !== 'sync');
   document.getElementById('view-agents').classList.toggle('hidden', view !== 'agents');
-
+  
   if (view === 'dashboard') loadDashboard();
   else if (view === 'callbacks') {
     loadCallbackReport(currentReportDate);
@@ -131,22 +131,22 @@ async function checkMissedCallbacksBadge() {
 async function loadDashboard() {
   const agentTableBody = document.getElementById('agent-activity-body');
   const statsContainer = document.getElementById('status-stats');
-
+  
   agentTableBody.innerHTML = `
     <tr><td colspan="3" class="px-6 py-8 text-center">
       <div class="spinner mx-auto mb-2"></div>
       <p class="text-gray-500 text-sm">Loading dashboard...</p>
     </td></tr>`;
-
+  
   try {
     const data = await callBackend('getAdminDashboard');
-
+    
     document.getElementById('stat-active-agents').textContent = data.activeCount || 0;
     const totalCustomers = Object.values(data.statuses).reduce((a, b) => a + b, 0);
     document.getElementById('stat-total-customers').textContent = totalCustomers;
     const todayTouches = data.agents.reduce((a, ag) => a + ag.touches, 0);
     document.getElementById('stat-today-touches').textContent = todayTouches;
-
+    
     if (data.agents.length === 0) {
       agentTableBody.innerHTML = `
         <tr><td colspan="3" class="px-6 py-8 text-center text-gray-500 text-sm">
@@ -175,7 +175,7 @@ async function loadDashboard() {
         </tr>
       `).join('');
     }
-
+    
     // Status breakdown
     statsContainer.innerHTML = Object.entries(data.statuses).map(([status, count]) => {
       const pct = totalCustomers > 0 ? Math.round((count / totalCustomers) * 100) : 0;
@@ -191,7 +191,7 @@ async function loadDashboard() {
         </div>
       `;
     }).join('');
-
+    
   } catch (err) {
     agentTableBody.innerHTML = `
       <tr><td colspan="3" class="px-6 py-8 text-center text-red-400 text-sm">
@@ -203,7 +203,7 @@ async function loadDashboard() {
 // ── Call Back Performance & Accountability Report ────────────
 function setReportDateOffset(offsetDays) {
   currentReportDate = addDaysToToday(offsetDays);
-
+  
   const btnToday = document.getElementById('btn-report-today');
   const btnYesterday = document.getElementById('btn-report-yesterday');
   const picker = document.getElementById('admin-report-date-picker');
@@ -381,22 +381,22 @@ async function loadMasterGrid() {
   const tbody = document.getElementById('grid-body');
   const countEl = document.getElementById('grid-count');
   tbody.innerHTML = `<tr><td colspan="7" class="px-6 py-12 text-center"><div class="spinner mx-auto mb-2"></div><p class="text-gray-500 text-sm">Loading master records...</p></td></tr>`;
-
+  
   try {
     const result = await callBackend('getAdminMasterGrid', { offset: gridOffset, limit: GRID_LIMIT });
     gridTotal = result.total;
     countEl.textContent = `${result.total} records`;
-
+    
     if (result.data.length === 0) {
       tbody.innerHTML = `<tr><td colspan="7" class="px-6 py-12 text-center text-gray-500">No records found</td></tr>`;
       return;
     }
-
+    
     tbody.innerHTML = result.data.map(r => `
       <tr class="border-b border-white/5 hover:bg-white/[0.03] transition-colors text-xs">
         <td class="px-4 py-3">
           <p class="font-semibold text-white">${escHtml(r.name)}</p>
-          <p class="text-[11px] text-gray-500 font-mono">${escHtml(r.agentName)}</p>
+          <p class="text-[11px] text-gray-500 font-mono">${escHtml(r.id)}</p>
         </td>
         <td class="px-4 py-3 font-mono text-gray-300">${escHtml(r.cellNumber || '—')}</td>
         <td class="px-4 py-3 text-gray-300">${escHtml(r.agent || '—')}</td>
@@ -423,11 +423,11 @@ function statusBadge(status) {
 async function triggerAgilitySync() {
   const btn = document.getElementById('sync-btn');
   const resultBox = document.getElementById('sync-result');
-
+  
   btn.disabled = true;
   btn.innerHTML = `<div class="spinner-sm mx-auto"></div>`;
   resultBox.classList.add('hidden');
-
+  
   try {
     const result = await callBackend('runAgilitySync');
     resultBox.classList.remove('hidden');
@@ -604,7 +604,7 @@ async function loadPromisedPayments() {
       if (formattedPhone && !formattedPhone.toString().startsWith('0')) {
         formattedPhone = '0' + formattedPhone;
       }
-
+      
       let timeStatus = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-white/10 text-gray-300 border border-white/20">Upcoming (in ${Math.abs(p.daysUntilDue)} days)</span>`;
       if (p.daysUntilDue === 0) timeStatus = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">Due Today</span>`;
       else if (p.daysUntilDue > 0) timeStatus = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/20 text-red-300 border border-red-500/30">Overdue by ${p.daysUntilDue} days</span>`;
@@ -658,7 +658,7 @@ function openAdminFollowUpModal(customerId, name, phone) {
   document.getElementById('afu-client-phone').textContent = phone || 'No Number';
   document.getElementById('afu-next-date').value = '';
   document.getElementById('afu-notes').value = '';
-
+  
   populateAgentDropdown('afu-agent-id');
   document.getElementById('afu-agent-id').value = '';
 
