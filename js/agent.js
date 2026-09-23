@@ -18,6 +18,7 @@ const ACTIVITY_LIMIT = 20;
 let activityTotal = 0;
 
 let selectedOutcomePreset = 'Callback Rescheduled';
+let currentModalIsPayment = false; // tracks if current modal is for a payment follow-up
 
 // ── Helpers ──────────────────────────────────────────────────
 function getTodayStr() {
@@ -207,9 +208,20 @@ function renderCallbackCards() {
       formattedPhone = '0' + formattedPhone;
     }
     const isOverdue = c.isOverdue && !c.isCompletedToday;
-    const cardBorder = c.isCompletedToday 
-      ? 'border-emerald-500/20 bg-emerald-950/10' 
-      : (isOverdue ? 'border-amber-500/40 bg-amber-950/15' : 'border-white/10 bg-white/[0.02]');
+    const isPayment = c.isPromisedPayment;
+
+    // Card border colors: purple for payment, amber for overdue, emerald for done, default otherwise
+    const cardBorder = c.isCompletedToday
+      ? 'border-emerald-500/20 bg-emerald-950/10'
+      : isPayment
+        ? (isOverdue ? 'border-purple-500/60 bg-purple-950/20' : 'border-purple-500/30 bg-purple-950/10')
+        : (isOverdue ? 'border-amber-500/40 bg-amber-950/15' : 'border-white/10 bg-white/[0.02]');
+
+    const avatarColor = c.isCompletedToday
+      ? 'bg-emerald-500/20 text-emerald-300'
+      : isPayment
+        ? 'bg-purple-500/20 text-purple-300'
+        : (isOverdue ? 'bg-amber-500/20 text-amber-300' : 'bg-fiber-500/20 text-fiber-300');
 
     return `
       <div class="p-4 rounded-2xl border ${cardBorder} hover:border-fiber-500/50 transition-all shadow-sm">
@@ -217,18 +229,20 @@ function renderCallbackCards() {
           
           <!-- Client Name & Phone (Minimal Focus) -->
           <div class="flex items-start gap-3.5">
-            <div class="w-11 h-11 rounded-xl ${c.isCompletedToday ? 'bg-emerald-500/20 text-emerald-300' : (isOverdue ? 'bg-amber-500/20 text-amber-300' : 'bg-fiber-500/20 text-fiber-300')} flex items-center justify-center font-bold text-base flex-shrink-0">
+            <div class="w-11 h-11 rounded-xl ${avatarColor} flex items-center justify-center font-bold text-base flex-shrink-0">
               ${escHtml((c.name || 'C').charAt(0))}
             </div>
             
             <div>
               <div class="flex items-center gap-2 flex-wrap">
                 <h4 class="text-base font-bold text-white tracking-tight">${escHtml(c.name)}</h4>
-                ${isOverdue ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">⚠️ Overdue (${c.daysOverdue}d)</span>` : ''}
+                ${isPayment ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">💳 Payment Follow-Up</span>` : ''}
+                ${isOverdue && !isPayment ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">⚠️ Overdue (${c.daysOverdue}d)</span>` : ''}
+                ${isOverdue && isPayment ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/20 text-red-300 border border-red-500/30">🔴 Payment Overdue (${c.daysOverdue}d)</span>` : ''}
                 ${c.isCompletedToday ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">✓ Done Today</span>` : ''}
               </div>
 
-              <!-- Phone Number with 1-click Call & Copy -->
+              <!-- Phone Number with 1-click Copy -->
               <div class="flex items-center gap-3 mt-1.5">
                 <button onclick="copyPhone('${escJs(formattedPhone)}')" class="inline-flex items-center gap-1.5 text-sm font-semibold font-mono text-fiber-400 hover:text-fiber-300 transition-colors cursor-pointer text-left">
                   <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -248,7 +262,8 @@ function renderCallbackCards() {
                 <span>📦 ${escHtml(c.package || 'Standard')}</span>
                 <span>•</span>
                 <span>Status: <strong class="text-white">${escHtml(c.status)}</strong></span>
-                ${c.lastOutcome ? `<span>•</span><span>Last: ${escHtml(c.lastOutcome)}</span>` : ''}
+                ${isPayment ? `<span>•</span><span class="text-purple-300 font-semibold">💳 Due: ${escHtml(c.promisedPaymentDate)}</span>` : ''}
+                ${c.lastOutcome && !isPayment ? `<span>•</span><span>Last: ${escHtml(c.lastOutcome)}</span>` : ''}
               </div>
             </div>
           </div>
@@ -258,9 +273,9 @@ function renderCallbackCards() {
             <button onclick="copyPhone('${escJs(formattedPhone)}')" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-white/5 hover:bg-white/10 text-white border border-white/10 transition-colors flex items-center gap-1.5 cursor-pointer">
               📞 Call Now
             </button>
-            <button onclick="openCallOutcomeModal('${escHtml(c.customerId)}', '${escJs(c.name)}', '${escJs(formattedPhone)}', '${escJs(c.package || '')}')"
-              class="px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-fiber-500 to-fiber-600 hover:from-fiber-600 hover:to-fiber-700 text-white shadow-md shadow-fiber-500/20 transition-all flex items-center gap-1.5">
-              ⚡ Log Outcome
+            <button onclick="openCallOutcomeModal('${escHtml(c.customerId)}', '${escJs(c.name)}', '${escJs(formattedPhone)}', '${escJs(c.package || '')}', ${isPayment ? 'true' : 'false'})"
+              class="px-4 py-2 rounded-xl text-xs font-bold ${isPayment ? 'bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 shadow-md shadow-purple-500/20' : 'bg-gradient-to-r from-fiber-500 to-fiber-600 hover:from-fiber-600 hover:to-fiber-700 shadow-md shadow-fiber-500/20'} text-white transition-all flex items-center gap-1.5">
+              ${isPayment ? '💳 Log Payment' : '⚡ Log Outcome'}
             </button>
           </div>
 
@@ -278,20 +293,40 @@ function copyPhone(phone) {
 }
 
 // ── 1-Click Call Outcome Drawer / Modal ──────────────────────
-function openCallOutcomeModal(customerId, name, phone, pkg) {
+function openCallOutcomeModal(customerId, name, phone, pkg, isPaymentFollowUp = false) {
+  currentModalIsPayment = !!isPaymentFollowUp;
+
   document.getElementById('co-customer-id').value = customerId;
   document.getElementById('co-client-name').textContent = name;
   document.getElementById('co-client-phone').textContent = phone;
   document.getElementById('co-notes').value = '';
-  
+
+  // Toggle preset sets based on whether this is a payment follow-up
+  const regularPresets = document.getElementById('co-regular-presets');
+  const paymentPresets = document.getElementById('co-payment-presets');
+  if (currentModalIsPayment) {
+    regularPresets.classList.add('hidden');
+    paymentPresets.classList.remove('hidden');
+    // Update modal header label
+    document.querySelector('#modal-call-outcome .text-fiber-400').textContent = '💳 Log Payment Outcome';
+  } else {
+    regularPresets.classList.remove('hidden');
+    paymentPresets.classList.add('hidden');
+    document.querySelector('#modal-call-outcome .text-fiber-400').textContent = 'Log Call Outcome';
+  }
+
   if (pkg) {
     const pkgEl = document.getElementById('co-package');
     if (pkgEl) pkgEl.value = pkg;
   }
 
-  // Default preset: Reschedule (+1 day)
-  selectOutcomePreset('Callback Rescheduled');
-  setOutcomeDateOffset(1);
+  // Default preset based on modal type
+  if (currentModalIsPayment) {
+    selectOutcomePreset('Payment Received');
+  } else {
+    selectOutcomePreset('Callback Rescheduled');
+    setOutcomeDateOffset(1);
+  }
 
   document.getElementById('modal-call-outcome').classList.remove('hidden');
 }
@@ -304,25 +339,35 @@ function selectOutcomePreset(preset) {
   selectedOutcomePreset = preset;
 
   document.querySelectorAll('.outcome-preset-btn').forEach(b => {
-    b.classList.remove('ring-2', 'ring-fiber-400');
+    b.classList.remove('ring-2', 'ring-fiber-400', 'ring-purple-400', 'ring-emerald-400');
   });
   const activeBtn = document.querySelector(`[data-outcome-btn="${preset}"]`);
-  if (activeBtn) activeBtn.classList.add('ring-2', 'ring-fiber-400');
+  if (activeBtn) {
+    const ringColor = preset === 'New Payment Date' ? 'ring-purple-400'
+      : preset === 'Payment Received' ? 'ring-emerald-400' : 'ring-fiber-400';
+    activeBtn.classList.add('ring-2', ringColor);
+  }
 
   const rescheduleSection = document.getElementById('co-reschedule-section');
   const saleSection = document.getElementById('co-sale-section');
+  const promisedPaySection = document.getElementById('co-promised-pay-section');
 
-  if (preset === 'Callback Rescheduled' || preset === 'No Answer / Voicemail') {
+  // Reset all sections
+  rescheduleSection.classList.add('hidden');
+  saleSection.classList.add('hidden');
+  promisedPaySection.classList.add('hidden');
+
+  if (preset === 'Callback Rescheduled' || preset === 'No Answer / Voicemail' || preset === 'No Payment - Reschedule') {
     rescheduleSection.classList.remove('hidden');
-    if (preset === 'No Answer / Voicemail') setOutcomeDateOffset(1);
-  } else {
-    rescheduleSection.classList.add('hidden');
+    setOutcomeDateOffset(1);
   }
 
   if (preset === 'Sale Won') {
     saleSection.classList.remove('hidden');
-  } else {
-    saleSection.classList.add('hidden');
+  }
+
+  if (preset === 'New Payment Date') {
+    promisedPaySection.classList.remove('hidden');
   }
 }
 
@@ -340,11 +385,15 @@ async function submitCallOutcome() {
   const nextDate = document.getElementById('co-next-date').value;
   const pkgChoice = document.getElementById('co-package').value;
   const payType = document.getElementById('co-payment-type').value;
+  const newPromisedPayDate = document.getElementById('co-new-promised-pay-date').value;
+  const salePromisedPayDate = document.getElementById('co-sale-promised-pay-date').value;
 
   if (!customerId) return;
 
-  // Validate 8-day limit
-  if ((selectedOutcomePreset === 'Callback Rescheduled' || selectedOutcomePreset === 'No Answer / Voicemail') && nextDate) {
+  const needsNextDate = (selectedOutcomePreset === 'Callback Rescheduled' || selectedOutcomePreset === 'No Answer / Voicemail' || selectedOutcomePreset === 'No Payment - Reschedule');
+
+  // Validate 8-day limit for regular callback reschedules
+  if (needsNextDate && nextDate) {
     const today = getTodayStr();
     const max8d = addDaysToToday(8);
     if (nextDate > max8d) {
@@ -357,6 +406,12 @@ async function submitCallOutcome() {
     }
   }
 
+  // Validate new promised payment date is provided when needed
+  if (selectedOutcomePreset === 'New Payment Date' && !newPromisedPayDate) {
+    showToast("Please select a new Promised Payment Date.", "error");
+    return;
+  }
+
   submitBtn.disabled = true;
   submitBtn.innerHTML = `<div class="spinner-sm mx-auto"></div>`;
 
@@ -365,10 +420,11 @@ async function submitCallOutcome() {
       customerId: customerId,
       outcome: selectedOutcomePreset,
       notes: notes,
-      nextAction: (selectedOutcomePreset === 'Callback Rescheduled' || selectedOutcomePreset === 'No Answer / Voicemail') ? 'Call Back' : '',
-      nextActionDate: (selectedOutcomePreset === 'Callback Rescheduled' || selectedOutcomePreset === 'No Answer / Voicemail') ? nextDate : '',
+      nextAction: needsNextDate ? 'Call Back' : (selectedOutcomePreset === 'Payment Received' ? '' : ''),
+      nextActionDate: needsNextDate ? nextDate : '',
       packageChoice: selectedOutcomePreset === 'Sale Won' ? pkgChoice : '',
-      paymentType: selectedOutcomePreset === 'Sale Won' ? payType : ''
+      paymentType: selectedOutcomePreset === 'Sale Won' ? payType : '',
+      newPromisedPaymentDate: selectedOutcomePreset === 'New Payment Date' ? newPromisedPayDate : (selectedOutcomePreset === 'Sale Won' ? salePromisedPayDate : '')
     };
 
     await callBackend('logCallOutcome', payload);

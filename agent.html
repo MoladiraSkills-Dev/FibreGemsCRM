@@ -634,7 +634,9 @@
       <!-- 1-Click Action Buttons -->
       <div class="mt-4">
         <label class="field-label mb-2">Select Quick Outcome *</label>
-        <div class="grid grid-cols-2 gap-2.5">
+
+        <!-- Regular Call Outcome Presets -->
+        <div id="co-regular-presets" class="grid grid-cols-2 gap-2.5">
           <button type="button" onclick="selectOutcomePreset('No Answer / Voicemail')"
             data-outcome-btn="No Answer / Voicemail"
             class="outcome-preset-btn p-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-left transition-all">
@@ -673,6 +675,45 @@
             <p class="text-[11px] text-gray-400 mt-1">Flag as lost lead</p>
           </button>
         </div>
+
+        <!-- Payment Follow-Up Presets (shown when isPromisedPayment) -->
+        <div id="co-payment-presets" class="hidden grid grid-cols-1 gap-2.5">
+          <button type="button" onclick="selectOutcomePreset('Payment Received')" data-outcome-btn="Payment Received"
+            class="outcome-preset-btn p-3 rounded-xl border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-left transition-all">
+            <div class="flex items-center gap-2">
+              <span class="text-base">✅</span>
+              <span class="text-xs font-semibold text-emerald-300">Payment Received</span>
+            </div>
+            <p class="text-[11px] text-gray-400 mt-1">Client paid — mark resolved</p>
+          </button>
+
+          <button type="button" onclick="selectOutcomePreset('New Payment Date')" data-outcome-btn="New Payment Date"
+            class="outcome-preset-btn p-3 rounded-xl border border-purple-500/40 bg-purple-500/10 hover:bg-purple-500/20 text-left transition-all">
+            <div class="flex items-center gap-2">
+              <span class="text-base">📅</span>
+              <span class="text-xs font-semibold text-purple-300">New Payment Date</span>
+            </div>
+            <p class="text-[11px] text-gray-400 mt-1">Client promises payment on a new date</p>
+          </button>
+
+          <button type="button" onclick="selectOutcomePreset('No Payment - Reschedule')" data-outcome-btn="No Payment - Reschedule"
+            class="outcome-preset-btn p-3 rounded-xl border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-left transition-all">
+            <div class="flex items-center gap-2">
+              <span class="text-base">📵</span>
+              <span class="text-xs font-semibold text-amber-300">No Payment - Reschedule</span>
+            </div>
+            <p class="text-[11px] text-gray-400 mt-1">No answer / not ready — reschedule call back</p>
+          </button>
+
+          <button type="button" onclick="selectOutcomePreset('No Answer / Voicemail')" data-outcome-btn="No Answer / Voicemail"
+            class="outcome-preset-btn p-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-left transition-all">
+            <div class="flex items-center gap-2">
+              <span class="text-base">📵</span>
+              <span class="text-xs font-semibold text-white">No Answer / VM</span>
+            </div>
+            <p class="text-[11px] text-gray-400 mt-1">Left voicemail — retry tomorrow</p>
+          </button>
+        </div>
       </div>
 
       <!-- Reschedule Datepicker & Quick Day Presets (Shows for Reschedule or Follow-up) -->
@@ -705,6 +746,13 @@
         </p>
       </div>
 
+      <!-- Promised Payment Date Section (shown for New Payment Date outcome) -->
+      <div id="co-promised-pay-section" class="hidden mt-4 p-3.5 bg-purple-500/5 border border-purple-500/20 rounded-xl">
+        <label class="field-label text-purple-300">New Promised Payment Date *</label>
+        <input type="date" id="co-new-promised-pay-date" class="input-field">
+        <p class="text-[11px] text-purple-400 mt-1">⚡ No date limit — client will automatically appear in your queue on this date.</p>
+      </div>
+
       <!-- Sale Won Details (Shown if Sale Won is selected) -->
       <div id="co-sale-section"
         class="hidden mt-4 p-3.5 bg-emerald-500/5 border border-emerald-500/20 rounded-xl space-y-3">
@@ -726,7 +774,11 @@
             <option value="Cash">Cash</option>
           </select>
         </div>
-        <p class="text-[11px] text-emerald-400">Order date will be automatically stamped as today's exact date.</p>
+        <div>
+          <label class="field-label text-emerald-300">Promised Payment Date (Optional)</label>
+          <input type="date" id="co-sale-promised-pay-date" class="input-field">
+          <p class="text-[11px] text-emerald-400 mt-1">Order date will be automatically stamped as today's exact date.</p>
+        </div>
       </div>
 
       <!-- Notes Field -->

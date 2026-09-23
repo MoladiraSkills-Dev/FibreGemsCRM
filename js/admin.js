@@ -101,7 +101,10 @@ function switchAdminView(view) {
   document.getElementById('view-agents').classList.toggle('hidden', view !== 'agents');
   
   if (view === 'dashboard') loadDashboard();
-  else if (view === 'callbacks') loadCallbackReport(currentReportDate);
+  else if (view === 'callbacks') {
+    loadCallbackReport(currentReportDate);
+    loadPromisedPayments();
+  }
   else if (view === 'grid') loadMasterGrid();
   else if (view === 'agents') loadAgentList();
 }
@@ -216,6 +219,7 @@ function setReportDateOffset(offsetDays) {
   }
 
   loadCallbackReport(currentReportDate);
+  loadPromisedPayments();
 }
 
 async function loadCallbackReport(targetDate) {
@@ -289,19 +293,28 @@ async function loadCallbackReport(targetDate) {
           ✓ No missed call backs on record for this period. Great performance!
         </td></tr>`;
     } else {
-      missedBody.innerHTML = report.missedCallbacks.map(m => `
+      missedBody.innerHTML = report.missedCallbacks.map(m => {
+        let formattedPhone = m.phone || '';
+        if (formattedPhone && !formattedPhone.toString().startsWith('0')) {
+          formattedPhone = '0' + formattedPhone;
+        }
+        return `
         <tr class="border-b border-white/5 hover:bg-red-950/10 text-xs">
           <td class="px-4 py-3">
             <p class="font-bold text-white">${escHtml(m.name)}</p>
             <p class="text-[11px] text-gray-500">${escHtml(m.customerId)}</p>
           </td>
-          <td class="px-4 py-3 font-mono text-fiber-400 font-semibold">${escHtml(m.phone || '—')}</td>
+          <td class="px-4 py-3 font-mono text-fiber-400 font-semibold">${escHtml(formattedPhone || '—')}</td>
           <td class="px-4 py-3 font-medium text-gray-300">${escHtml(m.agentName)}</td>
           <td class="px-4 py-3 font-mono text-gray-400">${escHtml(m.scheduledDate)}</td>
           <td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/20 text-red-300 border border-red-500/30">${m.daysOverdue} days overdue</span></td>
           <td class="px-4 py-3 text-gray-400">${escHtml(m.lastOutcome || 'None')}</td>
+          <td class="px-4 py-3 text-right">
+            <button onclick="openAdminFollowUpModal('${escHtml(m.customerId)}', '${escJs(m.name)}', '${escJs(formattedPhone)}')", class="px-2.5 py-1.5 bg-white/5 hover:bg-white/10 text-amber-300 border border-amber-500/30 rounded-lg text-[10px] font-bold transition-all whitespace-nowrap">⚡ Force Reschedule</button>
+          </td>
         </tr>
-      `).join('');
+        `;
+      }).join('');
     }
 
     // Section 3: 7-Day Chain-of-Command Escalations
@@ -311,13 +324,18 @@ async function loadCallbackReport(targetDate) {
           ✓ No stale leads escalated to supervisor tier.
         </td></tr>`;
     } else {
-      escalatedBody.innerHTML = report.escalatedLeads.map(e => `
+      escalatedBody.innerHTML = report.escalatedLeads.map(e => {
+        let formattedPhone = e.phone || '';
+        if (formattedPhone && !formattedPhone.toString().startsWith('0')) {
+          formattedPhone = '0' + formattedPhone;
+        }
+        return `
         <tr class="border-b border-white/5 hover:bg-amber-950/15 text-xs">
           <td class="px-4 py-3">
             <p class="font-bold text-white">${escHtml(e.name)}</p>
             <p class="text-[11px] text-gray-500">${escHtml(e.customerId)}</p>
           </td>
-          <td class="px-4 py-3 font-mono text-gray-300">${escHtml(e.phone || '—')}</td>
+          <td class="px-4 py-3 font-mono text-gray-300">${escHtml(formattedPhone || '—')}</td>
           <td class="px-4 py-3 font-medium text-gray-300">${escHtml(e.agentName)}</td>
           <td class="px-4 py-3 font-bold text-amber-400">${e.daysSinceContact} days silent</td>
           <td class="px-4 py-3">
@@ -327,7 +345,8 @@ async function loadCallbackReport(targetDate) {
           </td>
           <td class="px-4 py-3 text-gray-400">${escHtml(e.reason)}</td>
         </tr>
-      `).join('');
+        `;
+      }).join('');
     }
 
   } catch (err) {
@@ -345,7 +364,10 @@ async function runLifecycleEngine() {
     const result = await callBackend('enforceLeadLifecycleRules');
     showToast(`Audit Complete: ${result.expiredCount} leads expired (>42d) to Lost, ${result.escalatedCount} stale leads escalated (7d+).`, 'warning');
     loadDashboard();
-    if (currentAdminView === 'callbacks') loadCallbackReport(currentReportDate);
+    if (currentAdminView === 'callbacks') {
+      loadCallbackReport(currentReportDate);
+      loadPromisedPayments();
+    }
   } catch (err) {
     showToast(`Lifecycle audit failed: ${err.message}`, 'error');
   } finally {
@@ -559,5 +581,124 @@ async function saveAgentModal() {
   } finally {
     saveBtn.disabled = false;
     saveBtn.textContent = 'Save';
+  }
+}
+
+// ── Admin Promised Payments & Follow-Ups ─────────────────────
+async function loadPromisedPayments() {
+  const tbody = document.getElementById('rep-promised-body');
+  if (!tbody) return;
+  tbody.innerHTML = `<tr><td colspan="7" class="px-6 py-8 text-center"><div class="spinner mx-auto mb-2"></div><p class="text-xs text-gray-400">Loading promised payments...</p></td></tr>`;
+
+  try {
+    const result = await callBackend('getAdminPromisedPayments');
+    const payments = result.payments || [];
+
+    if (payments.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="7" class="px-6 py-8 text-center text-gray-500 text-xs">No active promised payment follow-ups found.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = payments.map(p => {
+      let formattedPhone = p.phone || '';
+      if (formattedPhone && !formattedPhone.toString().startsWith('0')) {
+        formattedPhone = '0' + formattedPhone;
+      }
+      
+      let timeStatus = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-white/10 text-gray-300 border border-white/20">Upcoming (in ${Math.abs(p.daysUntilDue)} days)</span>`;
+      if (p.daysUntilDue === 0) timeStatus = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">Due Today</span>`;
+      else if (p.daysUntilDue > 0) timeStatus = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/20 text-red-300 border border-red-500/30">Overdue by ${p.daysUntilDue} days</span>`;
+
+      return `
+        <tr class="border-b border-white/5 hover:bg-purple-950/15 text-xs">
+          <td class="px-4 py-3">
+            <p class="font-bold text-white">${escHtml(p.name)}</p>
+            <p class="text-[11px] text-gray-500">${escHtml(p.customerId)}</p>
+          </td>
+          <td class="px-4 py-3 font-mono text-gray-300">${escHtml(formattedPhone || '—')}</td>
+          <td class="px-4 py-3 font-medium text-gray-300">${escHtml(p.agentName)}</td>
+          <td class="px-4 py-3 font-mono font-bold text-purple-300">${escHtml(p.promisedPaymentDate)}</td>
+          <td class="px-4 py-3">${timeStatus}</td>
+          <td class="px-4 py-3">${statusBadge(p.status)}</td>
+          <td class="px-4 py-3 text-right">
+            <button onclick="openAdminFollowUpModal('${escHtml(p.customerId)}', '${escJs(p.name)}', '${escJs(formattedPhone)}')" class="px-2.5 py-1.5 bg-white/5 hover:bg-white/10 text-purple-300 border border-purple-500/30 rounded-lg text-[10px] font-bold transition-all whitespace-nowrap">Log Payment / Update</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="7" class="px-6 py-8 text-center text-red-400 text-xs">Failed to load promised payments: ${escHtml(err.message)}</td></tr>`;
+  }
+}
+
+async function populateAgentDropdown(selectId) {
+  const select = document.getElementById(selectId);
+  if (!select || select.options.length > 1) return; // already populated
+
+  try {
+    const result = await callBackend('getAgentList');
+    if (result.agents) {
+      result.agents.forEach(a => {
+        if (a.status === 'Verified') {
+          const opt = document.createElement('option');
+          opt.value = a.agentId;
+          opt.textContent = `${a.name} (${a.role})`;
+          select.appendChild(opt);
+        }
+      });
+    }
+  } catch (err) {
+    console.error('Failed to populate agent dropdown', err);
+  }
+}
+
+function openAdminFollowUpModal(customerId, name, phone) {
+  document.getElementById('afu-customer-id').value = customerId;
+  document.getElementById('afu-client-name').textContent = name;
+  document.getElementById('afu-client-phone').textContent = phone || 'No Number';
+  document.getElementById('afu-next-date').value = '';
+  document.getElementById('afu-notes').value = '';
+  
+  populateAgentDropdown('afu-agent-id');
+  document.getElementById('afu-agent-id').value = '';
+
+  document.getElementById('modal-admin-followup').classList.remove('hidden');
+}
+
+function closeAdminFollowUpModal() {
+  document.getElementById('modal-admin-followup').classList.add('hidden');
+}
+
+async function submitAdminFollowUp() {
+  const customerId = document.getElementById('afu-customer-id').value;
+  const nextDate = document.getElementById('afu-next-date').value;
+  const notes = document.getElementById('afu-notes').value;
+  const agentId = document.getElementById('afu-agent-id').value;
+  const submitBtn = document.getElementById('afu-submit-btn');
+
+  if (!nextDate) {
+    showToast('Please select a new follow-up date.', 'error');
+    return;
+  }
+
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = `<div class="spinner-sm mx-auto"></div>`;
+
+  try {
+    await callBackend('adminUpdateFollowUp', {
+      customerId,
+      newNextActionDate: nextDate,
+      notes,
+      reassignToAgentId: agentId || null
+    });
+    showToast('Follow-up successfully rescheduled.');
+    closeAdminFollowUpModal();
+    loadCallbackReport(currentReportDate);
+    loadPromisedPayments();
+  } catch (err) {
+    showToast(err.message, 'error');
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Force Reschedule';
   }
 }

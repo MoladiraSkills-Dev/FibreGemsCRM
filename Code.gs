@@ -67,6 +67,12 @@ function doPost(e) {
       case 'deleteAgent':
         result = deleteAgent(token, payload.agentId);
         break;
+      case 'adminUpdateFollowUp':
+        result = adminUpdateFollowUp(token, payload);
+        break;
+      case 'getAdminPromisedPayments':
+        result = getAdminPromisedPayments(token);
+        break;
       default:
         throw new Error("Invalid API action requested: " + action);
     }
@@ -304,6 +310,8 @@ function getAgentDailyQueue(token) {
     if (!ownsCustomer) continue;
 
     // Check if customer is scheduled for callback
+    const promisedPaymentDate = formatDateSafe_(row[23]);
+
     if (nextActionDate) {
       const scheduledDate = new Date(nextActionDate + 'T00:00:00');
       const diffDays = Math.round((todayDate - scheduledDate) / (1000 * 60 * 60 * 24));
@@ -326,11 +334,39 @@ function getAgentDailyQueue(token) {
         status: status,
         nextAction: nextAction,
         nextActionDate: nextActionDate,
+        promisedPaymentDate: promisedPaymentDate,
         isOverdue: diffDays > 0,
         daysOverdue: Math.max(0, diffDays),
         isCompletedToday: isCompleted,
+        isPromisedPayment: false,
         lastOutcome: String(row[37] || (agentActivityMap[custId] ? agentActivityMap[custId][7] : ''))
       });
+    } else if (promisedPaymentDate) {
+      // Promised Payment Date follow-up: appears when the payment date has arrived (today or overdue)
+      const payDate = new Date(promisedPaymentDate + 'T00:00:00');
+      const payDiffDays = Math.round((todayDate - payDate) / (1000 * 60 * 60 * 24));
+      // Only surface on or after the promised date
+      if (payDiffDays >= 0) {
+        totalScheduledToday++;
+        const isCompleted = (lastContactDate === todayStr);
+        if (isCompleted) callbacksCompletedToday++;
+        todayCallbacks.push({
+          customerId: custId,
+          name: String(row[7] || `${row[5]} ${row[6]}`),
+          cellNumber: String(row[8] || ''),
+          alternateCell: String(row[9] || ''),
+          package: String(row[13] || ''),
+          status: status,
+          nextAction: 'Payment Follow-Up',
+          nextActionDate: promisedPaymentDate,
+          promisedPaymentDate: promisedPaymentDate,
+          isOverdue: payDiffDays > 0,
+          daysOverdue: Math.max(0, payDiffDays),
+          isCompletedToday: isCompleted,
+          isPromisedPayment: true,
+          lastOutcome: String(row[37] || (agentActivityMap[custId] ? agentActivityMap[custId][7] : ''))
+        });
+      }
     } else if (createdStr === todayStr) {
       // New lead assigned or captured today without scheduled action yet
       todayNewLeads.push({
@@ -371,7 +407,7 @@ function getAgentDailyQueue(token) {
  */
 function logCallOutcome(token, payload) {
   const session = getSessionUser(token);
-  const { customerId, outcome, notes, nextAction, nextActionDate, packageChoice, paymentType } = payload;
+  const { customerId, outcome, notes, nextAction, nextActionDate, packageChoice, paymentType, newPromisedPaymentDate } = payload;
   
   if (!customerId) throw new Error("Customer ID is required.");
   if (!outcome) throw new Error("Call outcome is required.");
@@ -397,6 +433,9 @@ function logCallOutcome(token, payload) {
   else if (isLost) newStatus = 'Lost';
   else if (outcome === 'Callback Rescheduled') newStatus = 'Callback Scheduled';
   else if (outcome === 'No Answer / Voicemail') newStatus = 'Follow-Up Needed';
+  else if (outcome === 'Payment Received') newStatus = 'Payment Received';
+  else if (outcome === 'No Payment - Reschedule') newStatus = 'Payment Pending';
+  else if (outcome === 'New Payment Date') newStatus = 'Payment Pending';
 
   const custRow = custData[rowIndex - 1];
   const customerName = custRow[7] || `${custRow[5]} ${custRow[6]}`;
@@ -425,6 +464,14 @@ function logCallOutcome(token, payload) {
     ]);
     ss.getSheetByName('PAYMENTS').appendRow(['PAY-' + Utilities.getUuid().slice(0,8), customerId, 'Pending', '', '', '']);
     ss.getSheetByName('ACTIVATIONS').appendRow(['ACT-' + Utilities.getUuid().slice(0,8), customerId, 'Pending', '', '']);
+  }
+
+  // Update promised payment date if a new one was set by the agent
+  if (newPromisedPaymentDate) {
+    custSheet.getRange(rowIndex, 24).setValue(newPromisedPaymentDate); // Promised_Payment_Date col
+  } else if (outcome === 'Payment Received') {
+    // Clear the promised payment date once payment is confirmed received
+    custSheet.getRange(rowIndex, 24).setValue('');
   }
 
   custSheet.getRange(rowIndex, 33, 1, 3).setValues([[newStatus, nextAction || (outcome === 'Callback Rescheduled' ? 'Call Back' : ''), nextActionDate || '']]);
@@ -828,6 +875,107 @@ function enforceLeadLifecycleRules(token) {
   }
 
   return { success: true, expiredCount, escalatedCount };
+}
+
+// ============================================================
+// 9b. ADMIN FOLLOW-UP OVERRIDE & PROMISED PAYMENT QUERIES
+// ============================================================
+
+/**
+ * Admin can force-reschedule a missed callback or payment follow-up.
+ * Bypasses the 8-day rule. Requires admin token.
+ */
+function adminUpdateFollowUp(token, payload) {
+  requireAdmin_(token);
+  const { customerId, newNextActionDate, notes, reassignToAgentId } = payload;
+  if (!customerId) throw new Error('customerId is required.');
+  if (!newNextActionDate) throw new Error('New next action date is required.');
+
+  const timestamp = new Date().toISOString();
+  const todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  const custSheet = ss.getSheetByName('CUSTOMERS');
+  const custData = custSheet.getDataRange().getValues();
+  const rowIndex = custData.findIndex(r => String(r[0]) === String(customerId)) + 1;
+  if (rowIndex === 0) throw new Error('Customer not found.');
+
+  const custRow = custData[rowIndex - 1];
+  const customerName = custRow[7] || `${custRow[5]} ${custRow[6]}`;
+
+  // Update next action + date
+  custSheet.getRange(rowIndex, 34, 1, 2).setValues([['Call Back', newNextActionDate]]);
+  custSheet.getRange(rowIndex, 5).setValue(timestamp);
+
+  // Optionally reassign agent
+  if (reassignToAgentId) {
+    custSheet.getRange(rowIndex, 31).setValue(reassignToAgentId); // Assigned_Agent col
+  }
+
+  // Log to ACTIVITY_LOG
+  ss.getSheetByName('ACTIVITY_LOG').appendRow([
+    'ACT-' + Utilities.getUuid().substring(0, 8).toUpperCase(),
+    timestamp,
+    customerId,
+    customerName,
+    reassignToAgentId || custRow[30],
+    'Admin Override',
+    'Admin Portal',
+    'Follow-Up Rescheduled by Admin',
+    custRow[32] || '',
+    '',
+    'Call Back',
+    newNextActionDate,
+    'False',
+    'None',
+    '',
+    notes || '',
+    'ADMIN',
+    timestamp
+  ]);
+
+  return { success: true, customerId, newNextActionDate };
+}
+
+/**
+ * Returns all active leads with an upcoming or overdue Promised Payment Date.
+ * Admin only.
+ */
+function getAdminPromisedPayments(token) {
+  requireAdmin_(token);
+  const todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  const todayDate = new Date(todayStr + 'T00:00:00');
+  const custData = ss.getSheetByName('CUSTOMERS').getDataRange().getValues();
+  const usersData = ss.getSheetByName('Users').getDataRange().getValues();
+  const userMap = new Map(usersData.slice(1).map(u => [String(u[0]), String(u[1])]));
+
+  const results = [];
+  for (let i = 1; i < custData.length; i++) {
+    const row = custData[i];
+    const custId = String(row[0] || '').trim();
+    if (!custId || row[1] === 'Archived' || row[1] === 'Expired') continue;
+    const status = String(row[32] || '');
+    if (status === 'Won' || status === 'Lost' || status.includes('Lost')) continue;
+    const promisedPaymentDate = formatDateSafe_(row[23]);
+    if (!promisedPaymentDate) continue;
+
+    const payDate = new Date(promisedPaymentDate + 'T00:00:00');
+    const daysUntilDue = Math.round((payDate - todayDate) / (1000 * 60 * 60 * 24));
+    const assignedAgentId = String(row[30] || '');
+
+    results.push({
+      customerId: custId,
+      name: String(row[7] || `${row[5]} ${row[6]}`),
+      phone: String(row[8] || ''),
+      agentId: assignedAgentId,
+      agentName: userMap.get(assignedAgentId) || 'Unassigned',
+      promisedPaymentDate: promisedPaymentDate,
+      daysUntilDue: daysUntilDue,
+      status: status
+    });
+  }
+
+  // Sort: overdue first, then soonest upcoming
+  results.sort((a, b) => a.daysUntilDue - b.daysUntilDue);
+  return { payments: results };
 }
 
 // ============================================================
