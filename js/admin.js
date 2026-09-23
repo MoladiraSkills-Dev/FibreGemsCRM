@@ -1,6 +1,7 @@
 /**
- * FibreGems CRM — Admin Page Logic
- * Handles dashboard stats, agent activity, master grid, status chart, and Agility sync.
+ * FibreGems CRM — Admin Command Centre Logic
+ * Handles dashboard KPIs, callback performance & accountability, missed call alerts,
+ * 7-day escalations, 42-day auto-expiry audit engine, master grid, and Agility sync.
  */
 
 // ── State ────────────────────────────────────────────────────
@@ -8,9 +9,62 @@ let currentAdminView = 'dashboard';
 let gridOffset = 0;
 const GRID_LIMIT = 50;
 let gridTotal = 0;
+let currentReportDate = getTodayStr();
+
+// ── Helpers ──────────────────────────────────────────────────
+function getTodayStr() {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function addDaysToToday(days) {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function escHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function escJs(str) {
+  if (!str) return '';
+  return String(str).replace(/'/g, "\\'").replace(/"/g, '\\"');
+}
+
+function showToast(msg, type = 'success') {
+  const container = document.getElementById('toast-container');
+  if (!container) return;
+  const toast = document.createElement('div');
+  const bgClass = type === 'error' ? 'bg-red-500/90 text-white' : (type === 'warning' ? 'bg-amber-500/95 text-navy-900' : 'bg-emerald-500/90 text-white');
+  toast.className = `px-4 py-3 rounded-xl shadow-xl text-xs font-semibold backdrop-blur flex items-center gap-2 ${bgClass} animate-slide-in`;
+  toast.innerHTML = `<span>${escHtml(msg)}</span>`;
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(-10px)';
+    setTimeout(() => toast.remove(), 300);
+  }, 4500);
+}
+
+function formatTime(isoOrDate) {
+  if (!isoOrDate) return '—';
+  try {
+    const d = new Date(isoOrDate);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } catch (e) {
+    return '—';
+  }
+}
 
 // ── Initialization ───────────────────────────────────────────
-
 document.addEventListener('DOMContentLoaded', () => {
   if (!requireAdmin()) return;
   
@@ -18,43 +72,65 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('admin-role').textContent = session.role || 'Admin';
   const avatarEl = document.getElementById('admin-avatar');
   if (avatarEl && session.name) avatarEl.textContent = session.name.charAt(0).toUpperCase();
+
+  const picker = document.getElementById('admin-report-date-picker');
+  if (picker) picker.value = currentReportDate;
   
   loadDashboard();
+  checkMissedCallbacksBadge();
 });
 
 // ── View Switching ───────────────────────────────────────────
-
 function switchAdminView(view) {
   currentAdminView = view;
   
   document.querySelectorAll('[data-admin-nav]').forEach(el => {
-    el.classList.remove('bg-fiber-500/20', 'text-fiber-300', 'border-fiber-500');
-    el.classList.add('text-gray-400', 'hover:text-white', 'hover:bg-white/5');
+    el.classList.remove('bg-fiber-500/20', 'text-fiber-300', 'border-fiber-500', 'border-l-4');
+    el.classList.add('text-gray-400', 'hover:text-white', 'hover:bg-white/5', 'border-transparent', 'border-l-4');
   });
   const activeNav = document.querySelector(`[data-admin-nav="${view}"]`);
   if (activeNav) {
     activeNav.classList.add('bg-fiber-500/20', 'text-fiber-300', 'border-fiber-500');
-    activeNav.classList.remove('text-gray-400', 'hover:text-white', 'hover:bg-white/5');
+    activeNav.classList.remove('text-gray-400', 'hover:text-white', 'hover:bg-white/5', 'border-transparent');
   }
   
   document.getElementById('view-dashboard').classList.toggle('hidden', view !== 'dashboard');
+  document.getElementById('view-callbacks').classList.toggle('hidden', view !== 'callbacks');
   document.getElementById('view-grid').classList.toggle('hidden', view !== 'grid');
   document.getElementById('view-sync').classList.toggle('hidden', view !== 'sync');
   document.getElementById('view-agents').classList.toggle('hidden', view !== 'agents');
   
   if (view === 'dashboard') loadDashboard();
+  else if (view === 'callbacks') loadCallbackReport(currentReportDate);
   else if (view === 'grid') loadMasterGrid();
   else if (view === 'agents') loadAgentList();
 }
 
-// ── Dashboard ────────────────────────────────────────────────
+// ── Quick Badge Check ────────────────────────────────────────
+async function checkMissedCallbacksBadge() {
+  try {
+    const report = await callBackend('getAdminCallbackReport', { targetDate: getTodayStr() });
+    const badge = document.getElementById('nav-admin-missed-badge');
+    if (badge) {
+      if (report.totalMissed > 0) {
+        badge.textContent = `${report.totalMissed} Missed`;
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
+    }
+  } catch (e) {
+    console.error("Could not check missed callbacks badge", e);
+  }
+}
 
+// ── Dashboard ────────────────────────────────────────────────
 async function loadDashboard() {
   const agentTableBody = document.getElementById('agent-activity-body');
   const statsContainer = document.getElementById('status-stats');
   
   agentTableBody.innerHTML = `
-    <tr><td colspan="4" class="px-6 py-8 text-center">
+    <tr><td colspan="3" class="px-6 py-8 text-center">
       <div class="spinner mx-auto mb-2"></div>
       <p class="text-gray-500 text-sm">Loading dashboard...</p>
     </td></tr>`;
@@ -62,21 +138,16 @@ async function loadDashboard() {
   try {
     const data = await callBackend('getAdminDashboard');
     
-    // Update stat cards
     document.getElementById('stat-active-agents').textContent = data.activeCount || 0;
-    
     const totalCustomers = Object.values(data.statuses).reduce((a, b) => a + b, 0);
     document.getElementById('stat-total-customers').textContent = totalCustomers;
-    
     const todayTouches = data.agents.reduce((a, ag) => a + ag.touches, 0);
     document.getElementById('stat-today-touches').textContent = todayTouches;
     
-    // Agent activity table
     if (data.agents.length === 0) {
       agentTableBody.innerHTML = `
-        <tr><td colspan="4" class="px-6 py-8 text-center text-gray-500">
-          <p class="font-medium">No agent activity today</p>
-          <p class="text-sm mt-1 text-gray-600">Activity will appear as agents log in and work</p>
+        <tr><td colspan="3" class="px-6 py-8 text-center text-gray-500 text-sm">
+          No agent activity recorded yet today
         </td></tr>`;
     } else {
       agentTableBody.innerHTML = data.agents.map(agent => `
@@ -87,521 +158,406 @@ async function loadDashboard() {
                 ${(agent.name || 'U').charAt(0)}
               </div>
               <div>
-                <p class="font-medium text-white text-sm">${escHtml(agent.name)}</p>
+                <p class="font-semibold text-white text-sm">${escHtml(agent.name)}</p>
                 <p class="text-xs text-gray-500">${escHtml(agent.role)}</p>
               </div>
             </div>
           </td>
           <td class="px-4 py-3">
-            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-fiber-500/15 text-fiber-400">
-              ${agent.touches}
+            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-fiber-500/15 text-fiber-400">
+              ${agent.touches} touches
             </span>
           </td>
           <td class="px-4 py-3 text-sm text-gray-400">${formatTime(agent.lastActive)}</td>
-          <td class="px-4 py-3">
-            <span class="inline-flex w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          </td>
         </tr>
       `).join('');
     }
     
     // Status breakdown
-    renderStatusChart(data.statuses);
-    renderStatusStats(data.statuses);
+    statsContainer.innerHTML = Object.entries(data.statuses).map(([status, count]) => {
+      const pct = totalCustomers > 0 ? Math.round((count / totalCustomers) * 100) : 0;
+      return `
+        <div>
+          <div class="flex items-center justify-between text-xs mb-1">
+            <span class="text-gray-300 font-medium">${escHtml(status)}</span>
+            <span class="text-gray-400 font-bold">${count} <span class="text-gray-600">(${pct}%)</span></span>
+          </div>
+          <div class="w-full bg-white/5 rounded-full h-1.5 overflow-hidden">
+            <div class="bg-fiber-500 h-full rounded-full" style="width: ${pct}%"></div>
+          </div>
+        </div>
+      `;
+    }).join('');
     
   } catch (err) {
     agentTableBody.innerHTML = `
-      <tr><td colspan="4" class="px-6 py-8 text-center text-red-400">
-        <p class="font-medium">Failed to load dashboard</p>
-        <p class="text-sm text-red-500/70 mt-1">${escHtml(err.message)}</p>
-        <button onclick="loadDashboard()" class="mt-2 text-sm text-fiber-400 hover:underline">Retry</button>
+      <tr><td colspan="3" class="px-6 py-8 text-center text-red-400 text-sm">
+        Failed to load dashboard: ${escHtml(err.message)}
       </td></tr>`;
   }
 }
 
-function renderStatusStats(statuses) {
-  const container = document.getElementById('status-stats');
-  const total = Object.values(statuses).reduce((a, b) => a + b, 0);
+// ── Call Back Performance & Accountability Report ────────────
+function setReportDateOffset(offsetDays) {
+  currentReportDate = addDaysToToday(offsetDays);
   
-  const colorMap = {
-    'New Lead': { bg: 'bg-blue-500/15', text: 'text-blue-400', bar: 'bg-blue-500' },
-    'Contacted': { bg: 'bg-cyan-500/15', text: 'text-cyan-400', bar: 'bg-cyan-500' },
-    'Interested': { bg: 'bg-emerald-500/15', text: 'text-emerald-400', bar: 'bg-emerald-500' },
-    'Payment Pending': { bg: 'bg-amber-500/15', text: 'text-amber-400', bar: 'bg-amber-500' },
-    'Payment Received': { bg: 'bg-green-500/15', text: 'text-green-400', bar: 'bg-green-500' },
-    'Activated': { bg: 'bg-purple-500/15', text: 'text-purple-400', bar: 'bg-purple-500' },
-    'Cancelled': { bg: 'bg-red-500/15', text: 'text-red-400', bar: 'bg-red-500' },
-    'Not Interested': { bg: 'bg-gray-500/15', text: 'text-gray-400', bar: 'bg-gray-500' },
-  };
-  
-  const sorted = Object.entries(statuses).sort((a, b) => b[1] - a[1]);
-  
-  container.innerHTML = sorted.map(([status, count]) => {
-    const pct = total > 0 ? Math.round((count / total) * 100) : 0;
-    const colors = colorMap[status] || { bg: 'bg-gray-500/15', text: 'text-gray-400', bar: 'bg-gray-500' };
-    return `
-      <div class="flex items-center gap-3">
-        <div class="flex-1">
-          <div class="flex items-center justify-between mb-1">
-            <span class="text-xs font-medium ${colors.text}">${escHtml(status)}</span>
-            <span class="text-xs text-gray-500">${count} (${pct}%)</span>
-          </div>
-          <div class="w-full h-1.5 rounded-full bg-white/5 overflow-hidden">
-            <div class="h-full rounded-full ${colors.bar} transition-all duration-700" style="width: ${pct}%"></div>
-          </div>
-        </div>
-      </div>
-    `;
-  }).join('');
+  const btnToday = document.getElementById('btn-report-today');
+  const btnYesterday = document.getElementById('btn-report-yesterday');
+  const picker = document.getElementById('admin-report-date-picker');
+
+  if (picker) picker.value = currentReportDate;
+
+  if (offsetDays === 0) {
+    btnToday.className = "px-3 py-1.5 rounded-lg text-xs font-bold bg-fiber-500 text-white transition-all";
+    btnYesterday.className = "px-3 py-1.5 rounded-lg text-xs font-bold bg-white/5 text-gray-400 hover:text-white transition-all";
+  } else if (offsetDays === -1) {
+    btnYesterday.className = "px-3 py-1.5 rounded-lg text-xs font-bold bg-fiber-500 text-white transition-all";
+    btnToday.className = "px-3 py-1.5 rounded-lg text-xs font-bold bg-white/5 text-gray-400 hover:text-white transition-all";
+  }
+
+  loadCallbackReport(currentReportDate);
 }
 
-function renderStatusChart(statuses) {
-  const canvas = document.getElementById('status-chart');
-  if (!canvas) return;
-  
-  const ctx = canvas.getContext('2d');
-  const dpr = window.devicePixelRatio || 1;
-  const size = 200;
-  canvas.width = size * dpr;
-  canvas.height = size * dpr;
-  canvas.style.width = size + 'px';
-  canvas.style.height = size + 'px';
-  ctx.scale(dpr, dpr);
-  
-  const total = Object.values(statuses).reduce((a, b) => a + b, 0);
-  if (total === 0) {
-    ctx.fillStyle = '#374151';
-    ctx.font = '14px Inter, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('No data', size / 2, size / 2);
-    return;
+async function loadCallbackReport(targetDate) {
+  currentReportDate = targetDate || getTodayStr();
+  const dateLabel = document.getElementById('rep-current-date-label');
+  if (dateLabel) dateLabel.textContent = currentReportDate === getTodayStr() ? `Today (${currentReportDate})` : currentReportDate;
+
+  const agentBody = document.getElementById('rep-agent-body');
+  const missedBody = document.getElementById('rep-missed-body');
+  const escalatedBody = document.getElementById('rep-escalated-body');
+  const banner = document.getElementById('missed-alert-banner');
+
+  agentBody.innerHTML = `<tr><td colspan="6" class="px-6 py-8 text-center"><div class="spinner mx-auto mb-2"></div><p class="text-xs text-gray-400">Loading performance data...</p></td></tr>`;
+
+  try {
+    const report = await callBackend('getAdminCallbackReport', { targetDate: currentReportDate });
+
+    // Update KPI Cards
+    document.getElementById('rep-stat-scheduled').textContent = report.totalScheduled;
+    document.getElementById('rep-stat-completed').textContent = report.totalCompleted;
+    document.getElementById('rep-stat-missed').textContent = report.totalMissed;
+    document.getElementById('rep-stat-escalated').textContent = report.totalEscalated;
+
+    // Missed Alert Banner
+    if (report.totalMissed > 0) {
+      banner.classList.remove('hidden');
+      document.getElementById('missed-alert-text').textContent = `🚨 ${report.totalMissed} scheduled call back${report.totalMissed > 1 ? 's were' : ' was'} missed on or before ${currentReportDate}. Immediate follow-up required!`;
+    } else {
+      banner.classList.add('hidden');
+    }
+
+    // Section 1: Agent Execution Breakdown
+    if (report.agents.length === 0) {
+      agentBody.innerHTML = `<tr><td colspan="6" class="px-6 py-8 text-center text-gray-500 text-xs">No agent assignments found for this date.</td></tr>`;
+    } else {
+      agentBody.innerHTML = report.agents.map(ag => {
+        let compBadge = `<span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">✓ Excellent (100%)</span>`;
+        if (ag.missed > 0) {
+          compBadge = `<span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-red-500/20 text-red-300 border border-red-500/30 animate-pulse">⚠️ Missed Calls (${ag.missed})</span>`;
+        } else if (ag.scheduled === 0) {
+          compBadge = `<span class="px-2.5 py-1 rounded-full text-[11px] font-medium bg-white/5 text-gray-400">No Calls Due</span>`;
+        }
+
+        return `
+          <tr class="border-b border-white/5 hover:bg-white/[0.02] text-xs">
+            <td class="px-4 py-3">
+              <p class="font-bold text-white text-sm">${escHtml(ag.name)}</p>
+              <p class="text-[11px] text-gray-500">${escHtml(ag.agentId)}</p>
+            </td>
+            <td class="px-4 py-3 font-semibold text-white">${ag.scheduled}</td>
+            <td class="px-4 py-3 font-bold text-emerald-400">${ag.completed}</td>
+            <td class="px-4 py-3 font-bold ${ag.missed > 0 ? 'text-red-400' : 'text-gray-500'}">${ag.missed}</td>
+            <td class="px-4 py-3">
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-white">${ag.completionRate}%</span>
+                <div class="w-16 bg-white/10 rounded-full h-1.5 overflow-hidden">
+                  <div class="h-full rounded-full ${ag.completionRate === 100 ? 'bg-emerald-400' : (ag.completionRate >= 70 ? 'bg-amber-400' : 'bg-red-400')}" style="width: ${ag.completionRate}%"></div>
+                </div>
+              </div>
+            </td>
+            <td class="px-4 py-3">${compBadge}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // Section 2: Missed Call Backs Table
+    if (report.missedCallbacks.length === 0) {
+      missedBody.innerHTML = `
+        <tr><td colspan="6" class="px-6 py-8 text-center text-emerald-400 text-xs">
+          ✓ No missed call backs on record for this period. Great performance!
+        </td></tr>`;
+    } else {
+      missedBody.innerHTML = report.missedCallbacks.map(m => `
+        <tr class="border-b border-white/5 hover:bg-red-950/10 text-xs">
+          <td class="px-4 py-3">
+            <p class="font-bold text-white">${escHtml(m.name)}</p>
+            <p class="text-[11px] text-gray-500">${escHtml(m.customerId)}</p>
+          </td>
+          <td class="px-4 py-3 font-mono text-fiber-400 font-semibold">${escHtml(m.phone || '—')}</td>
+          <td class="px-4 py-3 font-medium text-gray-300">${escHtml(m.agentName)}</td>
+          <td class="px-4 py-3 font-mono text-gray-400">${escHtml(m.scheduledDate)}</td>
+          <td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/20 text-red-300 border border-red-500/30">${m.daysOverdue} days overdue</span></td>
+          <td class="px-4 py-3 text-gray-400">${escHtml(m.lastOutcome || 'None')}</td>
+        </tr>
+      `).join('');
+    }
+
+    // Section 3: 7-Day Chain-of-Command Escalations
+    if (report.escalatedLeads.length === 0) {
+      escalatedBody.innerHTML = `
+        <tr><td colspan="6" class="px-6 py-8 text-center text-gray-400 text-xs">
+          ✓ No stale leads escalated to supervisor tier.
+        </td></tr>`;
+    } else {
+      escalatedBody.innerHTML = report.escalatedLeads.map(e => `
+        <tr class="border-b border-white/5 hover:bg-amber-950/15 text-xs">
+          <td class="px-4 py-3">
+            <p class="font-bold text-white">${escHtml(e.name)}</p>
+            <p class="text-[11px] text-gray-500">${escHtml(e.customerId)}</p>
+          </td>
+          <td class="px-4 py-3 font-mono text-gray-300">${escHtml(e.phone || '—')}</td>
+          <td class="px-4 py-3 font-medium text-gray-300">${escHtml(e.agentName)}</td>
+          <td class="px-4 py-3 font-bold text-amber-400">${e.daysSinceContact} days silent</td>
+          <td class="px-4 py-3">
+            <span class="px-2.5 py-1 rounded-full text-[10px] font-bold ${e.escalationLevel.includes('Level 3') ? 'bg-red-500/20 text-red-300 border border-red-500/30' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'}">
+              ${escHtml(e.escalationLevel)}
+            </span>
+          </td>
+          <td class="px-4 py-3 text-gray-400">${escHtml(e.reason)}</td>
+        </tr>
+      `).join('');
+    }
+
+  } catch (err) {
+    agentBody.innerHTML = `<tr><td colspan="6" class="px-6 py-8 text-center text-red-400 text-xs">Failed to load callback report: ${escHtml(err.message)}</td></tr>`;
   }
-  
-  const colors = ['#3b82f6', '#06b6d4', '#10b981', '#f59e0b', '#22c55e', '#a855f7', '#ef4444', '#6b7280'];
-  const cx = size / 2;
-  const cy = size / 2;
-  const radius = 80;
-  const innerRadius = 50;
-  
-  let startAngle = -Math.PI / 2;
-  const entries = Object.entries(statuses);
-  
-  entries.forEach(([status, count], i) => {
-    const slice = (count / total) * 2 * Math.PI;
-    const endAngle = startAngle + slice;
-    
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius, startAngle, endAngle);
-    ctx.arc(cx, cy, innerRadius, endAngle, startAngle, true);
-    ctx.closePath();
-    ctx.fillStyle = colors[i % colors.length];
-    ctx.fill();
-    
-    startAngle = endAngle;
-  });
-  
-  // Center text
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 24px Inter, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(total, cx, cy - 8);
-  ctx.fillStyle = '#9ca3af';
-  ctx.font = '11px Inter, sans-serif';
-  ctx.fillText('TOTAL', cx, cy + 12);
+}
+
+// ── 42-Day Auto-Lost & 7-Day Escalation Lifecycle Engine ────
+async function runLifecycleEngine() {
+  const btn = document.getElementById('lifecycle-btn');
+  btn.disabled = true;
+  btn.innerHTML = `<div class="spinner-sm mx-auto"></div>`;
+
+  try {
+    const result = await callBackend('enforceLeadLifecycleRules');
+    showToast(`Audit Complete: ${result.expiredCount} leads expired (>42d) to Lost, ${result.escalatedCount} stale leads escalated (7d+).`, 'warning');
+    loadDashboard();
+    if (currentAdminView === 'callbacks') loadCallbackReport(currentReportDate);
+  } catch (err) {
+    showToast(`Lifecycle audit failed: ${err.message}`, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `⚙️ Run 42-Day & 7-Day Audit`;
+  }
 }
 
 // ── Master Grid ──────────────────────────────────────────────
-
 async function loadMasterGrid() {
   const tbody = document.getElementById('grid-body');
   const countEl = document.getElementById('grid-count');
-  
-  tbody.innerHTML = `
-    <tr><td colspan="5" class="px-6 py-12 text-center">
-      <div class="spinner mx-auto mb-3"></div>
-      <p class="text-gray-500 text-sm">Loading master grid...</p>
-    </td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="7" class="px-6 py-12 text-center"><div class="spinner mx-auto mb-2"></div><p class="text-gray-500 text-sm">Loading master records...</p></td></tr>`;
   
   try {
     const result = await callBackend('getAdminMasterGrid', { offset: gridOffset, limit: GRID_LIMIT });
     gridTotal = result.total;
-    countEl.textContent = `${result.total} total record${result.total !== 1 ? 's' : ''}`;
+    countEl.textContent = `${result.total} records`;
     
     if (result.data.length === 0) {
-      tbody.innerHTML = `
-        <tr><td colspan="5" class="px-6 py-12 text-center text-gray-500">
-          <p class="font-medium">No customer records found</p>
-        </td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" class="px-6 py-12 text-center text-gray-500">No records found</td></tr>`;
       return;
     }
     
-    tbody.innerHTML = result.data.map(c => {
-      const payColors = {
-        'Paid': 'bg-green-500/15 text-green-400 border-green-500/30',
-        'Pending': 'bg-amber-500/15 text-amber-400 border-amber-500/30',
-      };
-      const payCls = payColors[c.payStatus] || 'bg-gray-500/15 text-gray-400 border-gray-500/30';
-      
-      return `
-        <tr class="border-b border-white/5 hover:bg-white/[0.03] transition-colors">
-          <td class="px-4 py-3">
-            <p class="font-medium text-white text-sm">${escHtml(c.name)}</p>
-            <p class="text-xs text-gray-500 mt-0.5 font-mono">${escHtml(c.id)}</p>
-          </td>
-          <td class="px-4 py-3 text-sm text-gray-300">${escHtml(c.agent || '—')}</td>
-          <td class="px-4 py-3">${adminStatusBadge(c.status)}</td>
-          <td class="px-4 py-3">
-            <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-medium border ${payCls}">${escHtml(c.payStatus)}</span>
-          </td>
-        </tr>`;
-    }).join('');
-    
-    updateGridPagination();
+    tbody.innerHTML = result.data.map(r => `
+      <tr class="border-b border-white/5 hover:bg-white/[0.03] transition-colors text-xs">
+        <td class="px-4 py-3">
+          <p class="font-semibold text-white">${escHtml(r.name)}</p>
+          <p class="text-[11px] text-gray-500 font-mono">${escHtml(r.id)}</p>
+        </td>
+        <td class="px-4 py-3 font-mono text-gray-300">${escHtml(r.cellNumber || '—')}</td>
+        <td class="px-4 py-3 text-gray-300">${escHtml(r.agent || '—')}</td>
+        <td class="px-4 py-3 font-mono text-gray-400">${escHtml(r.createdDate || '—')}</td>
+        <td class="px-4 py-3 font-mono font-semibold text-fiber-400">${escHtml(r.orderDate || '—')}</td>
+        <td class="px-4 py-3">${statusBadge(r.status)}</td>
+        <td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-white/5 text-gray-300">${escHtml(r.payStatus)}</span></td>
+      </tr>
+    `).join('');
   } catch (err) {
-    tbody.innerHTML = `
-      <tr><td colspan="5" class="px-6 py-12 text-center text-red-400">
-        <p class="font-medium">Failed to load grid</p>
-        <p class="text-sm text-red-500/70 mt-1">${escHtml(err.message)}</p>
-        <button onclick="loadMasterGrid()" class="mt-2 text-sm text-fiber-400 hover:underline">Retry</button>
-      </td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="px-6 py-8 text-center text-red-400 text-xs">Failed to load grid: ${escHtml(err.message)}</td></tr>`;
   }
 }
 
-function updateGridPagination() {
-  const paginationEl = document.getElementById('grid-pagination');
-  const totalPages = Math.ceil(gridTotal / GRID_LIMIT);
-  const currentPage = Math.floor(gridOffset / GRID_LIMIT) + 1;
-  
-  if (totalPages <= 1) { paginationEl.innerHTML = ''; return; }
-  
-  paginationEl.innerHTML = `
-    <button onclick="goGridPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}
-      class="px-3 py-1.5 rounded-lg text-sm ${currentPage === 1 ? 'text-gray-600 cursor-not-allowed' : 'text-gray-400 hover:bg-white/5'}">
-      ← Prev
-    </button>
-    <span class="text-sm text-gray-500">Page ${currentPage} of ${totalPages}</span>
-    <button onclick="goGridPage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}
-      class="px-3 py-1.5 rounded-lg text-sm ${currentPage === totalPages ? 'text-gray-600 cursor-not-allowed' : 'text-gray-400 hover:bg-white/5'}">
-      Next →
-    </button>`;
-}
-
-function goGridPage(page) {
-  gridOffset = (page - 1) * GRID_LIMIT;
-  loadMasterGrid();
+function statusBadge(status) {
+  const s = (status || '').toLowerCase();
+  if (s.includes('won') || s.includes('activated')) return `<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">${escHtml(status)}</span>`;
+  if (s.includes('lost') || s.includes('cancel') || s.includes('expiry')) return `<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-500/15 text-red-400 border border-red-500/20">${escHtml(status)}</span>`;
+  if (s.includes('pending') || s.includes('call')) return `<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/20">${escHtml(status)}</span>`;
+  return `<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-500/15 text-blue-400 border border-blue-500/20">${escHtml(status || 'New')}</span>`;
 }
 
 // ── Agility Sync ─────────────────────────────────────────────
-
 async function triggerAgilitySync() {
   const btn = document.getElementById('sync-btn');
   const resultBox = document.getElementById('sync-result');
   
   btn.disabled = true;
-  btn.innerHTML = `
-    <div class="flex items-center gap-2">
-      <div class="spinner-sm"></div>
-      <span>Syncing...</span>
-    </div>`;
+  btn.innerHTML = `<div class="spinner-sm mx-auto"></div>`;
   resultBox.classList.add('hidden');
   
   try {
     const result = await callBackend('runAgilitySync');
-    
     resultBox.classList.remove('hidden');
     resultBox.innerHTML = `
-      <div class="flex items-start gap-4">
-        <div class="w-12 h-12 rounded-xl bg-emerald-500/15 flex items-center justify-center flex-shrink-0">
-          <svg class="w-6 h-6 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        </div>
-        <div>
-          <h4 class="text-lg font-semibold text-emerald-300">Sync Complete</h4>
-          <div class="mt-3 grid grid-cols-2 gap-4">
-            <div class="bg-white/5 rounded-xl p-4 text-center">
-              <p class="text-2xl font-bold text-white">${result.newLeads}</p>
-              <p class="text-xs text-gray-400 mt-1">New Leads Created</p>
-            </div>
-            <div class="bg-white/5 rounded-xl p-4 text-center">
-              <p class="text-2xl font-bold text-white">${result.updatedLeads}</p>
-              <p class="text-xs text-gray-400 mt-1">Existing Matched</p>
-            </div>
-          </div>
-        </div>
-      </div>`;
-    
-    showToast(`Agility sync complete: ${result.newLeads} new, ${result.updatedLeads} matched.`, 'success');
+      <div class="flex items-center gap-3 text-emerald-400 font-semibold mb-2">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        Agility Sync Successful
+      </div>
+      <p class="text-sm text-gray-300">
+        Injected <strong class="text-white font-bold">${result.newLeads}</strong> new leads with exact order dates and updated <strong class="text-white font-bold">${result.updatedLeads}</strong> existing records.
+      </p>
+    `;
+    showToast("Agility sync completed!");
   } catch (err) {
     resultBox.classList.remove('hidden');
     resultBox.innerHTML = `
-      <div class="flex items-center gap-3 text-red-400">
-        <svg class="w-6 h-6 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-        </svg>
-        <div>
-          <p class="font-medium">Sync Failed</p>
-          <p class="text-sm text-red-500/70 mt-0.5">${escHtml(err.message)}</p>
-        </div>
-      </div>`;
-    showToast(err.message, 'error');
+      <div class="text-red-400 font-semibold mb-1">Sync Error</div>
+      <p class="text-sm text-gray-400">${escHtml(err.message)}</p>
+    `;
   } finally {
     btn.disabled = false;
-    btn.innerHTML = `
-      <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" />
-      </svg>
-      Run Agility Sync`;
+    btn.innerHTML = `Run Agility Sync`;
   }
-}
-
-// ── Utilities ────────────────────────────────────────────────
-
-function adminStatusBadge(status) {
-  const colors = {
-    'New Lead': 'bg-blue-500/15 text-blue-400 border-blue-500/30',
-    'Contacted': 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30',
-    'Interested': 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
-    'Payment Pending': 'bg-amber-500/15 text-amber-400 border-amber-500/30',
-    'Payment Received': 'bg-green-500/15 text-green-400 border-green-500/30',
-    'Activated': 'bg-purple-500/15 text-purple-400 border-purple-500/30',
-    'Cancelled': 'bg-red-500/15 text-red-400 border-red-500/30',
-    'Not Interested': 'bg-gray-500/15 text-gray-400 border-gray-500/30'
-  };
-  const cls = colors[status] || 'bg-gray-500/15 text-gray-400 border-gray-500/30';
-  return `<span class="inline-flex px-2.5 py-1 rounded-full text-xs font-medium border ${cls}">${escHtml(status || 'Unknown')}</span>`;
-}
-
-function formatTime(dateStr) {
-  if (!dateStr) return '—';
-  const d = new Date(dateStr);
-  return d.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' });
-}
-
-function escHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str || '';
-  return div.innerHTML;
 }
 
 // ── Agent Management ─────────────────────────────────────────
-
-let _agentModalMode = 'create'; // 'create' | 'edit' | 'password'
-let _activeAgentTab = 'details';
-
 async function loadAgentList() {
-  const tbody    = document.getElementById('agents-body');
-  const countEl  = document.getElementById('agents-count');
-  tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-12 text-center"><div class="spinner mx-auto mb-3"></div><p class="text-gray-500 text-sm">Loading agents...</p></td></tr>`;
+  const tbody = document.getElementById('agents-body');
+  const countEl = document.getElementById('agents-count');
+  tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-8 text-center"><div class="spinner mx-auto mb-2"></div><p class="text-xs text-gray-400">Loading agents...</p></td></tr>`;
 
   try {
-    const data = await callBackend('getAgentList');
-    const agents = data.agents || [];
-    countEl.textContent = `${agents.length} agent${agents.length !== 1 ? 's' : ''}`;
+    const result = await callBackend('getAgentList');
+    const agents = result.agents || [];
+    countEl.textContent = `${agents.length} agent account${agents.length !== 1 ? 's' : ''}`;
 
     if (agents.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-12 text-center text-gray-500"><p class="font-medium">No agents found</p></td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-8 text-center text-gray-500 text-xs">No agents created yet.</td></tr>`;
       return;
     }
 
-    tbody.innerHTML = agents.map(a => {
-      const statusCls = {
-        'Verified': 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
-        'Inactive': 'bg-red-500/15 text-red-400 border-red-500/30',
-        'Pending':  'bg-amber-500/15 text-amber-400 border-amber-500/30'
-      }[a.status] || 'bg-gray-500/15 text-gray-400 border-gray-500/30';
-
-      const roleCls = a.role === 'Admin'
-        ? 'bg-gem-500/15 text-gem-400 border-gem-500/30'
-        : 'bg-fiber-500/15 text-fiber-400 border-fiber-500/30';
-
-      const isInactive = a.status === 'Inactive';
-
-      return `
-        <tr class="border-b border-white/5 hover:bg-white/[0.03] transition-colors group">
-          <td class="px-4 py-3.5">
-            <div class="flex items-center gap-3">
-              <div class="w-8 h-8 rounded-full bg-gradient-to-br from-fiber-500 to-fiber-700 flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
-                ${(a.name || 'U').charAt(0).toUpperCase()}
-              </div>
-              <div>
-                <p class="font-medium text-white text-sm">${escHtml(a.name)}</p>
-                <p class="text-xs text-gray-500 font-mono mt-0.5">${escHtml(a.agentId)}</p>
-              </div>
-            </div>
-          </td>
-          <td class="px-4 py-3.5 text-sm text-gray-300">${escHtml(a.email)}</td>
-          <td class="px-4 py-3.5">
-            <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-medium border ${roleCls}">${escHtml(a.role)}</span>
-          </td>
-          <td class="px-4 py-3.5">
-            <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-medium border ${statusCls}">${escHtml(a.status)}</span>
-          </td>
-          <td class="px-4 py-3.5">
-            ${a.tempPass
-              ? `<span class="font-mono text-xs text-amber-300 bg-amber-500/10 border border-amber-500/20 px-2 py-1 rounded-lg">${escHtml(a.tempPass)}</span>`
-              : `<span class="text-gray-600 text-sm">—</span>`}
-          </td>
-          <td class="px-4 py-3.5">
-            <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all">
-              <button onclick="openAgentModal(${JSON.stringify(a).replace(/"/g, '&quot;')})" title="Edit"
-                class="p-1.5 rounded-lg bg-white/5 text-gray-400 hover:text-white hover:bg-white/10 transition-colors">
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125" />
-                </svg>
-              </button>
-              <button onclick="openSetPassword(${JSON.stringify(a).replace(/"/g, '&quot;')})" title="Set Password"
-                class="p-1.5 rounded-lg bg-white/5 text-gray-400 hover:text-amber-400 hover:bg-amber-500/10 transition-colors">
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" />
-                </svg>
-              </button>
-              <button onclick="promptDeactivate('${a.agentId}', ${JSON.stringify(a.name).replace(/"/g, '&quot;')}, ${isInactive})" title="${isInactive ? 'Reactivate' : 'Deactivate'}"
-                class="p-1.5 rounded-lg bg-white/5 transition-colors ${isInactive ? 'text-emerald-400 hover:bg-emerald-500/10' : 'text-red-400/60 hover:text-red-400 hover:bg-red-500/10'}">
-                ${isInactive
-                  ? `<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`
-                  : `<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M22 10.5h-6m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM4 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 0110.374 21c-2.331 0-4.512-.645-6.374-1.766z" /></svg>`
-                }
-              </button>
-            </div>
-          </td>
-        </tr>`;
-    }).join('');
+    tbody.innerHTML = agents.map(a => `
+      <tr class="border-b border-white/5 hover:bg-white/[0.02] text-xs">
+        <td class="px-4 py-3">
+          <p class="font-bold text-white">${escHtml(a.name)}</p>
+          <p class="text-[11px] text-gray-500 font-mono">${escHtml(a.agentId)}</p>
+        </td>
+        <td class="px-4 py-3 text-gray-300 font-mono">${escHtml(a.email)}</td>
+        <td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${a.role === 'Admin' ? 'bg-purple-500/20 text-purple-300' : 'bg-blue-500/20 text-blue-300'}">${escHtml(a.role)}</span></td>
+        <td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${a.status === 'Verified' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-gray-500/20 text-gray-400'}">${escHtml(a.status)}</span></td>
+        <td class="px-4 py-3 font-mono text-gray-400">${escHtml(a.tempPass || '—')}</td>
+        <td class="px-4 py-3">
+          <button onclick="openEditAgent('${escHtml(a.agentId)}', '${escJs(a.name)}', '${escJs(a.email)}', '${escJs(a.role)}', '${escJs(a.status)}')" class="px-2.5 py-1 bg-white/5 hover:bg-white/10 text-gray-300 rounded text-[11px] font-semibold transition-colors mr-1">Edit</button>
+        </td>
+      </tr>
+    `).join('');
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-12 text-center text-red-400"><p class="font-medium">Failed to load agents</p><p class="text-sm text-red-500/70 mt-1">${escHtml(err.message)}</p><button onclick="loadAgentList()" class="mt-2 text-sm text-fiber-400 hover:underline">Retry</button></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-8 text-center text-red-400 text-xs">Failed to load agents: ${escHtml(err.message)}</td></tr>`;
   }
 }
 
-function openAgentModal(agentData = null) {
-  _agentModalMode = agentData ? 'edit' : 'create';
-  _activeAgentTab = 'details';
-
-  document.getElementById('am-agent-id').value   = agentData?.agentId || '';
-  document.getElementById('am-name').value        = agentData?.name    || '';
-  document.getElementById('am-email').value       = agentData?.email   || '';
-  document.getElementById('am-role').value        = agentData?.role    || 'Agent';
-  document.getElementById('am-status').value      = agentData?.status  || 'Verified';
-  document.getElementById('am-password').value    = '';
-  document.getElementById('am-temp-password').value = '';
+function openAgentModal(isEdit = false) {
+  document.getElementById('modal-agent').classList.remove('hidden');
   document.getElementById('temp-pass-result').classList.add('hidden');
-
-  const isCreate = !agentData;
-  document.getElementById('agent-modal-title').textContent    = isCreate ? 'Add Agent'  : 'Edit Agent';
-  document.getElementById('agent-modal-subtitle').textContent = isCreate ? 'Create a new portal account' : agentData.name;
-  document.getElementById('am-password-row').classList.toggle('hidden', !isCreate);
-  document.getElementById('am-status-row').classList.toggle('hidden', isCreate);
-
-  // Show/hide password tab (only when editing)
-  document.getElementById('tab-password').classList.toggle('hidden', isCreate);
-
   switchAgentTab('details');
-  show('modal-agent');
+
+  if (!isEdit) {
+    document.getElementById('agent-modal-title').textContent = 'Add Agent';
+    document.getElementById('agent-modal-subtitle').textContent = 'Create a new portal account';
+    document.getElementById('am-agent-id').value = '';
+    document.getElementById('am-name').value = '';
+    document.getElementById('am-email').value = '';
+    document.getElementById('am-role').value = 'Agent';
+    document.getElementById('am-status-row').classList.add('hidden');
+    document.getElementById('am-password-row').classList.remove('hidden');
+    document.getElementById('am-password').value = '';
+    document.getElementById('tab-password').classList.add('hidden');
+  }
 }
 
-function openSetPassword(agentData) {
-  openAgentModal(agentData);
-  switchAgentTab('password');
-}
-
-function switchAgentTab(tab) {
-  _activeAgentTab = tab;
-  ['details', 'password'].forEach(t => {
-    document.getElementById(`tab-${t}`).classList.toggle('text-fiber-400', t === tab);
-    document.getElementById(`tab-${t}`).classList.toggle('border-fiber-500', t === tab);
-    document.getElementById(`tab-${t}`).classList.toggle('text-gray-500', t !== tab);
-    document.getElementById(`tab-${t}`).classList.toggle('border-transparent', t !== tab);
-    document.getElementById(`tab-panel-${t}`).classList.toggle('hidden', t !== tab);
-  });
-  const saveBtn = document.getElementById('agent-modal-save-btn');
-  saveBtn.textContent = tab === 'password' ? 'Set Password' : 'Save';
+function openEditAgent(agentId, name, email, role, status) {
+  openAgentModal(true);
+  document.getElementById('agent-modal-title').textContent = 'Edit Agent';
+  document.getElementById('agent-modal-subtitle').textContent = `Editing ${name}`;
+  document.getElementById('am-agent-id').value = agentId;
+  document.getElementById('am-name').value = name;
+  document.getElementById('am-email').value = email;
+  document.getElementById('am-role').value = role;
+  document.getElementById('am-status').value = status;
+  document.getElementById('am-status-row').classList.remove('hidden');
+  document.getElementById('am-password-row').classList.add('hidden');
+  document.getElementById('tab-password').classList.remove('hidden');
 }
 
 function closeAgentModal() {
-  hide('modal-agent');
+  document.getElementById('modal-agent').classList.add('hidden');
+}
+
+function switchAgentTab(tab) {
+  const tabDetails = document.getElementById('tab-details');
+  const tabPass = document.getElementById('tab-password');
+  const panelDetails = document.getElementById('tab-panel-details');
+  const panelPass = document.getElementById('tab-panel-password');
+
+  if (tab === 'details') {
+    tabDetails.className = 'flex-1 py-3 text-sm font-medium text-fiber-400 border-b-2 border-fiber-500 transition-colors';
+    tabPass.className = 'flex-1 py-3 text-sm font-medium text-gray-500 border-b-2 border-transparent hover:text-gray-300 transition-colors';
+    panelDetails.classList.remove('hidden');
+    panelPass.classList.add('hidden');
+  } else {
+    tabPass.className = 'flex-1 py-3 text-sm font-medium text-fiber-400 border-b-2 border-fiber-500 transition-colors';
+    tabDetails.className = 'flex-1 py-3 text-sm font-medium text-gray-500 border-b-2 border-transparent hover:text-gray-300 transition-colors';
+    panelPass.classList.remove('hidden');
+    panelDetails.classList.add('hidden');
+  }
 }
 
 async function saveAgentModal() {
-  const btn = document.getElementById('agent-modal-save-btn');
-  btn.disabled = true;
-  const origText = btn.textContent;
-  btn.textContent = 'Saving...';
+  const agentId = document.getElementById('am-agent-id').value;
+  const isEdit = !!agentId;
+  const saveBtn = document.getElementById('agent-modal-save-btn');
+
+  saveBtn.disabled = true;
+  saveBtn.innerHTML = `<div class="spinner-sm mx-auto"></div>`;
 
   try {
-    if (_activeAgentTab === 'password') {
-      // Set temp password
-      const agentId      = document.getElementById('am-agent-id').value;
-      const tempPassword = document.getElementById('am-temp-password').value.trim();
-      if (!tempPassword) { showToast('Please enter a temporary password.', 'warning'); return; }
-      await callBackend('setAgentTempPassword', { agentId, tempPassword });
-      document.getElementById('temp-pass-value').textContent = tempPassword;
-      document.getElementById('temp-pass-result').classList.remove('hidden');
-      showToast('Temporary password set successfully!', 'success');
-      loadAgentList();
-
-    } else if (_agentModalMode === 'create') {
-      const name     = document.getElementById('am-name').value.trim();
-      const email    = document.getElementById('am-email').value.trim();
-      const password = document.getElementById('am-password').value.trim();
-      const role     = document.getElementById('am-role').value;
-      if (!name || !email || !password) { showToast('Name, email and password are required.', 'warning'); return; }
-      const result = await callBackend('createAgent', { name, email, password, role });
-      showToast(`Agent created! ID: ${result.agentId}`, 'success');
-      closeAgentModal();
-      loadAgentList();
-
+    if (!isEdit) {
+      await callBackend('createAgent', {
+        name: document.getElementById('am-name').value.trim(),
+        email: document.getElementById('am-email').value.trim(),
+        role: document.getElementById('am-role').value,
+        password: document.getElementById('am-password').value
+      });
+      showToast('Agent created successfully!');
     } else {
-      // Edit mode
-      const agentId = document.getElementById('am-agent-id').value;
-      const name    = document.getElementById('am-name').value.trim();
-      const email   = document.getElementById('am-email').value.trim();
-      const role    = document.getElementById('am-role').value;
-      const status  = document.getElementById('am-status').value;
-      if (!name || !email) { showToast('Name and email are required.', 'warning'); return; }
-      await callBackend('updateAgent', { agentId, name, email, role, status });
-      showToast('Agent updated successfully!', 'success');
-      closeAgentModal();
-      loadAgentList();
+      await callBackend('updateAgent', {
+        agentId: agentId,
+        name: document.getElementById('am-name').value.trim(),
+        email: document.getElementById('am-email').value.trim(),
+        role: document.getElementById('am-role').value,
+        status: document.getElementById('am-status').value
+      });
+      showToast('Agent details updated!');
     }
-  } catch (err) {
-    showToast(err.message, 'error');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = origText;
-  }
-}
-
-function promptDeactivate(agentId, name, isInactive) {
-  if (isInactive) {
-    // Reactivate directly
-    callBackend('updateAgent', { agentId, status: 'Verified' })
-      .then(() => { showToast(`${name} reactivated.`, 'success'); loadAgentList(); })
-      .catch(err => showToast(err.message, 'error'));
-    return;
-  }
-  document.getElementById('deactivate-agent-id').value   = agentId;
-  document.getElementById('deactivate-agent-name').textContent = name;
-  show('modal-deactivate');
-}
-
-function closeDeactivate() { hide('modal-deactivate'); }
-
-async function confirmDeactivate() {
-  const agentId = document.getElementById('deactivate-agent-id').value;
-  try {
-    await callBackend('deleteAgent', { agentId });
-    showToast('Agent deactivated.', 'success');
-    closeDeactivate();
+    closeAgentModal();
     loadAgentList();
   } catch (err) {
     showToast(err.message, 'error');
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save';
   }
-}
-
-/** Generates a random 10-char alphanumeric password and fills the target input. */
-function generatePassword(inputId) {
-  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#!';
-  let pwd = '';
-  for (let i = 0; i < 10; i++) pwd += chars.charAt(Math.floor(Math.random() * chars.length));
-  document.getElementById(inputId).value = pwd;
 }

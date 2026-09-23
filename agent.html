@@ -4,8 +4,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FibreGems CRM — Agent Dashboard</title>
-  <meta name="description" content="FibreGems CRM agent dashboard for field lead capture and customer management.">
+  <title>FibreGems CRM — Agent Command & Daily Queue</title>
+  <meta name="description" content="FibreGems CRM agent dashboard for field lead capture, daily call backs, and customer management.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"
@@ -31,66 +31,32 @@
     }
 
     @keyframes slide-in {
-      from {
-        transform: translateX(100%);
-        opacity: 0;
-      }
-
-      to {
-        transform: translateX(0);
-        opacity: 1;
-      }
-    }
-
-    @keyframes slide-out {
-      from {
-        transform: translateX(0);
-        opacity: 1;
-      }
-
-      to {
-        transform: translateX(100%);
-        opacity: 0;
-      }
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
     }
 
     .animate-slide-in {
       animation: slide-in 0.3s ease-out;
     }
 
-    .animate-slide-out {
-      animation: slide-out 0.3s ease-in;
-    }
-
     .spinner {
       width: 32px;
       height: 32px;
-      border: 3px solid rgba(0, 180, 216, 0.2);
-      border-top-color: #00b4d8;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-
-    .spinner-sm {
-      width: 20px;
-      height: 20px;
-      border: 2px solid rgba(255, 255, 255, 0.3);
-      border-top-color: white;
+      border: 3px solid rgba(241, 163, 40, 0.2);
+      border-top-color: #F1A328;
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
     }
 
     @keyframes spin {
-      to {
-        transform: rotate(360deg);
-      }
+      to { transform: rotate(360deg); }
     }
 
     .sidebar-transition {
       transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
-    /* ── Input Fields ────────────────────────────────────────── */
+    /* Input Fields */
     .input-field {
       width: 100%;
       padding: 0.65rem 1rem;
@@ -121,7 +87,6 @@
       box-shadow: 0 0 0 3px rgba(224, 124, 42, 0.15), 0 1px 3px rgba(0, 0, 0, 0.3);
     }
 
-    /* Select arrow override */
     select.input-field {
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
       background-repeat: no-repeat;
@@ -135,24 +100,11 @@
       color: #f1f5f9;
     }
 
-    /* Date picker icon tint */
     input[type="date"].input-field::-webkit-calendar-picker-indicator {
       filter: invert(0.6) sepia(0.3) saturate(2) hue-rotate(10deg);
       cursor: pointer;
     }
 
-    /* Autofill — keep dark theme */
-    input:-webkit-autofill,
-    input:-webkit-autofill:hover,
-    input:-webkit-autofill:focus,
-    input:-webkit-autofill:active {
-      -webkit-box-shadow: 0 0 0 40px #1a1f2e inset !important;
-      -webkit-text-fill-color: #f1f5f9 !important;
-      border-radius: 0.75rem;
-      caret-color: #f1f5f9;
-    }
-
-    /* ── Fieldset cards ──────────────────────────────────────── */
     fieldset.form-card {
       background: rgba(255, 255, 255, 0.03);
       border: 1px solid rgba(255, 255, 255, 0.07);
@@ -160,7 +112,6 @@
       padding: 1.5rem;
     }
 
-    /* Label style */
     .field-label {
       display: block;
       font-size: 0.7rem;
@@ -172,22 +123,21 @@
     }
 
     .modal-overlay {
-      background: rgba(14, 34, 64, 0.7);
-      backdrop-filter: blur(4px);
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(6px);
     }
   </style>
 </head>
 
-<body class="bg-navy-900 min-h-screen font-inter text-white">
+<body class="bg-navy-900 min-h-screen font-inter text-white antialiased">
 
   <!-- Toast container -->
-  <div id="toast-container" class="fixed top-4 right-4 z-[60] flex flex-col gap-3"></div>
+  <div id="toast-container" class="fixed top-4 right-4 z-[70] flex flex-col gap-3"></div>
 
   <!-- ═══════════════════════════════════════════════════════════ -->
   <!-- Mobile Header                                              -->
   <!-- ═══════════════════════════════════════════════════════════ -->
-  <header
-    class="lg:hidden fixed top-0 left-0 right-0 z-30 bg-navy-900/95 backdrop-blur-lg border-b border-white/5 px-4 py-3 flex items-center justify-between">
+  <header class="lg:hidden fixed top-0 left-0 right-0 z-30 bg-navy-900/95 backdrop-blur-lg border-b border-white/5 px-4 py-3 flex items-center justify-between">
     <div class="flex items-center gap-3">
       <button onclick="toggleSidebar()" id="menu-toggle" class="p-2 rounded-lg hover:bg-white/5 transition-colors">
         <svg class="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -199,63 +149,80 @@
       </div>
     </div>
     <div class="flex items-center gap-2">
-      <span class="text-xs text-gray-400" id="agent-name-mobile"></span>
+      <span class="text-xs text-gray-300 font-medium" id="agent-name-mobile"></span>
     </div>
   </header>
 
   <!-- ═══════════════════════════════════════════════════════════ -->
   <!-- Sidebar                                                     -->
   <!-- ═══════════════════════════════════════════════════════════ -->
-  <aside id="sidebar"
-    class="fixed top-0 left-0 bottom-0 w-64 bg-navy-800/50 backdrop-blur-xl border-r border-white/5 z-40 sidebar-transition -translate-x-full lg:translate-x-0">
+  <aside id="sidebar" class="fixed top-0 left-0 bottom-0 w-64 bg-navy-800/80 backdrop-blur-xl border-r border-white/5 z-40 sidebar-transition -translate-x-full lg:translate-x-0">
     <!-- Brand -->
     <div class="px-6 py-6 border-b border-white/5">
       <div class="flex flex-col gap-2">
-        <div class="rounded-lg p-2 inline-block shadow-lg">
+        <div class="rounded-lg p-2 inline-block shadow-lg bg-black/40">
           <img src="images/logo.jpg" alt="FibreGems" class="h-8 object-contain">
         </div>
-        <p class="text-xs text-gray-500 font-medium">Agent Portal</p>
+        <p class="text-xs text-gray-400 font-semibold tracking-wider uppercase">Agent Daily Workspace</p>
       </div>
     </div>
 
     <!-- Agent Info -->
     <div class="px-6 py-4 border-b border-white/5">
       <div class="flex items-center gap-3">
-        <div
-          class="w-9 h-9 rounded-full bg-gradient-to-br from-gem-500 to-gem-700 flex items-center justify-center text-sm font-bold text-white">
+        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-fiber-500 to-fiber-700 flex items-center justify-center text-sm font-bold text-white shadow-md shadow-fiber-500/20">
           <span id="agent-avatar">A</span>
         </div>
         <div class="flex-1 min-w-0">
-          <p class="text-sm font-medium text-white truncate" id="agent-name">Agent</p>
-          <p class="text-xs text-gray-500" id="agent-role">Agent</p>
+          <p class="text-sm font-semibold text-white truncate" id="agent-name">Agent</p>
+          <p class="text-xs text-fiber-400 font-medium" id="agent-role">Field Agent</p>
         </div>
       </div>
     </div>
 
     <!-- Navigation -->
-    <nav class="px-3 py-4 space-y-1">
+    <nav class="px-3 py-4 space-y-1.5">
+      <button onclick="switchView('callbacks')" data-nav="callbacks"
+        class="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 border-l-4 bg-fiber-500/20 text-fiber-300 border-fiber-500 shadow-sm">
+        <div class="flex items-center gap-3">
+          <svg class="w-5 h-5 text-fiber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
+          </svg>
+          <span>Today's Call Backs</span>
+        </div>
+        <span id="nav-callback-badge" class="px-2 py-0.5 rounded-full text-xs font-bold bg-fiber-500 text-white">0</span>
+      </button>
+
       <button onclick="switchView('worklist')" data-nav="worklist"
-        class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 border-l-2 bg-fiber-500/20 text-fiber-300 border-fiber-500">
+        class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 border-l-4 border-transparent text-gray-400 hover:text-white hover:bg-white/5">
         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
           <path stroke-linecap="round" stroke-linejoin="round"
             d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
         </svg>
-        My Leads
+        <span>All Assigned Leads</span>
       </button>
+
       <button onclick="switchView('newlead')" data-nav="newlead"
-        class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 border-l-2 border-transparent text-gray-400 hover:text-white hover:bg-white/5">
-        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-          <path stroke-linecap="round" stroke-linejoin="round"
-            d="M19 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM4 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 0110.374 21c-2.331 0-4.512-.645-6.374-1.766z" />
+        class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 border-l-4 border-transparent text-gray-400 hover:text-white hover:bg-white/5">
+        <svg class="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
         </svg>
-        New Lead
+        <span>New Lead Capture</span>
+      </button>
+
+      <button onclick="switchView('activity')" data-nav="activity"
+        class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 border-l-4 border-transparent text-gray-400 hover:text-white hover:bg-white/5">
+        <svg class="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <span>My Activity Log</span>
       </button>
     </nav>
 
     <!-- Logout -->
     <div class="absolute bottom-0 left-0 right-0 p-4 border-t border-white/5">
       <button onclick="logout()"
-        class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-red-400/70 hover:text-red-400 hover:bg-red-500/10 transition-all">
+        class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-red-400/80 hover:text-red-300 hover:bg-red-500/10 transition-all">
         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
           <path stroke-linecap="round" stroke-linejoin="round"
             d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
@@ -266,46 +233,132 @@
   </aside>
 
   <!-- Sidebar overlay for mobile -->
-  <div id="sidebar-overlay" onclick="toggleSidebar()" class="hidden fixed inset-0 bg-black/50 z-30 lg:hidden"></div>
+  <div id="sidebar-overlay" onclick="toggleSidebar()" class="hidden fixed inset-0 bg-black/60 z-30 lg:hidden"></div>
 
   <!-- ═══════════════════════════════════════════════════════════ -->
   <!-- Main Content                                                -->
   <!-- ═══════════════════════════════════════════════════════════ -->
-  <main class="lg:ml-64 pt-16 lg:pt-0 min-h-screen">
+  <main class="lg:ml-64 pt-16 lg:pt-0 min-h-screen pb-12">
 
-    <!-- ─── WORKLIST VIEW ──────────────────────────────────── -->
-    <div id="view-worklist">
-      <!-- Header bar -->
-      <div
-        class="px-6 lg:px-8 py-6 border-b border-white/5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <!-- ─── DAILY GOAL & PROGRESS HEADER ─────────────────────── -->
+    <section class="bg-gradient-to-r from-navy-800/90 to-navy-900 border-b border-white/10 px-6 lg:px-8 py-6">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 class="text-xl font-bold text-white">My Leads</h2>
-          <p class="text-sm text-gray-500 mt-0.5"><span id="worklist-count">0 customers</span> assigned to you</p>
+          <div class="flex items-center gap-2">
+            <h1 class="text-xl font-bold text-white tracking-tight">Daily Execution Command</h1>
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-fiber-500/20 text-fiber-400 border border-fiber-500/30" id="current-today-badge">Today</span>
+          </div>
+          <p class="text-xs text-gray-400 mt-1">Direct daily workflow — leads scheduled for future dates remain hidden until their exact day.</p>
         </div>
-        <button onclick="switchView('newlead')"
-          class="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-fiber-500 to-fiber-600 text-white rounded-xl text-sm font-semibold hover:shadow-lg hover:shadow-fiber-500/25 transition-all hover:-translate-y-0.5">
-          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-          </svg>
-          New Lead
-        </button>
+
+        <div class="flex items-center gap-3">
+          <button onclick="refreshDailyData()" class="p-2.5 bg-white/5 hover:bg-white/10 text-gray-300 rounded-xl transition-all border border-white/10 text-xs font-medium flex items-center gap-1.5">
+            <svg class="w-4 h-4 text-fiber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+            </svg>
+            Refresh
+          </button>
+          <button onclick="switchView('newlead')" class="px-4 py-2.5 bg-gradient-to-r from-fiber-500 to-fiber-600 text-white rounded-xl text-xs font-semibold hover:shadow-lg hover:shadow-fiber-500/25 transition-all flex items-center gap-1.5">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            + Quick Lead
+          </button>
+        </div>
+      </div>
+
+      <!-- KPI Progress Row -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
+        <div class="bg-white/[0.03] border border-white/5 rounded-xl p-3.5 flex flex-col justify-between">
+          <span class="text-xs text-gray-400 font-medium">Scheduled Today</span>
+          <div class="flex items-baseline justify-between mt-1">
+            <span class="text-2xl font-bold text-white" id="stat-scheduled">0</span>
+            <span class="text-xs text-fiber-400 font-medium">Calls</span>
+          </div>
+        </div>
+        <div class="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3.5 flex flex-col justify-between">
+          <span class="text-xs text-emerald-300 font-medium">Completed Today</span>
+          <div class="flex items-baseline justify-between mt-1">
+            <span class="text-2xl font-bold text-emerald-400" id="stat-completed">0</span>
+            <span class="text-xs text-emerald-400 font-medium">Done</span>
+          </div>
+        </div>
+        <div class="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3.5 flex flex-col justify-between">
+          <span class="text-xs text-amber-300 font-medium">Remaining Calls</span>
+          <div class="flex items-baseline justify-between mt-1">
+            <span class="text-2xl font-bold text-amber-400" id="stat-remaining">0</span>
+            <span class="text-xs text-amber-400 font-medium">Pending</span>
+          </div>
+        </div>
+        <div class="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3.5 flex flex-col justify-between">
+          <span class="text-xs text-blue-300 font-medium">Total Touches Logged</span>
+          <div class="flex items-baseline justify-between mt-1">
+            <span class="text-2xl font-bold text-blue-400" id="stat-touches">0</span>
+            <span class="text-xs text-blue-400 font-medium">Actions</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Progress bar -->
+      <div class="mt-4">
+        <div class="flex items-center justify-between text-xs text-gray-400 mb-1.5">
+          <span>Today's Call Completion Rate</span>
+          <span class="font-bold text-fiber-400" id="stat-progress-pct">0%</span>
+        </div>
+        <div class="w-full bg-white/5 rounded-full h-2 overflow-hidden">
+          <div id="stat-progress-bar" class="bg-gradient-to-r from-fiber-500 to-emerald-400 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── 1. TODAY'S CALL BACKS VIEW (PRIMARY WORKFLOW) ──────── -->
+    <div id="view-callbacks" class="px-6 lg:px-8 py-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-fiber-400 animate-pulse"></span>
+            Today's Focused Call Back Queue
+          </h2>
+          <p class="text-xs text-gray-400 mt-0.5">Streamlined contact view showing client name and number for rapid 1-click execution.</p>
+        </div>
+        <div class="flex items-center gap-2" id="callback-filter-buttons">
+          <button onclick="setCallbackFilter('all')" data-cb-filter="all" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-fiber-500 text-white transition-all">All (<span id="cb-count-all">0</span>)</button>
+          <button onclick="setCallbackFilter('pending')" data-cb-filter="pending" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/5 text-gray-400 hover:text-white transition-all">Pending (<span id="cb-count-pending">0</span>)</button>
+          <button onclick="setCallbackFilter('completed')" data-cb-filter="completed" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/5 text-gray-400 hover:text-white transition-all">Done Today (<span id="cb-count-done">0</span>)</button>
+        </div>
+      </div>
+
+      <!-- Call Back Cards Container -->
+      <div id="callback-cards-container" class="space-y-3">
+        <div class="py-16 text-center">
+          <div class="spinner mx-auto mb-3"></div>
+          <p class="text-gray-400 text-sm">Loading today's call backs...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── 2. ALL ASSIGNED LEADS VIEW (TABULAR WORKLIST) ──────── -->
+    <div id="view-worklist" class="hidden">
+      <!-- Header bar -->
+      <div class="px-6 lg:px-8 py-6 border-b border-white/5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h2 class="text-xl font-bold text-white">All Assigned Leads</h2>
+          <p class="text-sm text-gray-500 mt-0.5"><span id="worklist-count">0 customers</span> in your pipeline</p>
+        </div>
       </div>
 
       <!-- Table -->
       <div class="overflow-x-auto">
         <table class="w-full">
           <thead>
-            <tr class="border-b border-white/10">
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Customer</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Package</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Next Action
-              </th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Last Contact
-              </th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Last Outcome
-              </th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider"></th>
+            <tr class="border-b border-white/10 bg-white/[0.02]">
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Customer</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Phone</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Package</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Scheduled Callback</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Last Outcome</th>
+              <th class="px-4 py-3 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">Action</th>
             </tr>
           </thead>
           <tbody id="worklist-body"></tbody>
@@ -316,18 +369,18 @@
       <div id="pagination" class="px-6 py-4 flex items-center justify-center gap-4 border-t border-white/5"></div>
     </div>
 
-    <!-- ─── NEW LEAD VIEW ──────────────────────────────────── -->
+    <!-- ─── 3. NEW LEAD VIEW ──────────────────────────────────── -->
     <div id="view-newlead" class="hidden">
       <div class="px-6 lg:px-8 py-6 border-b border-white/5">
         <div class="flex items-center gap-3">
-          <button onclick="switchView('worklist')" class="p-2 rounded-lg hover:bg-white/5 transition-colors">
+          <button onclick="switchView('callbacks')" class="p-2 rounded-lg hover:bg-white/5 transition-colors">
             <svg class="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
             </svg>
           </button>
           <div>
-            <h2 class="text-xl font-bold text-white">Capture New Lead</h2>
-            <p class="text-sm text-gray-500 mt-0.5">Enter customer details below</p>
+            <h2 class="text-xl font-bold text-white">Capture Lead & Close Sale</h2>
+            <p class="text-sm text-gray-400 mt-0.5">Automated order date stamping and duplicate check enabled</p>
           </div>
         </div>
       </div>
@@ -395,7 +448,7 @@
               <path stroke-linecap="round" stroke-linejoin="round"
                 d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375" />
             </svg>
-            Product & Sales
+            Product & Sales (Automatic Order Stamping)
           </legend>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
@@ -420,8 +473,8 @@
               </select>
             </div>
             <div>
-              <label for="nf-order-date" class="field-label">Order Date</label>
-              <input type="date" id="nf-order-date" class="input-field">
+              <label for="nf-order-date" class="field-label">Order Date (Auto-Stamped on Creation)</label>
+              <input type="date" id="nf-order-date" class="input-field" readonly>
             </div>
             <div>
               <label for="nf-promised-pay-date" class="field-label">Promised Payment Date</label>
@@ -430,32 +483,30 @@
           </div>
         </fieldset>
 
-        <!-- Status & Actions -->
+        <!-- Status & Next Action with 8-Day Limit -->
         <fieldset class="mb-4 form-card">
           <legend class="text-sm font-semibold text-fiber-400 uppercase tracking-wider mb-5 flex items-center gap-2">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round"
                 d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            Status & Next Steps
+            Status & Next Action (8-Day Max Window)
           </legend>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label for="nf-status" class="field-label">Customer Status</label>
-              <select id="nf-status" class="input-field">
+              <select id="nf-status" class="input-field" onchange="handleLeadStatusChange(this.value)">
                 <option value="New Lead">New Lead</option>
                 <option value="Contacted">Contacted</option>
                 <option value="Interested">Interested</option>
                 <option value="Payment Pending">Payment Pending</option>
-                <option value="Payment Received">Payment Received</option>
-                <option value="Activated">Activated</option>
-                <option value="Cancelled">Cancelled</option>
+                <option value="Won">Won (Sale Completed)</option>
                 <option value="Not Interested">Not Interested</option>
               </select>
             </div>
             <div>
               <label for="nf-outcome" class="field-label">Last Contact Outcome</label>
-              <input type="text" id="nf-outcome" placeholder="e.g. Voicemail left" class="input-field">
+              <input type="text" id="nf-outcome" placeholder="e.g. Call Back Requested" class="input-field">
             </div>
             <div>
               <label for="nf-next-action" class="field-label">Next Action</label>
@@ -465,12 +516,12 @@
                 <option value="Send Info">Send Info</option>
                 <option value="Follow Up Payment">Follow Up Payment</option>
                 <option value="Schedule Installation">Schedule Installation</option>
-                <option value="Close">Close</option>
               </select>
             </div>
             <div>
-              <label for="nf-next-action-date" class="field-label">Next Action Date</label>
+              <label for="nf-next-action-date" class="field-label">Next Action Date (Max +8 Days)</label>
               <input type="date" id="nf-next-action-date" class="input-field">
+              <span class="text-[11px] text-gray-500 mt-1 block">Scheduled leads only show on their exact target date.</span>
             </div>
           </div>
         </fieldset>
@@ -481,14 +532,171 @@
             class="px-6 py-3 bg-gradient-to-r from-fiber-500 to-fiber-600 text-white rounded-xl text-sm font-semibold hover:shadow-lg hover:shadow-fiber-500/25 transition-all hover:-translate-y-0.5">
             Capture Lead
           </button>
-          <button type="button" onclick="switchView('worklist')"
+          <button type="button" onclick="switchView('callbacks')"
             class="px-6 py-3 bg-white/5 text-gray-400 rounded-xl text-sm font-medium hover:bg-white/10 transition-colors">
             Cancel
           </button>
         </div>
       </form>
     </div>
+
+    <!-- ─── 4. AGENT ACTIVITY LOG VIEW ────────────────────────── -->
+    <div id="view-activity" class="hidden px-6 lg:px-8 py-6">
+      <div class="mb-6">
+        <h2 class="text-xl font-bold text-white">My Touchpoint Activity Log</h2>
+        <p class="text-sm text-gray-400 mt-0.5">Chronological audit of calls and actions you have logged</p>
+      </div>
+
+      <div class="overflow-x-auto rounded-xl border border-white/5 bg-white/[0.01]">
+        <table class="w-full">
+          <thead>
+            <tr class="border-b border-white/10 bg-white/[0.02]">
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Timestamp</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Customer</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Outcome</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Status After</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Next Action</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Notes</th>
+            </tr>
+          </thead>
+          <tbody id="activity-body">
+            <tr><td colspan="6" class="px-6 py-8 text-center text-gray-500 text-sm">Loading activity...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div id="activity-pagination" class="px-6 py-4 flex items-center justify-center gap-4 border-t border-white/5"></div>
+    </div>
+
   </main>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- 1-CLICK CALL OUTCOME DRAWER / MODAL                         -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <div id="modal-call-outcome" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div class="modal-overlay absolute inset-0" onclick="closeCallOutcomeModal()"></div>
+    <div class="relative bg-navy-800 border border-white/15 rounded-2xl shadow-2xl w-full max-w-lg p-6 z-10 animate-slide-in">
+      
+      <!-- Header -->
+      <div class="flex items-start justify-between pb-4 border-b border-white/10">
+        <div>
+          <span class="text-xs font-semibold uppercase tracking-wider text-fiber-400">Log Call Outcome</span>
+          <h3 class="text-lg font-bold text-white mt-0.5" id="co-client-name">Client Name</h3>
+          <p class="text-sm font-mono text-emerald-400 mt-0.5" id="co-client-phone">000 000 0000</p>
+        </div>
+        <button onclick="closeCallOutcomeModal()" class="p-2 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white transition-colors">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <input type="hidden" id="co-customer-id">
+
+      <!-- 1-Click Action Buttons -->
+      <div class="mt-4">
+        <label class="field-label mb-2">Select Quick Outcome *</label>
+        <div class="grid grid-cols-2 gap-2.5">
+          <button type="button" onclick="selectOutcomePreset('No Answer / Voicemail')" data-outcome-btn="No Answer / Voicemail"
+            class="outcome-preset-btn p-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-left transition-all">
+            <div class="flex items-center gap-2">
+              <span class="text-base">📵</span>
+              <span class="text-xs font-semibold text-white">No Answer</span>
+            </div>
+            <p class="text-[11px] text-gray-400 mt-1">Left voicemail / Retry tomorrow</p>
+          </button>
+
+          <button type="button" onclick="selectOutcomePreset('Callback Rescheduled')" data-outcome-btn="Callback Rescheduled"
+            class="outcome-preset-btn p-3 rounded-xl border border-fiber-500/40 bg-fiber-500/10 hover:bg-fiber-500/20 text-left transition-all">
+            <div class="flex items-center gap-2">
+              <span class="text-base">🗓️</span>
+              <span class="text-xs font-semibold text-fiber-300">Reschedule Call</span>
+            </div>
+            <p class="text-[11px] text-gray-400 mt-1">Pick date (Max 8 days)</p>
+          </button>
+
+          <button type="button" onclick="selectOutcomePreset('Sale Won')" data-outcome-btn="Sale Won"
+            class="outcome-preset-btn p-3 rounded-xl border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-left transition-all">
+            <div class="flex items-center gap-2">
+              <span class="text-base">🏆</span>
+              <span class="text-xs font-semibold text-emerald-300">Sale Won!</span>
+            </div>
+            <p class="text-[11px] text-gray-400 mt-1">Create order for today</p>
+          </button>
+
+          <button type="button" onclick="selectOutcomePreset('Not Interested')" data-outcome-btn="Not Interested"
+            class="outcome-preset-btn p-3 rounded-xl border border-red-500/40 bg-red-500/10 hover:bg-red-500/20 text-left transition-all">
+            <div class="flex items-center gap-2">
+              <span class="text-base">❌</span>
+              <span class="text-xs font-semibold text-red-300">Not Interested</span>
+            </div>
+            <p class="text-[11px] text-gray-400 mt-1">Flag as lost lead</p>
+          </button>
+        </div>
+      </div>
+
+      <!-- Reschedule Datepicker & Quick Day Presets (Shows for Reschedule or Follow-up) -->
+      <div id="co-reschedule-section" class="mt-4 p-3.5 bg-white/[0.02] border border-white/10 rounded-xl">
+        <label class="field-label">Scheduled Call Back Date (Max 8 Days) *</label>
+        
+        <!-- Quick Day Buttons -->
+        <div class="grid grid-cols-4 gap-2 mb-2.5">
+          <button type="button" onclick="setOutcomeDateOffset(1)" class="py-1.5 px-2 bg-white/5 hover:bg-fiber-500/20 hover:text-fiber-300 border border-white/10 rounded-lg text-xs font-semibold transition-colors">+1 Day</button>
+          <button type="button" onclick="setOutcomeDateOffset(2)" class="py-1.5 px-2 bg-white/5 hover:bg-fiber-500/20 hover:text-fiber-300 border border-white/10 rounded-lg text-xs font-semibold transition-colors">+2 Days</button>
+          <button type="button" onclick="setOutcomeDateOffset(3)" class="py-1.5 px-2 bg-white/5 hover:bg-fiber-500/20 hover:text-fiber-300 border border-white/10 rounded-lg text-xs font-semibold transition-colors">+3 Days</button>
+          <button type="button" onclick="setOutcomeDateOffset(7)" class="py-1.5 px-2 bg-white/5 hover:bg-fiber-500/20 hover:text-fiber-300 border border-white/10 rounded-lg text-xs font-semibold transition-colors">+7 Days</button>
+        </div>
+
+        <input type="date" id="co-next-date" class="input-field">
+        <p class="text-[11px] text-fiber-400 mt-1 flex items-center gap-1">
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+          </svg>
+          Strict 8-day follow-up limit enforced. Lead will only appear on that scheduled day.
+        </p>
+      </div>
+
+      <!-- Sale Won Details (Shown if Sale Won is selected) -->
+      <div id="co-sale-section" class="hidden mt-4 p-3.5 bg-emerald-500/5 border border-emerald-500/20 rounded-xl space-y-3">
+        <div>
+          <label class="field-label text-emerald-300">Package Sold *</label>
+          <select id="co-package" class="input-field">
+            <option value="Vuma Reach 20Mbps/10Mbps">Vuma Reach 20Mbps/10Mbps</option>
+            <option value="Vuma Reach 10Mbps/10Mbps">Vuma Reach 10Mbps/10Mbps</option>
+            <option value="Vuma Reach 50Mbps/25Mbps">Vuma Reach 50Mbps/25Mbps</option>
+            <option value="Vuma Reach 100Mbps/50Mbps">Vuma Reach 100Mbps/50Mbps</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div>
+          <label class="field-label text-emerald-300">Payment Type</label>
+          <select id="co-payment-type" class="input-field">
+            <option value="Debit Order">Debit Order</option>
+            <option value="EFT">EFT</option>
+            <option value="Cash">Cash</option>
+          </select>
+        </div>
+        <p class="text-[11px] text-emerald-400">Order date will be automatically stamped as today's exact date.</p>
+      </div>
+
+      <!-- Notes Field -->
+      <div class="mt-4">
+        <label class="field-label">Call Notes / Discussion Summary</label>
+        <textarea id="co-notes" rows="2" placeholder="e.g. Client requested callback after 5PM, interested in 20Mbps..." class="input-field resize-none"></textarea>
+      </div>
+
+      <!-- Action Footer -->
+      <div class="flex items-center gap-3 mt-6 pt-4 border-t border-white/10">
+        <button onclick="submitCallOutcome()" id="co-submit-btn"
+          class="flex-1 py-3 bg-gradient-to-r from-fiber-500 to-fiber-600 text-white rounded-xl text-sm font-bold hover:shadow-lg hover:shadow-fiber-500/25 transition-all">
+          Save & Update Queue
+        </button>
+        <button onclick="closeCallOutcomeModal()"
+          class="px-5 py-3 bg-white/5 text-gray-400 rounded-xl text-sm font-medium hover:bg-white/10 transition-colors">
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- ═══════════════════════════════════════════════════════════ -->
   <!-- Quick Edit Modal                                            -->
@@ -498,11 +706,10 @@
     <div class="relative bg-navy-800 border border-white/10 rounded-2xl shadow-2xl w-full max-w-md p-6 z-10">
       <div class="flex items-center justify-between mb-5">
         <div>
-          <h3 class="text-lg font-semibold text-white">Quick Edit</h3>
+          <h3 class="text-lg font-semibold text-white">Quick Edit Lead</h3>
           <p class="text-sm text-gray-500" id="qe-customer-name">Customer</p>
         </div>
-        <button onclick="closeQuickEdit()"
-          class="p-2 rounded-lg hover:bg-white/5 text-gray-500 hover:text-white transition-colors">
+        <button onclick="closeQuickEdit()" class="p-2 rounded-lg hover:bg-white/5 text-gray-500 hover:text-white transition-colors">
           <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>
@@ -528,9 +735,7 @@
             <option value="Contacted">Contacted</option>
             <option value="Interested">Interested</option>
             <option value="Payment Pending">Payment Pending</option>
-            <option value="Payment Received">Payment Received</option>
-            <option value="Activated">Activated</option>
-            <option value="Cancelled">Cancelled</option>
+            <option value="Won">Won</option>
             <option value="Not Interested">Not Interested</option>
           </select>
         </div>
@@ -542,11 +747,10 @@
             <option value="Send Info">Send Info</option>
             <option value="Follow Up Payment">Follow Up Payment</option>
             <option value="Schedule Installation">Schedule Installation</option>
-            <option value="Close">Close</option>
           </select>
         </div>
         <div>
-          <label class="field-label">Next Action Date</label>
+          <label class="field-label">Next Action Date (Max 8 Days)</label>
           <input type="date" id="qe-next-action-date" class="input-field">
         </div>
       </div>
@@ -610,7 +814,6 @@
       overlay.classList.toggle('hidden');
     }
 
-    // Update mobile agent name and avatar
     document.addEventListener('DOMContentLoaded', () => {
       if (session) {
         const mobileEl = document.getElementById('agent-name-mobile');
