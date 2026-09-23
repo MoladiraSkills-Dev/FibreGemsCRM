@@ -553,7 +553,7 @@ async function loadWorklist() {
           <p class="font-semibold text-white text-sm">${escHtml(c.name)}</p>
           <p class="text-xs text-gray-500 mt-0.5">${escHtml(c.customerId)}</p>
         </td>
-        <td class="px-4 py-3.5 text-sm font-mono text-gray-300">${escHtml(c.cellNumber || '—')}</td>
+        <td class="px-4 py-3.5 text-sm font-mono text-gray-300">${escHtml("0" + c.cellNumber || '—')}</td>
         <td class="px-4 py-3.5 text-sm text-gray-300">${escHtml(c.package || '—')}</td>
         <td class="px-4 py-3.5">${statusBadge(c.status)}</td>
         <td class="px-4 py-3.5">
