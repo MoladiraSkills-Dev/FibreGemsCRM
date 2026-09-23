@@ -25,6 +25,12 @@ function doPost(e) {
       case 'getAgentWorklist':
         result = getAgentWorklist(token, payload.offset, payload.limit);
         break;
+      case 'getAgentDailyQueue':
+        result = getAgentDailyQueue(token);
+        break;
+      case 'logCallOutcome':
+        result = logCallOutcome(token, payload);
+        break;
       case 'getAgentActivityLog':
         result = getAgentActivityLog(token, payload.offset, payload.limit);
         break;
@@ -36,6 +42,12 @@ function doPost(e) {
         break;
       case 'getAdminMasterGrid':
         result = getAdminMasterGrid(token, payload.offset, payload.limit);
+        break;
+      case 'getAdminCallbackReport':
+        result = getAdminCallbackReport(token, payload.targetDate);
+        break;
+      case 'enforceLeadLifecycleRules':
+        result = enforceLeadLifecycleRules(token);
         break;
       case 'runAgilitySync':
         result = runAgilitySync(token);
@@ -56,7 +68,7 @@ function doPost(e) {
         result = deleteAgent(token, payload.agentId);
         break;
       default:
-        throw new Error("Invalid API action requested.");
+        throw new Error("Invalid API action requested: " + action);
     }
 
     return ContentService.createTextOutput(JSON.stringify({ status: 'success', data: result }))
@@ -75,7 +87,7 @@ function doGet(e) {
 }
 
 // ============================================================
-// 2. CORE FUNCTIONS
+// 2. HELPER FUNCTIONS & BUSINESS RULES VALIDATION
 // ============================================================
 
 function hashPassword(password, salt) {
@@ -116,6 +128,43 @@ function getSessionUser(token) {
   throw new Error('Session expired. Please log in again.');
 }
 
+function requireAdmin_(token) {
+  const s = getSessionUser(token);
+  if (s.role !== 'Admin') throw new Error('Admin privileges required.');
+  return s;
+}
+
+/**
+ * Validates follow-up / next action date.
+ * Rule: Next action date cannot exceed Today + 8 days (8-day follow-up limit).
+ */
+function validateFollowUpDate_(dateStr) {
+  if (!dateStr) return '';
+  const todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  const targetDate = new Date(dateStr + 'T00:00:00');
+  const today = new Date(todayStr + 'T00:00:00');
+  const diffDays = Math.round((targetDate - today) / (1000 * 60 * 60 * 24));
+  
+  if (diffDays > 8) {
+    throw new Error("Follow-up / Call Back date cannot exceed 8 days from today (8-day rule limit).");
+  }
+  if (diffDays < 0) {
+    throw new Error("Follow-up / Call Back date cannot be set in the past.");
+  }
+  return dateStr;
+}
+
+/**
+ * Returns formatted date string (yyyy-MM-dd) safely from Date or string
+ */
+function formatDateSafe_(val) {
+  if (!val) return '';
+  if (val instanceof Date) {
+    return Utilities.formatDate(val, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  }
+  return String(val).slice(0, 10);
+}
+
 // ============================================================
 // 3. AGENT LEAD CAPTURE & UPDATE
 // ============================================================
@@ -126,6 +175,11 @@ function handleAgentLeadUpdate(existingIdOverride, formData, token) {
   const todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
   const custSheet = ss.getSheetByName('CUSTOMERS');
   const custData = custSheet.getDataRange().getValues();
+  
+  // Validate 8-day follow up limit
+  if (formData.nextActionDate) {
+    validateFollowUpDate_(formData.nextActionDate);
+  }
   
   // Duplicate protection
   if (!existingIdOverride && formData.cellNumber) {
@@ -138,6 +192,10 @@ function handleAgentLeadUpdate(existingIdOverride, formData, token) {
     }
   }
   
+  const isSaleWon = (formData.customerStatus === 'Won' || formData.customerStatus === 'Sale Completed');
+  // Order date is automatically the exact current day (Order Date >= Created Date)
+  const orderDate = (isSaleWon || formData.orderDate) ? todayStr : "";
+  
   let customerId = existingIdOverride;
   if(!customerId) {
     // New lead — insert across all tables
@@ -145,29 +203,262 @@ function handleAgentLeadUpdate(existingIdOverride, formData, token) {
     custSheet.appendRow([
       customerId, 'Active', timestamp, session.agentId, timestamp, formData.firstName, formData.surname, `${formData.firstName} ${formData.surname}`,
       formData.cellNumber, formData.alternateCell, formData.email, formData.address, formData.suburb, formData.package || "", formData.paymentType || "",
-      formData.orderDate || "", "", "", "", "", "", "", "", formData.promisedPaymentDate || "", "", "", "", "", "", session.agentId, session.agentId, "",
+      orderDate, "", "", "", "", "", "", "", formData.promisedPaymentDate || "", "", "", "", "", "", session.agentId, session.agentId, "",
       formData.customerStatus || "New Lead", formData.nextAction || "", formData.nextActionDate || "", "", todayStr, formData.lastContactOutcome || ""
     ]);
-    ss.getSheetByName('ORDERS').appendRow(['ORD-' + Utilities.getUuid().slice(0,8), customerId, `${formData.firstName} ${formData.surname}`, formData.orderDate||"", '', '', '', '', '', '']);
-    ss.getSheetByName('PAYMENTS').appendRow(['PAY-' + Utilities.getUuid().slice(0,8), customerId, 'Pending', formData.promisedPaymentDate||"", '', '']);
-    ss.getSheetByName('ACTIVATIONS').appendRow(['ACT-' + Utilities.getUuid().slice(0,8), customerId, 'Pending', '', '']);
+    
+    if (orderDate || isSaleWon) {
+      ss.getSheetByName('ORDERS').appendRow(['ORD-' + Utilities.getUuid().slice(0,8), customerId, `${formData.firstName} ${formData.surname}`, orderDate, '', '', session.name, isSaleWon ? 'Sale Completed' : 'Pending', formData.nextAction||'', formData.nextActionDate||'', todayStr, 'Direct Capture']);
+      ss.getSheetByName('PAYMENTS').appendRow(['PAY-' + Utilities.getUuid().slice(0,8), customerId, 'Pending', formData.promisedPaymentDate||"", '', '']);
+      ss.getSheetByName('ACTIVATIONS').appendRow(['ACT-' + Utilities.getUuid().slice(0,8), customerId, 'Pending', '', '']);
+    }
   } else {
     // Update existing lead
     let rowIndex = custData.findIndex(r => r[0] === customerId) + 1;
     if(rowIndex > 0) {
       custSheet.getRange(rowIndex, 5, 1, 9).setValues([[timestamp, formData.firstName, formData.surname, `${formData.firstName} ${formData.surname}`, formData.cellNumber, formData.alternateCell, formData.email, formData.address, formData.suburb]]);
-      custSheet.getRange(rowIndex, 14, 1, 2).setValues([[formData.package || "", formData.paymentType || ""]]);
+      custSheet.getRange(rowIndex, 14, 1, 3).setValues([[formData.package || "", formData.paymentType || "", orderDate]]);
       custSheet.getRange(rowIndex, 33, 1, 3).setValues([[formData.customerStatus, formData.nextAction, formData.nextActionDate]]);
+      custSheet.getRange(rowIndex, 37, 1, 2).setValues([[todayStr, formData.lastContactOutcome || ""]]);
     }
   }
   
   // Audit log
-  ss.getSheetByName('ACTIVITY_LOG').appendRow(['ACT-' + Utilities.getUuid().substring(0, 8).toUpperCase(), timestamp, customerId, `${formData.firstName} ${formData.surname}`, session.agentId, existingIdOverride ? "Lead Overwritten" : "Lead Captured", "Web Portal", formData.lastContactOutcome||"", formData.customerStatus||"", formData.promisedPaymentDate || "", formData.nextAction||"", formData.nextActionDate||"", "False", "None", "", "", session.agentId, timestamp]);
+  ss.getSheetByName('ACTIVITY_LOG').appendRow([
+    'ACT-' + Utilities.getUuid().substring(0, 8).toUpperCase(),
+    timestamp,
+    customerId,
+    `${formData.firstName} ${formData.surname}`,
+    session.agentId,
+    existingIdOverride ? "Lead Updated" : "Lead Captured",
+    "Web Portal",
+    formData.lastContactOutcome || (isSaleWon ? "Sale Won" : "Details Captured"),
+    formData.customerStatus || "New Lead",
+    formData.promisedPaymentDate || "",
+    formData.nextAction || "",
+    formData.nextActionDate || "",
+    "False",
+    "None",
+    "",
+    formData.notes || "",
+    session.agentId,
+    timestamp
+  ]);
+  
   return { success: true, customerId: customerId };
 }
 
 // ============================================================
-// 4. AGENT WORKLIST
+// 4. AGENT DAILY QUEUE & DEDICATED CALL BACK WORKFLOW
+// ============================================================
+
+/**
+ * Returns today's active leads and callbacks for the logged-in agent.
+ * STRICT RULE: Only shows leads relevant for TODAY (scheduled for today or overdue).
+ * Leads scheduled for a future day are excluded and will only show on their scheduled date.
+ */
+function getAgentDailyQueue(token) {
+  const session = getSessionUser(token);
+  const todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  const todayDate = new Date(todayStr + 'T00:00:00');
+  
+  const custData = ss.getSheetByName('CUSTOMERS').getDataRange().getValues();
+  const actData  = ss.getSheetByName('ACTIVITY_LOG').getDataRange().getValues();
+
+  // Map latest activity for each customer by this agent
+  const agentActivityMap = {};
+  // Count touches logged today by this agent
+  let todayTouchCount = 0;
+  for (let i = 1; i < actData.length; i++) {
+    const row = actData[i];
+    const rowAgentId = String(row[4] || '').trim();
+    const customerId = String(row[2] || '').trim();
+    const actDateStr = formatDateSafe_(row[1]);
+    
+    if (rowAgentId === session.agentId) {
+      if (actDateStr === todayStr) todayTouchCount++;
+      if (customerId) agentActivityMap[customerId] = row;
+    }
+  }
+
+  const todayCallbacks = [];
+  const todayNewLeads = [];
+  let totalScheduledToday = 0;
+  let callbacksCompletedToday = 0;
+
+  for (let i = 1; i < custData.length; i++) {
+    const row = custData[i];
+    const custId = String(row[0] || '').trim();
+    const recordStatus = String(row[1] || 'Active').trim();
+    const createdStr = formatDateSafe_(row[2]);
+    const assignedAgent = String(row[30] || '').trim();
+    const status = String(row[32] || '').trim();
+    const nextAction = String(row[33] || '').trim();
+    const nextActionDate = formatDateSafe_(row[34]);
+    const lastContactDate = formatDateSafe_(row[36]);
+
+    if (!custId || recordStatus === 'Archived' || recordStatus === 'Expired') continue;
+    if (status === 'Won' || status === 'Lost' || status.includes('Lost')) continue;
+
+    const ownsCustomer = (assignedAgent === session.agentId);
+    if (!ownsCustomer) continue;
+
+    // Check if customer is scheduled for callback
+    if (nextActionDate) {
+      const scheduledDate = new Date(nextActionDate + 'T00:00:00');
+      const diffDays = Math.round((todayDate - scheduledDate) / (1000 * 60 * 60 * 24));
+      
+      // Future callbacks (diffDays < 0): HIDE! They should ONLY show on the scheduled day
+      if (diffDays < 0) {
+        continue;
+      }
+
+      totalScheduledToday++;
+      const isCompleted = (lastContactDate === todayStr);
+      if (isCompleted) callbacksCompletedToday++;
+
+      todayCallbacks.push({
+        customerId: custId,
+        name: String(row[7] || `${row[5]} ${row[6]}`),
+        cellNumber: String(row[8] || ''),
+        alternateCell: String(row[9] || ''),
+        package: String(row[13] || ''),
+        status: status,
+        nextAction: nextAction,
+        nextActionDate: nextActionDate,
+        isOverdue: diffDays > 0,
+        daysOverdue: Math.max(0, diffDays),
+        isCompletedToday: isCompleted,
+        lastOutcome: String(row[37] || (agentActivityMap[custId] ? agentActivityMap[custId][7] : ''))
+      });
+    } else if (createdStr === todayStr) {
+      // New lead assigned or captured today without scheduled action yet
+      todayNewLeads.push({
+        customerId: custId,
+        name: String(row[7] || `${row[5]} ${row[6]}`),
+        cellNumber: String(row[8] || ''),
+        package: String(row[13] || ''),
+        status: status,
+        createdDate: createdStr,
+        isCompletedToday: (lastContactDate === todayStr)
+      });
+    }
+  }
+
+  // Sort callbacks: overdue first, then scheduled today, completed at the end
+  todayCallbacks.sort((a, b) => {
+    if (a.isCompletedToday !== b.isCompletedToday) return a.isCompletedToday ? 1 : -1;
+    return b.daysOverdue - a.daysOverdue;
+  });
+
+  return {
+    todayStr: todayStr,
+    callbacks: todayCallbacks,
+    newLeads: todayNewLeads,
+    stats: {
+      totalScheduled: totalScheduledToday,
+      completedToday: callbacksCompletedToday,
+      remainingToday: Math.max(0, totalScheduledToday - callbacksCompletedToday),
+      todayTouches: todayTouchCount
+    }
+  };
+}
+
+/**
+ * 1-Click Call Outcome Logger for Agents.
+ * Replaces spreadsheets: instantly records touchpoint, updates customer record,
+ * auto-sets order date if won, and enforces the strict 8-day follow-up limit.
+ */
+function logCallOutcome(token, payload) {
+  const session = getSessionUser(token);
+  const { customerId, outcome, notes, nextAction, nextActionDate, packageChoice, paymentType } = payload;
+  
+  if (!customerId) throw new Error("Customer ID is required.");
+  if (!outcome) throw new Error("Call outcome is required.");
+
+  // Validate 8-day rule limit
+  if (nextActionDate) {
+    validateFollowUpDate_(nextActionDate);
+  }
+
+  const timestamp = new Date().toISOString();
+  const todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  const custSheet = ss.getSheetByName('CUSTOMERS');
+  const custData = custSheet.getDataRange().getValues();
+  
+  const rowIndex = custData.findIndex(r => String(r[0]) === String(customerId)) + 1;
+  if (rowIndex === 0) throw new Error("Customer not found.");
+
+  const isSaleWon = (outcome === 'Sale Won' || outcome === 'Sale Completed');
+  const isLost = (outcome === 'Not Interested' || outcome === 'Lost' || outcome === 'Invalid Lead');
+  
+  let newStatus = 'In Progress';
+  if (isSaleWon) newStatus = 'Won';
+  else if (isLost) newStatus = 'Lost';
+  else if (outcome === 'Callback Rescheduled') newStatus = 'Callback Scheduled';
+  else if (outcome === 'No Answer / Voicemail') newStatus = 'Follow-Up Needed';
+
+  const custRow = custData[rowIndex - 1];
+  const customerName = custRow[7] || `${custRow[5]} ${custRow[6]}`;
+
+  // Update CUSTOMERS record
+  custSheet.getRange(rowIndex, 5).setValue(timestamp); // Last_Updated_DateTime
+  if (packageChoice) custSheet.getRange(rowIndex, 14).setValue(packageChoice);
+  if (paymentType) custSheet.getRange(rowIndex, 15).setValue(paymentType);
+  
+  // If sale won: Automatic Order Date = exact day (Order Date >= Created Date)
+  if (isSaleWon) {
+    custSheet.getRange(rowIndex, 16).setValue(todayStr); // Order_Date
+    ss.getSheetByName('ORDERS').appendRow([
+      'ORD-' + Utilities.getUuid().slice(0, 8).toUpperCase(),
+      customerId,
+      customerName,
+      todayStr,
+      '',
+      '',
+      session.name,
+      'Sale Completed',
+      nextAction || '',
+      nextActionDate || '',
+      todayStr,
+      'Agent Portal Call'
+    ]);
+    ss.getSheetByName('PAYMENTS').appendRow(['PAY-' + Utilities.getUuid().slice(0,8), customerId, 'Pending', '', '', '']);
+    ss.getSheetByName('ACTIVATIONS').appendRow(['ACT-' + Utilities.getUuid().slice(0,8), customerId, 'Pending', '', '']);
+  }
+
+  custSheet.getRange(rowIndex, 33, 1, 3).setValues([[newStatus, nextAction || (outcome === 'Callback Rescheduled' ? 'Call Back' : ''), nextActionDate || '']]);
+  custSheet.getRange(rowIndex, 37, 1, 2).setValues([[todayStr, outcome]]);
+  // Reset escalation flag since contact occurred
+  custSheet.getRange(rowIndex, 28, 1, 3).setValues([["False", "None", ""]]);
+
+  // Log in ACTIVITY_LOG
+  ss.getSheetByName('ACTIVITY_LOG').appendRow([
+    'ACT-' + Utilities.getUuid().substring(0, 8).toUpperCase(),
+    timestamp,
+    customerId,
+    customerName,
+    session.agentId,
+    "Call Logged",
+    "Phone Call",
+    outcome,
+    newStatus,
+    "",
+    nextAction || "",
+    nextActionDate || "",
+    "False",
+    "None",
+    "",
+    notes || "",
+    session.agentId,
+    timestamp
+  ]);
+
+  return { success: true, customerId, newStatus };
+}
+
+// ============================================================
+// 5. STANDARD AGENT WORKLIST & ACTIVITY LOG
 // ============================================================
 
 function getAgentWorklist(token, offset, limit) {
@@ -175,9 +466,7 @@ function getAgentWorklist(token, offset, limit) {
   const custData = ss.getSheetByName('CUSTOMERS').getDataRange().getValues();
   const actData  = ss.getSheetByName('ACTIVITY_LOG').getDataRange().getValues();
 
-  // Build a map of agentId → { customerId → latest activity row }
-  // Only include activity rows where THIS agent is the logger (col 4 = Agent_ID or col 16 = Logged_By_Agent_ID)
-  const agentActivityMap = {}; // customerId → latest activity row for this agent
+  const agentActivityMap = {};
   for (let i = 1; i < actData.length; i++) {
     const row = actData[i];
     const rowAgentId      = String(row[4]  || '').trim();
@@ -185,46 +474,36 @@ function getAgentWorklist(token, offset, limit) {
     const customerId      = String(row[2]  || '').trim();
     if (!customerId) continue;
     if (rowAgentId !== session.agentId && rowLoggedById !== session.agentId) continue;
-    // Keep the most recent entry per customer (rows are appended chronologically)
     agentActivityMap[customerId] = row;
   }
 
   let worklist = [];
   for (let i = 1; i < custData.length; i++) {
     const row = custData[i];
-    const custId    = String(row[0] || '').trim();
+    const custId = String(row[0] || '').trim();
     const assignedAgent = String(row[30] || '').trim();
-    if (custData[i][1] === 'Archived') continue;
+    if (row[1] === 'Archived' || row[1] === 'Expired') continue;
 
-    // Include customer if assigned to this agent OR if this agent has any activity logged for them
-    const ownsCustomer   = assignedAgent === session.agentId;
-    const hasActivity    = !!agentActivityMap[custId];
+    const ownsCustomer = (assignedAgent === session.agentId);
+    const hasActivity = !!agentActivityMap[custId];
     if (!ownsCustomer && !hasActivity) continue;
 
-    let naDate = row[34];
-    if (naDate && naDate instanceof Date) {
-      naDate = Utilities.formatDate(naDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
-    }
-
-    // Enrich with the agent's latest activity for this customer
+    const naDate = formatDateSafe_(row[34]);
     const lastAct = agentActivityMap[custId];
-    let lastContactDate = '';
-    let lastActionType  = '';
-    let lastOutcome     = '';
+    let lastContactDate = formatDateSafe_(row[36]);
+    let lastActionType = '';
+    let lastOutcome = String(row[37] || '');
+    
     if (lastAct) {
-      let actDate = lastAct[1];
-      if (actDate && actDate instanceof Date) {
-        lastContactDate = Utilities.formatDate(actDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
-      } else if (actDate) {
-        lastContactDate = String(actDate).slice(0, 10);
-      }
+      if (!lastContactDate) lastContactDate = formatDateSafe_(lastAct[1]);
       lastActionType = String(lastAct[5] || '').trim();
-      lastOutcome    = String(lastAct[7] || '').trim();
+      if (!lastOutcome) lastOutcome = String(lastAct[7] || '').trim();
     }
 
     worklist.push({
       customerId:      custId,
-      name:            row[7],
+      name:            row[7] || `${row[5]} ${row[6]}`,
+      cellNumber:      String(row[8] || ''),
       package:         row[13],
       status:          row[32],
       nextAction:      row[33] || '',
@@ -238,17 +517,16 @@ function getAgentWorklist(token, offset, limit) {
   return { data: worklist.slice(offset, offset + limit), total: worklist.length };
 }
 
-// Returns paginated ACTIVITY_LOG rows for the logged-in agent only
 function getAgentActivityLog(token, offset, limit) {
   const session  = getSessionUser(token);
   const actData  = ss.getSheetByName('ACTIVITY_LOG').getDataRange().getValues();
-  const headers  = actData[0];
   let rows = [];
   for (let i = 1; i < actData.length; i++) {
     const row = actData[i];
     const rowAgentId    = String(row[4]  || '').trim();
     const rowLoggedById = String(row[16] || '').trim();
     if (rowAgentId !== session.agentId && rowLoggedById !== session.agentId) continue;
+    
     let actDate = row[1];
     if (actDate && actDate instanceof Date) {
       actDate = Utilities.formatDate(actDate, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm');
@@ -263,17 +541,13 @@ function getAgentActivityLog(token, offset, limit) {
       outcome:       String(row[7]  || ''),
       statusAfter:   String(row[8]  || ''),
       nextAction:    String(row[10] || ''),
-      nextActionDate:String(row[11] || ''),
+      nextActionDate:formatDateSafe_(row[11]),
       notes:         String(row[15] || '')
     });
   }
-  rows.reverse(); // newest first
+  rows.reverse();
   return { data: rows.slice(offset, offset + limit), total: rows.length };
 }
-
-// ============================================================
-// 5. QUICK UPDATE
-// ============================================================
 
 function quickUpdateSalesData(customerId, payload, token) {
   const session = getSessionUser(token);
@@ -281,18 +555,45 @@ function quickUpdateSalesData(customerId, payload, token) {
   const custData = custSheet.getDataRange().getValues();
   let rowIndex = custData.findIndex(r => r[0] === customerId && r[30] === session.agentId) + 1;
   if (rowIndex === 0) throw new Error("Unauthorized or Customer not found.");
+  
+  if (payload.nextActionDate) {
+    validateFollowUpDate_(payload.nextActionDate);
+  }
+
+  const todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
   custSheet.getRange(rowIndex, 14).setValue(payload.package);
   custSheet.getRange(rowIndex, 33, 1, 3).setValues([[payload.status, payload.nextAction, payload.nextActionDate]]);  
-  ss.getSheetByName('ACTIVITY_LOG').appendRow(['ACT-' + Utilities.getUuid().substring(0,8).toUpperCase(), new Date(), customerId, custData[rowIndex-1][7], session.agentId, "Quick Edit", "", "", payload.status, "", payload.nextAction, payload.nextActionDate, "", "", "", "", session.agentId, new Date()]);
-  return {success: true};
+  custSheet.getRange(rowIndex, 37).setValue(todayStr);
+
+  ss.getSheetByName('ACTIVITY_LOG').appendRow([
+    'ACT-' + Utilities.getUuid().substring(0,8).toUpperCase(),
+    new Date(),
+    customerId,
+    custData[rowIndex-1][7],
+    session.agentId,
+    "Quick Edit",
+    "",
+    "Quick Update",
+    payload.status,
+    "",
+    payload.nextAction,
+    payload.nextActionDate,
+    "False",
+    "None",
+    "",
+    "",
+    session.agentId,
+    new Date()
+  ]);
+  return { success: true };
 }
 
 // ============================================================
-// 6. ADMIN DASHBOARD
+// 6. ADMIN DASHBOARD & CALL BACK ACCOUNTABILITY REPORTING
 // ============================================================
 
 function getAdminDashboard(token) {
-  getSessionUser(token);
+  requireAdmin_(token);
   const todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
   const activityData = ss.getSheetByName('ACTIVITY_LOG').getDataRange().getValues().slice(1);
   const userMap = new Map(ss.getSheetByName('Users').getDataRange().getValues().slice(1).map(u => [u[0], {name: u[1], role: u[5]}]));
@@ -300,31 +601,241 @@ function getAdminDashboard(token) {
   const agentStats = {};
   activityData.forEach(row => {
     let logDate = new Date(row[1]);
-    if (Utilities.formatDate(logDate, Session.getScriptTimeZone(), "yyyy-MM-dd") === todayStr) {
+    if (formatDateSafe_(logDate) === todayStr) {
       const aid = row[4];
       if (!agentStats[aid]) agentStats[aid] = { count: 0, lastActivity: logDate };
       agentStats[aid].count++;
       if (logDate > agentStats[aid].lastActivity) agentStats[aid].lastActivity = logDate;
     }
   });
+  
   const agents = Object.keys(agentStats).map(aid => ({
+    agentId: aid,
     name: userMap.get(aid)?.name || 'Unknown',
     role: userMap.get(aid)?.role || 'Agent',
     touches: agentStats[aid].count,
     lastActive: agentStats[aid].lastActivity
   })).sort((a,b) => b.lastActive - a.lastActive);
+  
   const custData = ss.getSheetByName('CUSTOMERS').getDataRange().getValues().slice(1);
-  const statuses = custData.reduce((acc, row) => { const stat = row[32] || 'Unknown'; acc[stat] = (acc[stat] || 0) + 1; return acc; }, {});
+  const statuses = custData.reduce((acc, row) => { 
+    if (row[1] !== 'Archived' && row[1] !== 'Expired') {
+      const stat = row[32] || 'New Lead'; 
+      acc[stat] = (acc[stat] || 0) + 1; 
+    }
+    return acc; 
+  }, {});
   
   return { activeCount: agents.length, agents, statuses };
 }
 
+/**
+ * Admin Comprehensive Call Back Report & Escalation Monitor.
+ * Reports on agent callback completion, missed callbacks, and 7-day escalations.
+ */
+function getAdminCallbackReport(token, targetDate) {
+  requireAdmin_(token);
+  const todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
+  const reportDateStr = targetDate || todayStr;
+  const reportDate = new Date(reportDateStr + 'T00:00:00');
+  
+  const custData = ss.getSheetByName('CUSTOMERS').getDataRange().getValues();
+  const actData  = ss.getSheetByName('ACTIVITY_LOG').getDataRange().getValues();
+  const usersData = ss.getSheetByName('Users').getDataRange().getValues();
+  const userMap = new Map(usersData.slice(1).map(u => [String(u[0]), { name: u[1], role: u[5] }]));
+
+  // Build agent map
+  const agentReport = {};
+  userMap.forEach((user, id) => {
+    agentReport[id] = {
+      agentId: id,
+      name: user.name,
+      role: user.role,
+      scheduled: 0,
+      completed: 0,
+      missed: 0,
+      completionRate: 0
+    };
+  });
+
+  const missedCallbacks = [];
+  const escalatedLeads = [];
+
+  for (let i = 1; i < custData.length; i++) {
+    const row = custData[i];
+    const custId = String(row[0] || '').trim();
+    if (!custId || row[1] === 'Archived' || row[1] === 'Expired') continue;
+
+    const assignedAgentId = String(row[30] || '').trim();
+    const customerName = String(row[7] || `${row[5]} ${row[6]}`);
+    const phone = String(row[8] || '');
+    const status = String(row[32] || '');
+    const nextActionDate = formatDateSafe_(row[34]);
+    const lastContactDate = formatDateSafe_(row[36]);
+    const isEscalated = (String(row[27] || '').toUpperCase() === 'TRUE');
+    const escalationType = String(row[28] || 'Level 1');
+    const escalationReason = String(row[29] || '');
+
+    // Check scheduled callbacks on or before reportDate
+    if (nextActionDate && status !== 'Won' && status !== 'Lost' && !status.includes('Lost')) {
+      const scheduledDate = new Date(nextActionDate + 'T00:00:00');
+      const isDueOnReportDate = (nextActionDate === reportDateStr);
+      const isOverdue = (scheduledDate < reportDate);
+
+      if (agentReport[assignedAgentId] && (isDueOnReportDate || isOverdue)) {
+        agentReport[assignedAgentId].scheduled++;
+        const touchedOnOrAfter = (lastContactDate >= nextActionDate);
+        
+        if (touchedOnOrAfter) {
+          agentReport[assignedAgentId].completed++;
+        } else {
+          agentReport[assignedAgentId].missed++;
+          missedCallbacks.push({
+            customerId: custId,
+            name: customerName,
+            phone: phone,
+            agentId: assignedAgentId,
+            agentName: userMap.get(assignedAgentId)?.name || 'Unassigned',
+            scheduledDate: nextActionDate,
+            daysOverdue: Math.max(1, Math.round((reportDate - scheduledDate) / (1000 * 60 * 60 * 24))),
+            lastOutcome: String(row[37] || 'None')
+          });
+        }
+      }
+    }
+
+    // 7-day stale check / Escalations
+    const createdDate = new Date(formatDateSafe_(row[2]) + 'T00:00:00');
+    const daysSinceCreation = Math.round((reportDate - createdDate) / (1000 * 60 * 60 * 24));
+    let daysSinceContact = 999;
+    if (lastContactDate) {
+      daysSinceContact = Math.round((reportDate - new Date(lastContactDate + 'T00:00:00')) / (1000 * 60 * 60 * 24));
+    }
+
+    if (isEscalated || (daysSinceContact >= 7 && status !== 'Won' && status !== 'Lost' && !status.includes('Lost'))) {
+      escalatedLeads.push({
+        customerId: custId,
+        name: customerName,
+        phone: phone,
+        agentId: assignedAgentId,
+        agentName: userMap.get(assignedAgentId)?.name || 'Unassigned',
+        daysSinceContact: daysSinceContact === 999 ? daysSinceCreation : daysSinceContact,
+        escalationLevel: daysSinceContact >= 14 ? 'Level 3 - Operations Escalation' : 'Level 2 - Supervisor Alert',
+        reason: escalationReason || `No feedback/touch for ${daysSinceContact === 999 ? daysSinceCreation : daysSinceContact} days`
+      });
+    }
+  }
+
+  // Calculate completion rates
+  const agentList = Object.values(agentReport).map(ag => {
+    ag.completionRate = ag.scheduled > 0 ? Math.round((ag.completed / ag.scheduled) * 100) : 100;
+    return ag;
+  }).sort((a, b) => b.missed - a.missed);
+
+  return {
+    reportDate: reportDateStr,
+    agents: agentList,
+    missedCallbacks: missedCallbacks,
+    escalatedLeads: escalatedLeads,
+    totalScheduled: agentList.reduce((acc, a) => acc + a.scheduled, 0),
+    totalCompleted: agentList.reduce((acc, a) => acc + a.completed, 0),
+    totalMissed: missedCallbacks.length,
+    totalEscalated: escalatedLeads.length
+  };
+}
+
 // ============================================================
-// 7. ADMIN MASTER GRID
+// 7. AUTOMATED LEAD LIFECYCLE ENGINE (42-Day Lost & 7-Day Escalation)
+// ============================================================
+
+/**
+ * Enforces automated lead lifecycle rules:
+ * 1. 42-Day Auto-Lost: Any lead open > 42 days without win is flagged Lost (42-Day Expiry).
+ * 2. 7-Day Escalation: Any lead with no contact for >= 7 days is escalated to supervisor.
+ */
+function enforceLeadLifecycleRules(token) {
+  requireAdmin_(token);
+  const todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  const today = new Date(todayStr + 'T00:00:00');
+  const custSheet = ss.getSheetByName('CUSTOMERS');
+  const custData = custSheet.getDataRange().getValues();
+  const timestamp = new Date().toISOString();
+
+  let expiredCount = 0;
+  let escalatedCount = 0;
+
+  for (let i = 1; i < custData.length; i++) {
+    const row = custData[i];
+    const custId = String(row[0] || '').trim();
+    if (!custId || row[1] === 'Archived' || row[1] === 'Expired') continue;
+
+    const status = String(row[32] || '');
+    if (status === 'Won' || status === 'Lost' || status.includes('Lost')) continue;
+
+    const createdDateStr = formatDateSafe_(row[2]);
+    const lastContactDateStr = formatDateSafe_(row[36]);
+    const nextActionDateStr = formatDateSafe_(row[34]);
+
+    const createdDate = new Date(createdDateStr + 'T00:00:00');
+    const ageDays = Math.round((today - createdDate) / (1000 * 60 * 60 * 24));
+
+    // Rule 1: 42-Day Auto-Lost Expiry
+    if (ageDays > 42) {
+      const rowIndex = i + 1;
+      custSheet.getRange(rowIndex, 2).setValue('Expired'); // Record_Status
+      custSheet.getRange(rowIndex, 33).setValue('Lost (42-Day Expiry)'); // Customer_Status
+      custSheet.getRange(rowIndex, 5).setValue(timestamp);
+      
+      ss.getSheetByName('ACTIVITY_LOG').appendRow([
+        'ACT-' + Utilities.getUuid().substring(0, 8).toUpperCase(),
+        timestamp,
+        custId,
+        row[7] || `${row[5]} ${row[6]}`,
+        'SYSTEM',
+        'Auto-Expiry',
+        'System Cron',
+        'Lost (42-Day Expiry)',
+        'Lost (42-Day Expiry)',
+        '',
+        'None',
+        '',
+        'False',
+        'None',
+        '',
+        `Lead exceeded 42-day lifespan (${ageDays} days since creation). Automatically flagged as Lost.`,
+        'SYSTEM',
+        timestamp
+      ]);
+      expiredCount++;
+      continue;
+    }
+
+    // Rule 2: 7-Day Uncontacted Escalation
+    let daysWithoutContact = ageDays;
+    if (lastContactDateStr) {
+      daysWithoutContact = Math.round((today - new Date(lastContactDateStr + 'T00:00:00')) / (1000 * 60 * 60 * 24));
+    }
+
+    if (daysWithoutContact >= 7) {
+      const rowIndex = i + 1;
+      custSheet.getRange(rowIndex, 28, 1, 3).setValues([[
+        "TRUE",
+        daysWithoutContact >= 14 ? "Level 3 - Operations Escalation" : "Level 2 - Supervisor Alert",
+        `No contact/feedback for ${daysWithoutContact} days`
+      ]]);
+      escalatedCount++;
+    }
+  }
+
+  return { success: true, expiredCount, escalatedCount };
+}
+
+// ============================================================
+// 8. ADMIN MASTER GRID & AGILITY SYNC
 // ============================================================
 
 function getAdminMasterGrid(token, offset, limit) {
-  getSessionUser(token);
+  requireAdmin_(token);
   const custData = ss.getSheetByName('CUSTOMERS').getDataRange().getValues();
   const payData = ss.getSheetByName('PAYMENTS').getDataRange().getValues();
   const payMap = new Map(payData.slice(1).map(r => [r[1], r]));
@@ -333,20 +844,22 @@ function getAdminMasterGrid(token, offset, limit) {
   for (let i = 1; i < custData.length; i++) {
     if(!custData[i][0]) continue;
     grid.push({
-      id: custData[i][0], name: custData[i][7], agent: custData[i][30],
-      status: custData[i][32], payStatus: (payMap.get(custData[i][0]) || [])[2] || 'Pending'
+      id: custData[i][0],
+      name: custData[i][7] || `${custData[i][5]} ${custData[i][6]}`,
+      cellNumber: custData[i][8] || '',
+      agent: custData[i][30],
+      status: custData[i][32],
+      orderDate: formatDateSafe_(custData[i][15]),
+      createdDate: formatDateSafe_(custData[i][2]),
+      nextActionDate: formatDateSafe_(custData[i][34]),
+      payStatus: (payMap.get(custData[i][0]) || [])[2] || 'Pending'
     });
   }
   return { data: grid.reverse().slice(offset, offset + limit), total: grid.length };
 }
 
-// ============================================================
-// 8. AGILITY SYNC ENGINE
-// ============================================================
-
 function runAgilitySync(token) {
-  const session = getSessionUser(token);
-  if (session.role !== 'Admin') throw new Error("Only Admins can trigger the Agility Sync.");
+  requireAdmin_(token);
   const agilitySheet = ss.getSheetByName('Agility REPORT');
   if (!agilitySheet) throw new Error("Agility REPORT sheet not found.");
   
@@ -361,8 +874,6 @@ function runAgilitySync(token) {
   if (SYNC_COL_INDEX === -1) throw new Error("Could not find 'Sync_Status' column header.");
   
   const syncStatusArray = agilitySheet.getRange(1, SYNC_COL_INDEX + 1, agilityData.length, 1).getValues();
-  const usersData = ss.getSheetByName('Users').getDataRange().getValues();
-  const agentMap = new Map(usersData.slice(1).map(u => [String(u[1]).toLowerCase().trim(), u[0]]));
   const orderData = ss.getSheetByName('ORDERS').getDataRange().getValues();
   const existingOvrMap = new Map();
   const existingOvkMap = new Map();
@@ -419,7 +930,8 @@ function runAgilitySync(token) {
         newCust.push([
           customerId, 'Active', timestamp, (agentName || 'Agility System'), timestamp,
           firstName, surname, fullName, '0000000000', '', '', 'Address Missing', 'Area Missing', mappedPackage,
-          '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''
+          '', todayStr, '', '', '', '', '', '', '', '', '', '', '', '', '', '', 'Agility System', '',
+          'New Lead', 'Call Back', todayStr, '', todayStr, 'Auto-Imported'
         ]);
         
         newOrd.push([
@@ -449,13 +961,6 @@ function runAgilitySync(token) {
 // 9. AGENT CRUD (Admin only)
 // ============================================================
 
-function requireAdmin_(token) {
-  const s = getSessionUser(token);
-  if (s.role !== 'Admin') throw new Error('Admin privileges required.');
-  return s;
-}
-
-/** Returns all users from the Users sheet (safe fields only). */
 function getAgentList(token) {
   requireAdmin_(token);
   const sheet = ss.getSheetByName('Users');
@@ -469,13 +974,12 @@ function getAgentList(token) {
       email:    String(data[i][2] || ''),
       role:     String(data[i][5] || 'Agent'),
       status:   String(data[i][6] || 'Pending'),
-      tempPass: String(data[i][7] || '')   // temp password (plain-text, shown once)
+      tempPass: String(data[i][7] || '')
     });
   }
   return { agents };
 }
 
-/** Creates a new agent account with a hashed password. */
 function createAgent(token, payload) {
   requireAdmin_(token);
   const { name, email, password, role } = payload;
@@ -484,7 +988,6 @@ function createAgent(token, payload) {
   const sheet = ss.getSheetByName('Users');
   const data  = sheet.getDataRange().getValues();
 
-  // Duplicate email check
   for (let i = 1; i < data.length; i++) {
     if (String(data[i][2]).toLowerCase().trim() === email.toLowerCase().trim()) {
       throw new Error('An account with this email already exists.');
@@ -496,12 +999,10 @@ function createAgent(token, payload) {
   const hash     = hashPassword(password, salt);
   const created  = new Date().toISOString();
 
-  // Columns: Agent_ID | Name | Email | PasswordHash | Salt | Role | Status | TempPassword | CreatedAt
   sheet.appendRow([agentId, name.trim(), email.trim().toLowerCase(), hash, salt, role || 'Agent', 'Verified', '', created]);
   return { success: true, agentId };
 }
 
-/** Updates an existing agent's name, email, role or status. */
 function updateAgent(token, payload) {
   requireAdmin_(token);
   const { agentId, name, email, role, status } = payload;
@@ -521,7 +1022,6 @@ function updateAgent(token, payload) {
   return { success: true };
 }
 
-/** Sets a temporary plain-text password (also stores hash). Admin can read it once. */
 function setAgentTempPassword(token, payload) {
   requireAdmin_(token);
   const { agentId, tempPassword } = payload;
@@ -536,15 +1036,14 @@ function setAgentTempPassword(token, payload) {
   const salt     = Utilities.getUuid();
   const hash     = hashPassword(tempPassword, salt);
 
-  sheet.getRange(sheetRow, 4).setValue(hash);          // PasswordHash
-  sheet.getRange(sheetRow, 5).setValue(salt);          // Salt
-  sheet.getRange(sheetRow, 8).setValue(tempPassword);  // TempPassword (plain, col H)
-  sheet.getRange(sheetRow, 7).setValue('Verified');    // Ensure account is active
+  sheet.getRange(sheetRow, 4).setValue(hash);
+  sheet.getRange(sheetRow, 5).setValue(salt);
+  sheet.getRange(sheetRow, 8).setValue(tempPassword);
+  sheet.getRange(sheetRow, 7).setValue('Verified');
 
   return { success: true, tempPassword };
 }
 
-/** Deactivates (soft-deletes) an agent — sets status to Inactive. */
 function deleteAgent(token, agentId) {
   requireAdmin_(token);
   if (!agentId) throw new Error('agentId is required.');
