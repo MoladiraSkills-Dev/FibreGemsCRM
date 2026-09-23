@@ -111,7 +111,7 @@ function handleLogin(email, password) {
         const agentId = data[i][0];
         const name = data[i][1];
         const now = new Date();
-        ss.getSheetByName('Daily_Logs').appendRow([Utilities.getUuid().slice(0,8), agentId, name, Utilities.formatDate(now, Session.getScriptTimeZone(), "yyyy-MM-dd"), now, now, token]);
+        ss.getSheetByName('Daily_Logs').appendRow([Utilities.getUuid().slice(0, 8), agentId, name, Utilities.formatDate(now, Session.getScriptTimeZone(), "yyyy-MM-dd"), now, now, token]);
         return { token, role: data[i][5], name: name, agentId: agentId };
       }
       throw new Error('Invalid credentials.');
@@ -127,7 +127,7 @@ function getSessionUser(token) {
     if (logs[i][6] === token) {
       const users = ss.getSheetByName('Users').getDataRange().getValues();
       const user = users.find(u => u[0] === logs[i][1]);
-      if(!user) throw new Error('User not found');
+      if (!user) throw new Error('User not found');
       return { agentId: user[0], role: user[5], name: user[1] };
     }
   }
@@ -150,7 +150,7 @@ function validateFollowUpDate_(dateStr) {
   const targetDate = new Date(dateStr + 'T00:00:00');
   const today = new Date(todayStr + 'T00:00:00');
   const diffDays = Math.round((targetDate - today) / (1000 * 60 * 60 * 24));
-  
+
   if (diffDays > 8) {
     throw new Error("Follow-up / Call Back date cannot exceed 8 days from today (8-day rule limit).");
   }
@@ -181,12 +181,12 @@ function handleAgentLeadUpdate(existingIdOverride, formData, token) {
   const todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
   const custSheet = ss.getSheetByName('CUSTOMERS');
   const custData = custSheet.getDataRange().getValues();
-  
+
   // Validate 8-day follow up limit
   if (formData.nextActionDate) {
     validateFollowUpDate_(formData.nextActionDate);
   }
-  
+
   // Duplicate protection
   if (!existingIdOverride && formData.cellNumber) {
     const inputCell = String(formData.cellNumber).trim();
@@ -197,13 +197,13 @@ function handleAgentLeadUpdate(existingIdOverride, formData, token) {
       }
     }
   }
-  
+
   const isSaleWon = (formData.customerStatus === 'Won' || formData.customerStatus === 'Sale Completed');
   // Order date is automatically the exact current day (Order Date >= Created Date)
   const orderDate = (isSaleWon || formData.orderDate) ? todayStr : "";
-  
+
   let customerId = existingIdOverride;
-  if(!customerId) {
+  if (!customerId) {
     // New lead — insert across all tables
     customerId = 'CUS-' + Utilities.getUuid().slice(0, 8).toUpperCase();
     custSheet.appendRow([
@@ -212,23 +212,23 @@ function handleAgentLeadUpdate(existingIdOverride, formData, token) {
       orderDate, "", "", "", "", "", "", "", formData.promisedPaymentDate || "", "", "", "", "", "", session.agentId, session.agentId, "",
       formData.customerStatus || "New Lead", formData.nextAction || "", formData.nextActionDate || "", "", todayStr, formData.lastContactOutcome || ""
     ]);
-    
+
     if (orderDate || isSaleWon) {
-      ss.getSheetByName('ORDERS').appendRow(['ORD-' + Utilities.getUuid().slice(0,8), customerId, `${formData.firstName} ${formData.surname}`, orderDate, '', '', session.name, isSaleWon ? 'Sale Completed' : 'Pending', formData.nextAction||'', formData.nextActionDate||'', todayStr, 'Direct Capture']);
-      ss.getSheetByName('PAYMENTS').appendRow(['PAY-' + Utilities.getUuid().slice(0,8), customerId, 'Pending', formData.promisedPaymentDate||"", '', '']);
-      ss.getSheetByName('ACTIVATIONS').appendRow(['ACT-' + Utilities.getUuid().slice(0,8), customerId, 'Pending', '', '']);
+      ss.getSheetByName('ORDERS').appendRow(['ORD-' + Utilities.getUuid().slice(0, 8), customerId, `${formData.firstName} ${formData.surname}`, orderDate, '', '', session.name, isSaleWon ? 'Sale Completed' : 'Pending', formData.nextAction || '', formData.nextActionDate || '', todayStr, 'Direct Capture']);
+      ss.getSheetByName('PAYMENTS').appendRow(['PAY-' + Utilities.getUuid().slice(0, 8), customerId, 'Pending', formData.promisedPaymentDate || "", '', '']);
+      ss.getSheetByName('ACTIVATIONS').appendRow(['ACT-' + Utilities.getUuid().slice(0, 8), customerId, 'Pending', '', '']);
     }
   } else {
     // Update existing lead
     let rowIndex = custData.findIndex(r => r[0] === customerId) + 1;
-    if(rowIndex > 0) {
+    if (rowIndex > 0) {
       custSheet.getRange(rowIndex, 5, 1, 9).setValues([[timestamp, formData.firstName, formData.surname, `${formData.firstName} ${formData.surname}`, formData.cellNumber, formData.alternateCell, formData.email, formData.address, formData.suburb]]);
       custSheet.getRange(rowIndex, 14, 1, 3).setValues([[formData.package || "", formData.paymentType || "", orderDate]]);
       custSheet.getRange(rowIndex, 33, 1, 3).setValues([[formData.customerStatus, formData.nextAction, formData.nextActionDate]]);
       custSheet.getRange(rowIndex, 37, 1, 2).setValues([[todayStr, formData.lastContactOutcome || ""]]);
     }
   }
-  
+
   // Audit log
   ss.getSheetByName('ACTIVITY_LOG').appendRow([
     'ACT-' + Utilities.getUuid().substring(0, 8).toUpperCase(),
@@ -250,7 +250,7 @@ function handleAgentLeadUpdate(existingIdOverride, formData, token) {
     session.agentId,
     timestamp
   ]);
-  
+
   return { success: true, customerId: customerId };
 }
 
@@ -267,9 +267,9 @@ function getAgentDailyQueue(token) {
   const session = getSessionUser(token);
   const todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
   const todayDate = new Date(todayStr + 'T00:00:00');
-  
+
   const custData = ss.getSheetByName('CUSTOMERS').getDataRange().getValues();
-  const actData  = ss.getSheetByName('ACTIVITY_LOG').getDataRange().getValues();
+  const actData = ss.getSheetByName('ACTIVITY_LOG').getDataRange().getValues();
 
   // Map latest activity for each customer by this agent
   const agentActivityMap = {};
@@ -280,7 +280,7 @@ function getAgentDailyQueue(token) {
     const rowAgentId = String(row[4] || '').trim();
     const customerId = String(row[2] || '').trim();
     const actDateStr = formatDateSafe_(row[1]);
-    
+
     if (rowAgentId === session.agentId) {
       if (actDateStr === todayStr) todayTouchCount++;
       if (customerId) agentActivityMap[customerId] = row;
@@ -315,7 +315,7 @@ function getAgentDailyQueue(token) {
     if (nextActionDate) {
       const scheduledDate = new Date(nextActionDate + 'T00:00:00');
       const diffDays = Math.round((todayDate - scheduledDate) / (1000 * 60 * 60 * 24));
-      
+
       // Future callbacks (diffDays < 0): HIDE! They should ONLY show on the scheduled day
       if (diffDays < 0) {
         continue;
@@ -408,7 +408,7 @@ function getAgentDailyQueue(token) {
 function logCallOutcome(token, payload) {
   const session = getSessionUser(token);
   const { customerId, outcome, notes, nextAction, nextActionDate, packageChoice, paymentType, newPromisedPaymentDate } = payload;
-  
+
   if (!customerId) throw new Error("Customer ID is required.");
   if (!outcome) throw new Error("Call outcome is required.");
 
@@ -421,13 +421,13 @@ function logCallOutcome(token, payload) {
   const todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
   const custSheet = ss.getSheetByName('CUSTOMERS');
   const custData = custSheet.getDataRange().getValues();
-  
+
   const rowIndex = custData.findIndex(r => String(r[0]) === String(customerId)) + 1;
   if (rowIndex === 0) throw new Error("Customer not found.");
 
   const isSaleWon = (outcome === 'Sale Won' || outcome === 'Sale Completed');
   const isLost = (outcome === 'Not Interested' || outcome === 'Lost' || outcome === 'Invalid Lead');
-  
+
   let newStatus = 'In Progress';
   if (isSaleWon) newStatus = 'Won';
   else if (isLost) newStatus = 'Lost';
@@ -444,7 +444,7 @@ function logCallOutcome(token, payload) {
   custSheet.getRange(rowIndex, 5).setValue(timestamp); // Last_Updated_DateTime
   if (packageChoice) custSheet.getRange(rowIndex, 14).setValue(packageChoice);
   if (paymentType) custSheet.getRange(rowIndex, 15).setValue(paymentType);
-  
+
   // If sale won: Automatic Order Date = exact day (Order Date >= Created Date)
   if (isSaleWon) {
     custSheet.getRange(rowIndex, 16).setValue(todayStr); // Order_Date
@@ -462,8 +462,8 @@ function logCallOutcome(token, payload) {
       todayStr,
       'Agent Portal Call'
     ]);
-    ss.getSheetByName('PAYMENTS').appendRow(['PAY-' + Utilities.getUuid().slice(0,8), customerId, 'Pending', '', '', '']);
-    ss.getSheetByName('ACTIVATIONS').appendRow(['ACT-' + Utilities.getUuid().slice(0,8), customerId, 'Pending', '', '']);
+    ss.getSheetByName('PAYMENTS').appendRow(['PAY-' + Utilities.getUuid().slice(0, 8), customerId, 'Pending', '', '', '']);
+    ss.getSheetByName('ACTIVATIONS').appendRow(['ACT-' + Utilities.getUuid().slice(0, 8), customerId, 'Pending', '', '']);
   }
 
   // Update promised payment date if a new one was set by the agent
@@ -511,14 +511,14 @@ function logCallOutcome(token, payload) {
 function getAgentWorklist(token, offset, limit) {
   const session = getSessionUser(token);
   const custData = ss.getSheetByName('CUSTOMERS').getDataRange().getValues();
-  const actData  = ss.getSheetByName('ACTIVITY_LOG').getDataRange().getValues();
+  const actData = ss.getSheetByName('ACTIVITY_LOG').getDataRange().getValues();
 
   const agentActivityMap = {};
   for (let i = 1; i < actData.length; i++) {
     const row = actData[i];
-    const rowAgentId      = String(row[4]  || '').trim();
-    const rowLoggedById   = String(row[16] || '').trim();
-    const customerId      = String(row[2]  || '').trim();
+    const rowAgentId = String(row[4] || '').trim();
+    const rowLoggedById = String(row[16] || '').trim();
+    const customerId = String(row[2] || '').trim();
     if (!customerId) continue;
     if (rowAgentId !== session.agentId && rowLoggedById !== session.agentId) continue;
     agentActivityMap[customerId] = row;
@@ -540,7 +540,7 @@ function getAgentWorklist(token, offset, limit) {
     let lastContactDate = formatDateSafe_(row[36]);
     let lastActionType = '';
     let lastOutcome = String(row[37] || '');
-    
+
     if (lastAct) {
       if (!lastContactDate) lastContactDate = formatDateSafe_(lastAct[1]);
       lastActionType = String(lastAct[5] || '').trim();
@@ -548,16 +548,16 @@ function getAgentWorklist(token, offset, limit) {
     }
 
     worklist.push({
-      customerId:      custId,
-      name:            row[7] || `${row[5]} ${row[6]}`,
-      cellNumber:      String(row[8] || ''),
-      package:         row[13],
-      status:          row[32],
-      nextAction:      row[33] || '',
-      nextActionDate:  naDate  || '',
+      customerId: custId,
+      name: row[7] || `${row[5]} ${row[6]}`,
+      cellNumber: String(row[8] || ''),
+      package: row[13],
+      status: row[32],
+      nextAction: row[33] || '',
+      nextActionDate: naDate || '',
       lastContactDate: lastContactDate,
-      lastActionType:  lastActionType,
-      lastOutcome:     lastOutcome
+      lastActionType: lastActionType,
+      lastOutcome: lastOutcome
     });
   }
   worklist.reverse();
@@ -565,31 +565,31 @@ function getAgentWorklist(token, offset, limit) {
 }
 
 function getAgentActivityLog(token, offset, limit) {
-  const session  = getSessionUser(token);
-  const actData  = ss.getSheetByName('ACTIVITY_LOG').getDataRange().getValues();
+  const session = getSessionUser(token);
+  const actData = ss.getSheetByName('ACTIVITY_LOG').getDataRange().getValues();
   let rows = [];
   for (let i = 1; i < actData.length; i++) {
     const row = actData[i];
-    const rowAgentId    = String(row[4]  || '').trim();
+    const rowAgentId = String(row[4] || '').trim();
     const rowLoggedById = String(row[16] || '').trim();
     if (rowAgentId !== session.agentId && rowLoggedById !== session.agentId) continue;
-    
+
     let actDate = row[1];
     if (actDate && actDate instanceof Date) {
       actDate = Utilities.formatDate(actDate, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm');
     }
     rows.push({
-      activityId:    String(row[0]  || ''),
-      dateTime:      actDate         || '',
-      customerId:    String(row[2]  || ''),
-      customerName:  String(row[3]  || ''),
-      actionType:    String(row[5]  || ''),
-      contactMethod: String(row[6]  || ''),
-      outcome:       String(row[7]  || ''),
-      statusAfter:   String(row[8]  || ''),
-      nextAction:    String(row[10] || ''),
-      nextActionDate:formatDateSafe_(row[11]),
-      notes:         String(row[15] || '')
+      activityId: String(row[0] || ''),
+      dateTime: actDate || '',
+      customerId: String(row[2] || ''),
+      customerName: String(row[3] || ''),
+      actionType: String(row[5] || ''),
+      contactMethod: String(row[6] || ''),
+      outcome: String(row[7] || ''),
+      statusAfter: String(row[8] || ''),
+      nextAction: String(row[10] || ''),
+      nextActionDate: formatDateSafe_(row[11]),
+      notes: String(row[15] || '')
     });
   }
   rows.reverse();
@@ -602,21 +602,21 @@ function quickUpdateSalesData(customerId, payload, token) {
   const custData = custSheet.getDataRange().getValues();
   let rowIndex = custData.findIndex(r => r[0] === customerId && r[30] === session.agentId) + 1;
   if (rowIndex === 0) throw new Error("Unauthorized or Customer not found.");
-  
+
   if (payload.nextActionDate) {
     validateFollowUpDate_(payload.nextActionDate);
   }
 
   const todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
   custSheet.getRange(rowIndex, 14).setValue(payload.package);
-  custSheet.getRange(rowIndex, 33, 1, 3).setValues([[payload.status, payload.nextAction, payload.nextActionDate]]);  
+  custSheet.getRange(rowIndex, 33, 1, 3).setValues([[payload.status, payload.nextAction, payload.nextActionDate]]);
   custSheet.getRange(rowIndex, 37).setValue(todayStr);
 
   ss.getSheetByName('ACTIVITY_LOG').appendRow([
-    'ACT-' + Utilities.getUuid().substring(0,8).toUpperCase(),
+    'ACT-' + Utilities.getUuid().substring(0, 8).toUpperCase(),
     new Date(),
     customerId,
-    custData[rowIndex-1][7],
+    custData[rowIndex - 1][7],
     session.agentId,
     "Quick Edit",
     "",
@@ -643,8 +643,8 @@ function getAdminDashboard(token) {
   requireAdmin_(token);
   const todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
   const activityData = ss.getSheetByName('ACTIVITY_LOG').getDataRange().getValues().slice(1);
-  const userMap = new Map(ss.getSheetByName('Users').getDataRange().getValues().slice(1).map(u => [u[0], {name: u[1], role: u[5]}]));
-  
+  const userMap = new Map(ss.getSheetByName('Users').getDataRange().getValues().slice(1).map(u => [u[0], { name: u[1], role: u[5] }]));
+
   const agentStats = {};
   activityData.forEach(row => {
     let logDate = new Date(row[1]);
@@ -655,24 +655,24 @@ function getAdminDashboard(token) {
       if (logDate > agentStats[aid].lastActivity) agentStats[aid].lastActivity = logDate;
     }
   });
-  
+
   const agents = Object.keys(agentStats).map(aid => ({
     agentId: aid,
     name: userMap.get(aid)?.name || 'Unknown',
     role: userMap.get(aid)?.role || 'Agent',
     touches: agentStats[aid].count,
     lastActive: agentStats[aid].lastActivity
-  })).sort((a,b) => b.lastActive - a.lastActive);
-  
+  })).sort((a, b) => b.lastActive - a.lastActive);
+
   const custData = ss.getSheetByName('CUSTOMERS').getDataRange().getValues().slice(1);
-  const statuses = custData.reduce((acc, row) => { 
+  const statuses = custData.reduce((acc, row) => {
     if (row[1] !== 'Archived' && row[1] !== 'Expired') {
-      const stat = row[32] || 'New Lead'; 
-      acc[stat] = (acc[stat] || 0) + 1; 
+      const stat = row[32] || 'New Lead';
+      acc[stat] = (acc[stat] || 0) + 1;
     }
-    return acc; 
+    return acc;
   }, {});
-  
+
   return { activeCount: agents.length, agents, statuses };
 }
 
@@ -685,9 +685,9 @@ function getAdminCallbackReport(token, targetDate) {
   const todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
   const reportDateStr = targetDate || todayStr;
   const reportDate = new Date(reportDateStr + 'T00:00:00');
-  
+
   const custData = ss.getSheetByName('CUSTOMERS').getDataRange().getValues();
-  const actData  = ss.getSheetByName('ACTIVITY_LOG').getDataRange().getValues();
+  const actData = ss.getSheetByName('ACTIVITY_LOG').getDataRange().getValues();
   const usersData = ss.getSheetByName('Users').getDataRange().getValues();
   const userMap = new Map(usersData.slice(1).map(u => [String(u[0]), { name: u[1], role: u[5] }]));
 
@@ -732,7 +732,7 @@ function getAdminCallbackReport(token, targetDate) {
       if (agentReport[assignedAgentId] && (isDueOnReportDate || isOverdue)) {
         agentReport[assignedAgentId].scheduled++;
         const touchedOnOrAfter = (lastContactDate >= nextActionDate);
-        
+
         if (touchedOnOrAfter) {
           agentReport[assignedAgentId].completed++;
         } else {
@@ -832,7 +832,7 @@ function enforceLeadLifecycleRules(token) {
       custSheet.getRange(rowIndex, 2).setValue('Expired'); // Record_Status
       custSheet.getRange(rowIndex, 33).setValue('Lost (42-Day Expiry)'); // Customer_Status
       custSheet.getRange(rowIndex, 5).setValue(timestamp);
-      
+
       ss.getSheetByName('ACTIVITY_LOG').appendRow([
         'ACT-' + Utilities.getUuid().substring(0, 8).toUpperCase(),
         timestamp,
@@ -987,15 +987,35 @@ function getAdminMasterGrid(token, offset, limit) {
   const custData = ss.getSheetByName('CUSTOMERS').getDataRange().getValues();
   const payData = ss.getSheetByName('PAYMENTS').getDataRange().getValues();
   const payMap = new Map(payData.slice(1).map(r => [r[1], r]));
-  
+
+  const usersData = ss.getSheetByName('Users').getDataRange().getValues();
+  const agentMap = new Map();
+  for (let i = 1; i < usersData.length; i++) {
+    if (usersData[i][0]) agentMap.set(String(usersData[i][0]), usersData[i][1]);
+  }
+
   let grid = [];
   for (let i = 1; i < custData.length; i++) {
-    if(!custData[i][0]) continue;
+    if (!custData[i][0]) continue;
+    const agentId = custData[i][30];
+    const agentName = agentMap.get(String(agentId)) || agentId;
+
+    const rawPhone = custData[i][8];
+    let phone = "—"
+
+    if (rawPhone !== "" & rawPhone !== null && rawPhone !== undefined) {
+      let phoneStr = String(rawPhone).trim()
+
+      if (phoneStr !== "") {
+        phone = phoneStr.startsWith("0") ? phoneStr : "0" + phoneStr
+      }
+    }
+
     grid.push({
       id: custData[i][0],
       name: custData[i][7] || `${custData[i][5]} ${custData[i][6]}`,
-      cellNumber: custData[i][8] || '',
-      agent: custData[i][30],
+      cellNumber: phone,
+      agent: agentName,
       status: custData[i][32],
       orderDate: formatDateSafe_(custData[i][15]),
       createdDate: formatDateSafe_(custData[i][2]),
@@ -1010,39 +1030,39 @@ function runAgilitySync(token) {
   requireAdmin_(token);
   const agilitySheet = ss.getSheetByName('Agility REPORT');
   if (!agilitySheet) throw new Error("Agility REPORT sheet not found.");
-  
+
   const agilityData = agilitySheet.getDataRange().getValues();
   const headers = agilityData[0];
-  
+
   const SYNC_COL_INDEX = headers.indexOf('Sync_Status');
   const CUSTOMER_COL_INDEX = headers.indexOf('customer');
   const PRODUCT_COL_INDEX = headers.indexOf('contractproductname');
   const AGENT_COL_INDEX = headers.indexOf('channel_partner_user_name');
-  
+
   if (SYNC_COL_INDEX === -1) throw new Error("Could not find 'Sync_Status' column header.");
-  
+
   const syncStatusArray = agilitySheet.getRange(1, SYNC_COL_INDEX + 1, agilityData.length, 1).getValues();
   const orderData = ss.getSheetByName('ORDERS').getDataRange().getValues();
   const existingOvrMap = new Map();
   const existingOvkMap = new Map();
-  
+
   for (let i = 1; i < orderData.length; i++) {
     if (orderData[i][4]) existingOvrMap.set(orderData[i][4], orderData[i][1]);
     if (orderData[i][5]) existingOvkMap.set(orderData[i][5], orderData[i][1]);
   }
-    
+
   let newLeads = 0; let updatedLeads = 0;
   const timestamp = new Date().toISOString();
   const todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
   const newCust = []; const newOrd = []; const newPay = []; const newAct = [];
-    
+
   for (let i = 1; i < agilityData.length; i++) {
     if (syncStatusArray[i][0] === 'Synced') continue;
-    
+
     const row = agilityData[i];
     const description = String(row[10] || '');
     const match = description.match(/(OVR|OVK)-[A-Z0-9-]+/i);
-    
+
     if (match) {
       const orderNum = match[0].toUpperCase();
       const isOvr = orderNum.startsWith('OVR');
@@ -1051,45 +1071,45 @@ function runAgilitySync(token) {
         updatedLeads++;
       } else {
         customerId = 'CUS-' + Utilities.getUuid().slice(0, 8).toUpperCase();
-        
+
         let agentName = '';
         if (AGENT_COL_INDEX !== -1 && row[AGENT_COL_INDEX]) {
-            agentName = String(row[AGENT_COL_INDEX]).trim();
+          agentName = String(row[AGENT_COL_INDEX]).trim();
         }
-        
+
         const isPaid = !!row[5];
         const isActivated = String(row[11] || '').toLowerCase().includes('activated');
         let fullName = "Agility Import";
         if (CUSTOMER_COL_INDEX !== -1 && row[CUSTOMER_COL_INDEX]) {
-            fullName = String(row[CUSTOMER_COL_INDEX]).trim();
+          fullName = String(row[CUSTOMER_COL_INDEX]).trim();
         }
         let nameParts = fullName.split(' ');
         let firstName = nameParts[0];
         let surname = nameParts.length > 1 ? nameParts.slice(1).join(' ') : 'Unknown';
-          
+
         let rawProduct = "";
         let mappedPackage = "Other";
         if (PRODUCT_COL_INDEX !== -1 && row[PRODUCT_COL_INDEX]) {
-            rawProduct = String(row[PRODUCT_COL_INDEX]).toLowerCase();
-            if (rawProduct.includes("fttr-20-10")) mappedPackage = "Vuma Reach 20Mbps/10Mbps";
-            else if (rawProduct.includes("fttr-10-10")) mappedPackage = "Vuma Reach 10Mbps/10Mbps";
+          rawProduct = String(row[PRODUCT_COL_INDEX]).toLowerCase();
+          if (rawProduct.includes("fttr-20-10")) mappedPackage = "Vuma Reach 20Mbps/10Mbps";
+          else if (rawProduct.includes("fttr-10-10")) mappedPackage = "Vuma Reach 10Mbps/10Mbps";
         }
-          
+
         newCust.push([
           customerId, 'Active', timestamp, (agentName || 'Agility System'), timestamp,
           firstName, surname, fullName, '0000000000', '', '', 'Address Missing', 'Area Missing', mappedPackage,
           '', todayStr, '', '', '', '', '', '', '', '', '', '', '', '', '', '', 'Agility System', '',
           'New Lead', 'Call Back', todayStr, '', todayStr, 'Auto-Imported'
         ]);
-        
+
         newOrd.push([
-          'ORD-' + Utilities.getUuid().slice(0,8), customerId, fullName, todayStr, (isOvr ? orderNum : ''), (!isOvr ? orderNum : ''),
+          'ORD-' + Utilities.getUuid().slice(0, 8), customerId, fullName, todayStr, (isOvr ? orderNum : ''), (!isOvr ? orderNum : ''),
           (agentName || 'Agility System'), row[11] || 'Imported via Agility', 'Update Missing Info', todayStr, todayStr, 'Auto-Imported'
         ]);
-        
-        newPay.push(['PAY-' + Utilities.getUuid().slice(0,8), customerId, (isPaid ? 'Paid' : 'Pending'), '', (isPaid ? row[5] : ''), (isPaid ? timestamp : '')]);
-        newAct.push(['ACT-' + Utilities.getUuid().slice(0,8), customerId, (isActivated ? 'Activated' : 'Pending'), (isActivated ? todayStr : ''), (isActivated ? timestamp : '')]);
-        
+
+        newPay.push(['PAY-' + Utilities.getUuid().slice(0, 8), customerId, (isPaid ? 'Paid' : 'Pending'), '', (isPaid ? row[5] : ''), (isPaid ? timestamp : '')]);
+        newAct.push(['ACT-' + Utilities.getUuid().slice(0, 8), customerId, (isActivated ? 'Activated' : 'Pending'), (isActivated ? todayStr : ''), (isActivated ? timestamp : '')]);
+
         if (isOvr) existingOvrMap.set(orderNum, customerId);
         else existingOvkMap.set(orderNum, customerId);
         newLeads++;
@@ -1097,10 +1117,10 @@ function runAgilitySync(token) {
     }
     syncStatusArray[i][0] = 'Synced';
   }
-  if(newCust.length > 0) ss.getSheetByName('CUSTOMERS').getRange(ss.getSheetByName('CUSTOMERS').getLastRow() + 1, 1, newCust.length, newCust[0].length).setValues(newCust);
-  if(newOrd.length > 0) ss.getSheetByName('ORDERS').getRange(ss.getSheetByName('ORDERS').getLastRow() + 1, 1, newOrd.length, newOrd[0].length).setValues(newOrd);
-  if(newPay.length > 0) ss.getSheetByName('PAYMENTS').getRange(ss.getSheetByName('PAYMENTS').getLastRow() + 1, 1, newPay.length, newPay[0].length).setValues(newPay);
-  if(newAct.length > 0) ss.getSheetByName('ACTIVATIONS').getRange(ss.getSheetByName('ACTIVATIONS').getLastRow() + 1, 1, newAct.length, newAct[0].length).setValues(newAct);
+  if (newCust.length > 0) ss.getSheetByName('CUSTOMERS').getRange(ss.getSheetByName('CUSTOMERS').getLastRow() + 1, 1, newCust.length, newCust[0].length).setValues(newCust);
+  if (newOrd.length > 0) ss.getSheetByName('ORDERS').getRange(ss.getSheetByName('ORDERS').getLastRow() + 1, 1, newOrd.length, newOrd[0].length).setValues(newOrd);
+  if (newPay.length > 0) ss.getSheetByName('PAYMENTS').getRange(ss.getSheetByName('PAYMENTS').getLastRow() + 1, 1, newPay.length, newPay[0].length).setValues(newPay);
+  if (newAct.length > 0) ss.getSheetByName('ACTIVATIONS').getRange(ss.getSheetByName('ACTIVATIONS').getLastRow() + 1, 1, newAct.length, newAct[0].length).setValues(newAct);
   agilitySheet.getRange(1, SYNC_COL_INDEX + 1, syncStatusArray.length, 1).setValues(syncStatusArray);
   return { success: true, newLeads, updatedLeads };
 }
@@ -1112,16 +1132,16 @@ function runAgilitySync(token) {
 function getAgentList(token) {
   requireAdmin_(token);
   const sheet = ss.getSheetByName('Users');
-  const data  = sheet.getDataRange().getValues();
+  const data = sheet.getDataRange().getValues();
   const agents = [];
   for (let i = 1; i < data.length; i++) {
     if (!data[i][0]) continue;
     agents.push({
-      agentId:  String(data[i][0]),
-      name:     String(data[i][1] || ''),
-      email:    String(data[i][2] || ''),
-      role:     String(data[i][5] || 'Agent'),
-      status:   String(data[i][6] || 'Pending'),
+      agentId: String(data[i][0]),
+      name: String(data[i][1] || ''),
+      email: String(data[i][2] || ''),
+      role: String(data[i][5] || 'Agent'),
+      status: String(data[i][6] || 'Pending'),
       tempPass: String(data[i][7] || '')
     });
   }
@@ -1134,7 +1154,7 @@ function createAgent(token, payload) {
   if (!name || !email || !password) throw new Error('Name, email and password are required.');
 
   const sheet = ss.getSheetByName('Users');
-  const data  = sheet.getDataRange().getValues();
+  const data = sheet.getDataRange().getValues();
 
   for (let i = 1; i < data.length; i++) {
     if (String(data[i][2]).toLowerCase().trim() === email.toLowerCase().trim()) {
@@ -1142,10 +1162,10 @@ function createAgent(token, payload) {
     }
   }
 
-  const agentId  = 'AGT-' + Utilities.getUuid().slice(0, 8).toUpperCase();
-  const salt     = Utilities.getUuid();
-  const hash     = hashPassword(password, salt);
-  const created  = new Date().toISOString();
+  const agentId = 'AGT-' + Utilities.getUuid().slice(0, 8).toUpperCase();
+  const salt = Utilities.getUuid();
+  const hash = hashPassword(password, salt);
+  const created = new Date().toISOString();
 
   sheet.appendRow([agentId, name.trim(), email.trim().toLowerCase(), hash, salt, role || 'Agent', 'Verified', '', created]);
   return { success: true, agentId };
@@ -1157,14 +1177,14 @@ function updateAgent(token, payload) {
   if (!agentId) throw new Error('agentId is required.');
 
   const sheet = ss.getSheetByName('Users');
-  const data  = sheet.getDataRange().getValues();
+  const data = sheet.getDataRange().getValues();
   const rowIdx = data.findIndex(r => String(r[0]) === String(agentId));
   if (rowIdx < 1) throw new Error('Agent not found.');
 
   const sheetRow = rowIdx + 1;
-  if (name)   sheet.getRange(sheetRow, 2).setValue(name.trim());
-  if (email)  sheet.getRange(sheetRow, 3).setValue(email.trim().toLowerCase());
-  if (role)   sheet.getRange(sheetRow, 6).setValue(role);
+  if (name) sheet.getRange(sheetRow, 2).setValue(name.trim());
+  if (email) sheet.getRange(sheetRow, 3).setValue(email.trim().toLowerCase());
+  if (role) sheet.getRange(sheetRow, 6).setValue(role);
   if (status) sheet.getRange(sheetRow, 7).setValue(status);
 
   return { success: true };
@@ -1175,14 +1195,14 @@ function setAgentTempPassword(token, payload) {
   const { agentId, tempPassword } = payload;
   if (!agentId || !tempPassword) throw new Error('agentId and tempPassword are required.');
 
-  const sheet  = ss.getSheetByName('Users');
-  const data   = sheet.getDataRange().getValues();
+  const sheet = ss.getSheetByName('Users');
+  const data = sheet.getDataRange().getValues();
   const rowIdx = data.findIndex(r => String(r[0]) === String(agentId));
   if (rowIdx < 1) throw new Error('Agent not found.');
 
   const sheetRow = rowIdx + 1;
-  const salt     = Utilities.getUuid();
-  const hash     = hashPassword(tempPassword, salt);
+  const salt = Utilities.getUuid();
+  const hash = hashPassword(tempPassword, salt);
 
   sheet.getRange(sheetRow, 4).setValue(hash);
   sheet.getRange(sheetRow, 5).setValue(salt);
@@ -1196,8 +1216,8 @@ function deleteAgent(token, agentId) {
   requireAdmin_(token);
   if (!agentId) throw new Error('agentId is required.');
 
-  const sheet  = ss.getSheetByName('Users');
-  const data   = sheet.getDataRange().getValues();
+  const sheet = ss.getSheetByName('Users');
+  const data = sheet.getDataRange().getValues();
   const rowIdx = data.findIndex(r => String(r[0]) === String(agentId));
   if (rowIdx < 1) throw new Error('Agent not found.');
 
