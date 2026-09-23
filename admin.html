@@ -36,6 +36,22 @@
       to { transform: translateX(0); opacity: 1; }
     }
 
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 8px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #E07C2A;
+      border-radius: 8px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #CE5926;
+    }
+
     .animate-slide-in {
       animation: slide-in 0.3s ease-out;
     }

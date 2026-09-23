@@ -43,6 +43,22 @@
       }
     }
 
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 8px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #E07C2A;
+      border-radius: 8px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #CE5926;
+    }
+
     .animate-slide-in {
       animation: slide-in 0.3s ease-out;
     }
@@ -611,8 +627,7 @@
   <!-- ═══════════════════════════════════════════════════════════ -->
   <div id="modal-call-outcome" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
     <div class="modal-overlay absolute inset-0" onclick="closeCallOutcomeModal()"></div>
-    <div
-      class="relative bg-navy-800 border border-white/15 rounded-2xl shadow-2xl w-full max-w-lg p-6 z-10 animate-slide-in">
+    <div class="relative bg-navy-800 border border-white/15 rounded-2xl shadow-2xl w-full max-w-lg p-6 z-10 animate-slide-in max-h-[90vh] overflow-y-auto custom-scrollbar">
 
       <!-- Header -->
       <div class="flex items-start justify-between pb-4 border-b border-white/10">
@@ -807,7 +822,7 @@
   <!-- ═══════════════════════════════════════════════════════════ -->
   <div id="modal-quick-edit" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
     <div class="modal-overlay absolute inset-0" onclick="closeQuickEdit()"></div>
-    <div class="relative bg-navy-800 border border-white/10 rounded-2xl shadow-2xl w-full max-w-md p-6 z-10">
+    <div class="relative bg-navy-800 border border-white/10 rounded-2xl shadow-2xl w-full max-w-md p-6 z-10 max-h-[90vh] overflow-y-auto custom-scrollbar">
       <div class="flex items-center justify-between mb-5">
         <div>
           <h3 class="text-lg font-semibold text-white">Quick Edit Lead</h3>
