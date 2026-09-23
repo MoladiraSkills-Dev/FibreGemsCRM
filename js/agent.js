@@ -251,9 +251,9 @@ function renderCallbackCards() {
 
           <!-- 1-Click Action Trigger -->
           <div class="flex items-center gap-2.5 sm:self-center">
-            <a href="tel:${escHtml(c.cellNumber)}" onclick="copyPhone('${escJs(c.cellNumber)}')" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-white/5 hover:bg-white/10 text-white border border-white/10 transition-colors flex items-center gap-1.5">
+            <button onclick="copyPhone('${escJs(c.cellNumber)}')" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-white/5 hover:bg-white/10 text-white border border-white/10 transition-colors flex items-center gap-1.5 cursor-pointer">
               📞 Call Now
-            </a>
+            </button>
             <button onclick="openCallOutcomeModal('${escHtml(c.customerId)}', '${escJs(c.name)}', '${escJs(c.cellNumber)}', '${escJs(c.package || '')}')"
               class="px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-fiber-500 to-fiber-600 hover:from-fiber-600 hover:to-fiber-700 text-white shadow-md shadow-fiber-500/20 transition-all flex items-center gap-1.5">
               ⚡ Log Outcome
