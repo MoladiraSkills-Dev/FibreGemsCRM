@@ -86,10 +86,10 @@ function setupDatepickerLimits() {
 // ── Initialization ───────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   if (!requireAuth()) return;
-  
+
   document.getElementById('agent-name').textContent = session.name || 'Agent';
   document.getElementById('agent-role').textContent = session.role || 'Agent';
-  
+
   setupDatepickerLimits();
   refreshDailyData();
 });
@@ -97,7 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // ── View Switching ───────────────────────────────────────────
 function switchView(view) {
   currentView = view;
-  
+
   // Update nav active states
   document.querySelectorAll('[data-nav]').forEach(el => {
     el.classList.remove('bg-fiber-500/20', 'text-fiber-300', 'border-fiber-500', 'border-l-4');
@@ -109,13 +109,13 @@ function switchView(view) {
     activeNav.classList.add('bg-fiber-500/20', 'text-fiber-300', 'border-fiber-500');
     activeNav.classList.remove('text-gray-400', 'hover:text-white', 'hover:bg-white/5', 'border-transparent');
   }
-  
+
   // Toggle views
   document.getElementById('view-callbacks').classList.toggle('hidden', view !== 'callbacks');
   document.getElementById('view-worklist').classList.toggle('hidden', view !== 'worklist');
   document.getElementById('view-newlead').classList.toggle('hidden', view !== 'newlead');
   document.getElementById('view-activity').classList.toggle('hidden', view !== 'activity');
-  
+
   if (view === 'callbacks') refreshDailyData();
   else if (view === 'worklist') loadWorklist();
   else if (view === 'activity') loadActivityLog();
@@ -140,10 +140,10 @@ async function refreshDailyData() {
     document.getElementById('stat-remaining').textContent = result.stats.remainingToday;
     document.getElementById('stat-touches').textContent = result.stats.todayTouches;
 
-    const rate = result.stats.totalScheduled > 0 
-      ? Math.round((result.stats.completedToday / result.stats.totalScheduled) * 100) 
+    const rate = result.stats.totalScheduled > 0
+      ? Math.round((result.stats.completedToday / result.stats.totalScheduled) * 100)
       : 100;
-    
+
     document.getElementById('stat-progress-pct').textContent = `${rate}%`;
     document.getElementById('stat-progress-bar').style.width = `${rate}%`;
     document.getElementById('nav-callback-badge').textContent = result.stats.remainingToday;
@@ -294,11 +294,14 @@ function copyPhone(phone) {
 
 // ── 1-Click Call Outcome Drawer / Modal ──────────────────────
 function openCallOutcomeModal(customerId, name, phone, pkg, isPaymentFollowUp = false) {
+
+  const formattedPhone = phone !== null ? "0" + phone : "No Number";
+
   currentModalIsPayment = !!isPaymentFollowUp;
 
   document.getElementById('co-customer-id').value = customerId;
   document.getElementById('co-client-name').textContent = name;
-  document.getElementById('co-client-phone').textContent = phone;
+  document.getElementById('co-client-phone').textContent = formattedPhone;
   document.getElementById('co-notes').value = '';
 
   // Toggle preset sets based on whether this is a payment follow-up
@@ -523,18 +526,18 @@ function closeDuplicate() {
 async function loadWorklist() {
   const tbody = document.getElementById('worklist-body');
   const countEl = document.getElementById('worklist-count');
-  
+
   tbody.innerHTML = `
     <tr><td colspan="7" class="px-6 py-12 text-center">
       <div class="spinner mx-auto mb-3"></div>
       <p class="text-gray-500 text-sm">Loading all assigned leads...</p>
     </td></tr>`;
-  
+
   try {
     const result = await callBackend('getAgentWorklist', { offset: worklistOffset, limit: WORKLIST_LIMIT });
     worklistTotal = result.total;
     countEl.textContent = `${result.total} customer${result.total !== 1 ? 's' : ''}`;
-    
+
     if (result.data.length === 0) {
       tbody.innerHTML = `
         <tr><td colspan="7" class="px-6 py-16 text-center text-gray-400">
@@ -543,7 +546,7 @@ async function loadWorklist() {
       updatePagination();
       return;
     }
-    
+
     tbody.innerHTML = result.data.map(c => `
       <tr class="border-b border-white/5 hover:bg-white/[0.03] transition-colors group">
         <td class="px-4 py-3.5">
@@ -566,7 +569,7 @@ async function loadWorklist() {
         </td>
       </tr>
     `).join('');
-    
+
     updatePagination();
   } catch (err) {
     tbody.innerHTML = `
@@ -581,12 +584,12 @@ function updatePagination() {
   const paginationEl = document.getElementById('pagination');
   const totalPages = Math.ceil(worklistTotal / WORKLIST_LIMIT);
   const currentPage = Math.floor(worklistOffset / WORKLIST_LIMIT) + 1;
-  
+
   if (totalPages <= 1) {
     paginationEl.innerHTML = '';
     return;
   }
-  
+
   paginationEl.innerHTML = `
     <button onclick="goPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''} 
       class="px-3 py-1.5 rounded-lg text-xs font-semibold ${currentPage === 1 ? 'text-gray-600 cursor-not-allowed' : 'text-gray-300 hover:bg-white/10'}">
