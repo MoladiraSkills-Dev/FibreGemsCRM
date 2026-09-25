@@ -573,14 +573,18 @@ function getAgentDailyQueue(token) {
     if (nextActionDate) {
       const scheduledDate = new Date(nextActionDate + 'T00:00:00');
       const diffDays = Math.round((todayDate - scheduledDate) / (1000 * 60 * 60 * 24));
+      
+      const wasCreatedToday = (createdStr === todayStr);
+      const wasCompletedToday = (lastContactDate === todayStr && !wasCreatedToday);
 
-      // Future callbacks (diffDays < 0): HIDE! They should ONLY show on the scheduled day
-      if (diffDays < 0) {
+      // Future callbacks (diffDays < 0): HIDE! They should ONLY show on the scheduled day, 
+      // UNLESS the agent actually completed it today (meaning they pushed it to the future today).
+      if (diffDays < 0 && !wasCompletedToday) {
         continue;
       }
       
-      // If it's today and a time is set, hide until 5 mins before
-      if (diffDays === 0 && nextActionTime) {
+      // If it's today and a time is set, hide until 5 mins before (UNLESS already completed)
+      if (diffDays === 0 && nextActionTime && !wasCompletedToday) {
         const now = new Date();
         const currentMins = now.getHours() * 60 + now.getMinutes();
         const [hours, mins] = nextActionTime.split(':').map(Number);
@@ -1224,12 +1228,15 @@ function getAdminCallbackReport(token, targetDate) {
       const scheduledDate = new Date(nextActionDate + 'T00:00:00');
       const isDueOnReportDate = (nextActionDate === reportDateStr);
       const isOverdue = (scheduledDate < reportDate);
+      
+      const createdDateStr = formatDateSafe_(row[2]);
+      const wasCreatedToday = (createdDateStr === reportDateStr);
+      const wasCompletedToday = (lastContactDate === reportDateStr && !wasCreatedToday);
 
-      if (agentReport[assignedAgentId] && (isDueOnReportDate || isOverdue)) {
+      if (agentReport[assignedAgentId] && (isDueOnReportDate || isOverdue || wasCompletedToday)) {
         agentReport[assignedAgentId].scheduled++;
-        const touchedOnOrAfter = (lastContactDate >= nextActionDate);
-
-        if (touchedOnOrAfter) {
+        
+        if (wasCompletedToday || lastContactDate >= nextActionDate) {
           agentReport[assignedAgentId].completed++;
         } else {
           agentReport[assignedAgentId].missed++;
@@ -1255,7 +1262,8 @@ function getAdminCallbackReport(token, targetDate) {
       daysSinceContact = Math.round((reportDate - new Date(lastContactDate + 'T00:00:00')) / (1000 * 60 * 60 * 24));
     }
 
-    if (isEscalated || (daysSinceContact >= 7 && status !== 'Order Placed' && status !== 'Not Interested' && status !== 'Closed' && status !== 'Cancelled')) {
+    // 7-day stale check / Escalations (Only for leads older than 7 days)
+    if (daysSinceCreation >= 7 && (isEscalated || (daysSinceContact >= 7 && status !== 'Order Placed' && status !== 'Not Interested' && status !== 'Closed' && status !== 'Cancelled'))) {
       escalatedLeads.push({
         customerId: custId,
         name: customerName,

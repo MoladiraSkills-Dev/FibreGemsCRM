@@ -886,3 +886,13 @@ async function submitQuickEdit() {
     showToast(err.message, "error");
   }
 }
+
+// Universal Table Filter
+function filterTable(tbodyId, query) {
+  const tbody = document.getElementById(tbodyId);
+  if (!tbody) return;
+  const q = query.toLowerCase();
+  Array.from(tbody.getElementsByTagName('tr')).forEach(tr => {
+    tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
