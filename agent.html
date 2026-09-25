@@ -59,6 +59,21 @@
       background: #CE5926;
     }
 
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 8px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: rgba(224, 124, 42, 0.4);
+      border-radius: 10px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: rgba(224, 124, 42, 0.7);
+    }
+
     .animate-slide-in {
       animation: slide-in 0.3s ease-out;
     }
@@ -159,6 +174,14 @@
 
   <!-- Toast container -->
   <div id="toast-container" class="fixed top-4 right-4 z-[70] flex flex-col gap-3"></div>
+
+  <!-- Global Loading Overlay -->
+  <div id="global-loader" class="hidden fixed inset-0 z-[80] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+    <div class="flex flex-col items-center gap-3">
+      <div class="w-10 h-10 rounded-full border-4 border-fiber-500/30 border-t-fiber-500 animate-spin"></div>
+      <p class="text-xs text-gray-300 font-semibold tracking-wide">Processing...</p>
+    </div>
+  </div>
 
   <!-- ═══════════════════════════════════════════════════════════ -->
   <!-- Mobile Header                                              -->
@@ -515,9 +538,7 @@
               <select id="nf-payment-type" class="input-field">
                 <option value="">Select...</option>
                 <option value="Debit Order">Debit Order</option>
-                <option value="EasyPay (Prepaid)">EasyPay (Prepaid)</option>
-                <option value="EFT">EFT</option>
-                <option value="Cash">Cash</option>
+                <option value="Prepaid">Prepaid</option>
               </select>
             </div>
             <div>
@@ -527,11 +548,11 @@
 
             <div>
               <label for="nf-order-number" class="field-label">Order Number
-                <span class="text-gray-500 font-normal normal-case ml-1">(from Agility / Walk-in)</span>
+                <span class="text-gray-500 font-normal normal-case ml-1">(From SADV portal)</span>
               </label>
               <input type="text" id="nf-order-number" placeholder="e.g. OVR-12345 or OVK-9988" class="input-field font-mono uppercase"
                 oninput="this.value = this.value.toUpperCase()">
-              <p class="text-[11px] text-gray-500 mt-1">Order numbers are entered manually (never auto-generated).</p>
+              <p class="text-[11px] text-gray-500 mt-1">Order numbers are entered manually.</p>
             </div>
             <div>
               <label for="nf-easypay-number" class="field-label">EasyPay Number
@@ -539,7 +560,7 @@
               </label>
               <input type="text" id="nf-easypay-number" placeholder="e.g. EP-123456789" class="input-field font-mono uppercase"
                 oninput="this.value = this.value.toUpperCase()">
-              <p class="text-[11px] text-gray-500 mt-1">Auto-generated on Sale Won if left blank. Max 3 cycles (14 days each).</p>
+              <p class="text-[11px] text-gray-500 mt-1">Max 3 cycles (14 days each).</p>
             </div>
 
             <div>
@@ -584,17 +605,29 @@
               <label for="nf-next-action" class="field-label">Next Action</label>
               <select id="nf-next-action" class="input-field">
                 <option value="">Select...</option>
-                <option value="Call Back">Call Back</option>
-                <option value="Send Info">Send Info</option>
-                <option value="Follow Up Payment">Follow Up Payment</option>
-                <option value="Activation Follow-Up (Check Connection)">Activation Follow-Up (Check Connection)</option>
-                <option value="Schedule Installation">Schedule Installation</option>
+                <option value="Initial Call">Initial Call</option>
+                <option value="Customer Callback">Call Back</option>
+                <option value="Payment Follow-Up">Payment Follow-Up</option>
+                <option value="Easypay Reminder">Easypay Reminder</option>
+                <option value="Easypay Expiry Follow-Up">Easypay Expiry Follow-Up</option>
+                <option value="Payment Verification">Payment Verification</option>
+                <option value="After-Sales Call">After Sales Call</option>
+                <option value="Referral Follow-Up">Referral Follow-Up</option>
+                <option value="Win-back Call">Win Back Call</option>
+                <option value="Customer Issue Follow-Up">Issue Follow Up</option>
+                <option value="Team Leader Review">Team Leader Review</option>
+                <option value="No Further Action">No Further Action</option>
               </select>
             </div>
             <div>
               <label for="nf-next-action-date" class="field-label">Next Action Date (Max +8 Days / +7 Days Activation)</label>
               <input type="date" id="nf-next-action-date" class="input-field">
               <span class="text-[11px] text-gray-500 mt-1 block">Scheduled leads only show on their exact target date.</span>
+            </div>
+            <div>
+              <label for="nf-next-action-time" class="field-label">Next Action Time (For Same-Day Callbacks)</label>
+              <input type="time" id="nf-next-action-time" class="input-field">
+              <span class="text-[11px] text-gray-500 mt-1 block">Only displays on dashboard 5 minutes before this time.</span>
             </div>
           </div>
         </fieldset>
@@ -790,14 +823,22 @@
             Days</button>
         </div>
 
-        <input type="date" id="co-next-date" class="input-field">
-        <p class="text-[11px] text-fiber-400 mt-1 flex items-center gap-1">
-          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round"
-              d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-          </svg>
-          Strict 8-day follow-up limit enforced. Lead will only appear on that scheduled day.
-        </p>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <input type="date" id="co-next-date" class="input-field">
+            <p class="text-[11px] text-fiber-400 mt-1 flex items-center gap-1">
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                  d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+              </svg>
+              Strict 8-day limit.
+            </p>
+          </div>
+          <div>
+            <input type="time" id="co-next-time" class="input-field">
+            <p class="text-[11px] text-gray-500 mt-1">Optional. Shows on dashboard 5 mins before.</p>
+          </div>
+        </div>
       </div>
 
       <!-- Promised Payment Date Section (shown for New Payment Date outcome) -->
@@ -842,6 +883,14 @@
           <p class="text-[11px] text-gray-500 mt-1">Order numbers are manual (never auto-generated). Pre-filled if on file.</p>
         </div>
         <div>
+          <label class="field-label text-emerald-300">EasyPay Number
+            <span class="text-gray-400 font-normal normal-case ml-1">(enter to restart 14-day validity)</span>
+          </label>
+          <input type="text" id="co-easypay-number" placeholder="e.g. 123456789" class="input-field font-mono"
+            oninput="this.value = this.value.replace(/[^0-9]/g,'')">
+          <p class="text-[11px] text-amber-400 mt-1">⚡ Entering a new EasyPay number restarts the 14-day expiry cycle.</p>
+        </div>
+        <div>
           <label class="field-label text-emerald-300">Package Sold *</label>
           <select id="co-package" class="input-field">
             <option value="Vuma Reach 20Mbps/10Mbps">Vuma Reach 20Mbps/10Mbps</option>
@@ -855,15 +904,16 @@
           <select id="co-payment-type" class="input-field">
             <option value="">-- Select Payment Type --</option>
             <option value="Debit Order">Debit Order</option>
-            <option value="EFT">EFT</option>
-            <option value="Cash">Cash</option>
+            <option value="Prepaid">Prepaid</option>
           </select>
           <p class="text-[11px] text-gray-500 mt-1">If previously selected, your choice is pre-filled above &mdash; change if needed.</p>
         </div>
         <div>
-          <label class="field-label text-emerald-300">Promised Payment Date (Optional)</label>
+          <label class="field-label text-emerald-300">Promised Payment Date (Optional)
+            <span class="text-gray-400 font-normal normal-case ml-1">— pre-set to +14 days (EasyPay expiry)</span>
+          </label>
           <input type="date" id="co-sale-promised-pay-date" class="input-field">
-          <p class="text-[11px] text-emerald-400 mt-1">⚡ EasyPay number (14-day validity) will be generated automatically.</p>
+          <p class="text-[11px] text-gray-500 mt-1">Leave blank if no payment date has been promised.</p>
         </div>
       </div>
 
@@ -976,6 +1026,10 @@
         <div>
           <label class="field-label">Next Action Date (Max 8 Days)</label>
           <input type="date" id="qe-next-action-date" class="input-field">
+        </div>
+        <div>
+          <label class="field-label">Next Action Time (Optional)</label>
+          <input type="time" id="qe-next-action-time" class="input-field">
         </div>
       </div>
       <div class="flex items-center gap-3 mt-6 pt-4 border-t border-white/5">

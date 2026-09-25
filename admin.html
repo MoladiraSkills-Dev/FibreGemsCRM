@@ -82,6 +82,36 @@
       transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 8px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #E07C2A;
+      border-radius: 8px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #CE5926;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 8px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: rgba(224, 124, 42, 0.4);
+      border-radius: 10px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: rgba(224, 124, 42, 0.7);
+    }
+
     .stat-card {
       background: rgba(255, 255, 255, 0.03);
       border: 1px solid rgba(255, 255, 255, 0.06);
@@ -140,6 +170,14 @@
 
   <!-- Toast container -->
   <div id="toast-container" class="fixed top-4 right-4 z-[70] flex flex-col gap-3"></div>
+
+  <!-- Global Loading Overlay -->
+  <div id="global-loader" class="hidden fixed inset-0 z-[80] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+    <div class="flex flex-col items-center gap-3">
+      <div class="w-10 h-10 rounded-full border-4 border-fiber-500/30 border-t-fiber-500 animate-spin"></div>
+      <p class="text-xs text-gray-300 font-semibold tracking-wide">Processing...</p>
+    </div>
+  </div>
 
   <!-- ═══════════════════════════════════════════════════════════ -->
   <!-- Mobile Header                                              -->
@@ -635,7 +673,7 @@
   <!-- ═══════════════════════════════════════════════════════════ -->
   <div id="modal-agent" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
     <div class="absolute inset-0 bg-navy-900/80 backdrop-blur-sm" onclick="closeAgentModal()"></div>
-    <div class="relative bg-navy-800 border border-white/10 rounded-2xl shadow-2xl w-full max-w-md z-10">
+    <div class="relative bg-navy-800 border border-white/10 rounded-2xl shadow-2xl w-full max-w-md z-10 max-h-[90vh] overflow-y-auto custom-scrollbar">
       <div class="flex items-center justify-between px-6 py-5 border-b border-white/5">
         <div>
           <h3 class="text-base font-semibold text-white" id="agent-modal-title">Add Agent</h3>
