@@ -7,7 +7,7 @@
 // ── State ────────────────────────────────────────────────────
 let currentView = 'callbacks';
 let dailyQueueData = null;
-let currentCallbackFilter = 'pending'; // 'all', 'pending', 'completed'
+let currentCallbackFilter = 'all'; // default matches the 'All' button which starts highlighted in HTML
 
 let worklistOffset = 0;
 const WORKLIST_LIMIT = 20;
@@ -161,7 +161,8 @@ async function refreshDailyData() {
 
     document.getElementById('stat-progress-pct').textContent = `${rate}%`;
     document.getElementById('stat-progress-bar').style.width = `${rate}%`;
-    document.getElementById('nav-callback-badge').textContent = result.stats.remainingToday;
+    // Show totalScheduled in nav badge so agents always see how many callbacks are due today
+    document.getElementById('nav-callback-badge').textContent = result.stats.totalScheduled;
 
     renderCallbackCards();
   } catch (err) {
