@@ -37,6 +37,9 @@ function doPost(e) {
       case 'quickUpdateSalesData':
         result = quickUpdateSalesData(payload.customerId, payload.data, token);
         break;
+      case 'issueNewEasyPay':
+        result = issueNewEasyPay(token, payload.customerId);
+        break;
       case 'getAdminDashboard':
         result = getAdminDashboard(token);
         break;
@@ -142,7 +145,8 @@ function requireAdmin_(token) {
 
 /**
  * Validates follow-up / next action date.
- * Rule: Next action date cannot exceed Today + 8 days (8-day follow-up limit).
+ * Rule: Next action date cannot exceed Today + 8 days (8-day follow-up limit),
+ * UNLESS it is an automated Activation Follow-Up (which is exactly 7 days).
  */
 function validateFollowUpDate_(dateStr) {
   if (!dateStr) return '';
@@ -171,6 +175,46 @@ function formatDateSafe_(val) {
   return String(val).slice(0, 10);
 }
 
+/**
+ * Adds days safely to a date string or today, returning yyyy-MM-dd
+ */
+function addDaysSafe_(dateStr, numDays) {
+  const baseDate = dateStr ? new Date(dateStr + 'T00:00:00') : new Date();
+  baseDate.setDate(baseDate.getDate() + numDays);
+  return Utilities.formatDate(baseDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+}
+
+/**
+ * Generates a unique referral code: REF-XXXXXX
+ */
+function generateReferralCode_() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = 'REF-';
+  for (let i = 0; i < 6; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
+
+/**
+ * Generates an EasyPay number: EP-XXXXX (5 digits)
+ */
+function generateEasyPayNumber_() {
+  return 'EP-' + Math.floor(10000 + Math.random() * 90000);
+}
+
+/**
+ * Ensures ORDERS sheet contains all required header columns including EasyPay fields.
+ */
+function ensureOrdersSheetHeaders_() {
+  const ordersSheet = ss.getSheetByName('ORDERS');
+  if (!ordersSheet) return;
+  const lastCol = ordersSheet.getLastColumn();
+  if (lastCol < 13) {
+    ordersSheet.getRange(1, 13, 1, 3).setValues([['EasyPay_Number', 'EasyPay_Cycle', 'EasyPay_Expiry_Date']]);
+  }
+}
+
 // ============================================================
 // 3. AGENT LEAD CAPTURE & UPDATE
 // ============================================================
@@ -183,7 +227,7 @@ function handleAgentLeadUpdate(existingIdOverride, formData, token) {
   const custData = custSheet.getDataRange().getValues();
 
   // Validate 8-day follow up limit
-  if (formData.nextActionDate) {
+  if (formData.nextActionDate && formData.customerStatus !== 'Activated') {
     validateFollowUpDate_(formData.nextActionDate);
   }
 
@@ -199,32 +243,98 @@ function handleAgentLeadUpdate(existingIdOverride, formData, token) {
   }
 
   const isSaleWon = (formData.customerStatus === 'Won' || formData.customerStatus === 'Sale Completed');
-  // Order date is automatically the exact current day (Order Date >= Created Date)
+  const isActivated = (formData.customerStatus === 'Activated');
+
+  // Automatic Order Date: exact current day
   const orderDate = (isSaleWon || formData.orderDate) ? todayStr : "";
+
+  // Order Number: ALWAYS manually entered by agent — never auto-generated.
+  // EasyPay Number: auto-generated on Sale Won if not manually provided.
+  const orderId = (formData.orderNumber || '').trim();
+  let easyPayNumber = (formData.easyPayNumber || '').trim();
+  let easyPayCycle = "";
+  let easyPayExpiry = "";
+
+  if (isSaleWon && !easyPayNumber) {
+    easyPayNumber = generateEasyPayNumber_();
+  }
+  if (easyPayNumber) {
+    easyPayCycle = 'Cycle 1 of 3';
+    easyPayExpiry = addDaysSafe_(todayStr, 14); // 14-day validity
+  }
+
+  // 1-Week Activation Follow-Up rule: 7 days after activation
+  let nextAction = formData.nextAction || "";
+  let nextActionDate = formData.nextActionDate || "";
+  let activationDate = "";
+
+  if (isActivated) {
+    activationDate = todayStr;
+    nextAction = 'Activation Follow-Up (Check Connection)';
+    nextActionDate = addDaysSafe_(todayStr, 7); // Exactly 1 week after activation
+  }
 
   let customerId = existingIdOverride;
   if (!customerId) {
-    // New lead — insert across all tables
+    // New lead — generate unique Referral Code
     customerId = 'CUS-' + Utilities.getUuid().slice(0, 8).toUpperCase();
+    const referralCode = generateReferralCode_();
+    const referredBy = (formData.referredByCode || '').toUpperCase().trim();
+
     custSheet.appendRow([
       customerId, 'Active', timestamp, session.agentId, timestamp, formData.firstName, formData.surname, `${formData.firstName} ${formData.surname}`,
       formData.cellNumber, formData.alternateCell, formData.email, formData.address, formData.suburb, formData.package || "", formData.paymentType || "",
-      orderDate, "", "", "", "", "", "", "", formData.promisedPaymentDate || "", "", "", "", "", "", session.agentId, session.agentId, "",
-      formData.customerStatus || "New Lead", formData.nextAction || "", formData.nextActionDate || "", "", todayStr, formData.lastContactOutcome || ""
+      orderDate, orderId, easyPayNumber, easyPayCycle, referralCode, referredBy, easyPayExpiry, activationDate, formData.promisedPaymentDate || "",
+      "", "", "", "False", "None", "", session.agentId, session.agentId,
+      formData.customerStatus || "New Lead", nextAction, nextActionDate, "", todayStr, formData.lastContactOutcome || ""
     ]);
 
-    if (orderDate || isSaleWon) {
-      ss.getSheetByName('ORDERS').appendRow(['ORD-' + Utilities.getUuid().slice(0, 8), customerId, `${formData.firstName} ${formData.surname}`, orderDate, '', '', session.name, isSaleWon ? 'Sale Completed' : 'Pending', formData.nextAction || '', formData.nextActionDate || '', todayStr, 'Direct Capture']);
+    // Log to ORDERS sheet if an order or EasyPay number exists
+    if (orderId || easyPayNumber) {
+      ensureOrdersSheetHeaders_();
+      const isOvr = orderId.toUpperCase().startsWith('OVR');
+      const isOvk = orderId.toUpperCase().startsWith('OVK');
+      const ovrNum = isOvr ? orderId : (!isOvk ? orderId : '');
+      const ovkNum = isOvk ? orderId : '';
+
+      ss.getSheetByName('ORDERS').appendRow([
+        orderId || ('ORD-' + customerId),               // 1: Order_ID
+        customerId,                                      // 2: Customer_ID
+        `${formData.firstName} ${formData.surname}`,     // 3: Customer_Name
+        orderDate || todayStr,                           // 4: Order_Date
+        ovrNum,                                          // 5: SADV_OVR_Number
+        ovkNum,                                          // 6: SADV_OVK_Number
+        session.name,                                    // 7: Agent Name
+        isSaleWon ? 'Sale Completed' : 'Pending',        // 8: Order Status
+        nextAction,                                      // 9: Next Action
+        nextActionDate,                                  // 10: Action Date
+        todayStr,                                        // 11: Import Date
+        'Direct Capture',                                // 12: Source
+        easyPayNumber,                                   // 13: EasyPay_Number
+        easyPayCycle,                                    // 14: EasyPay_Cycle
+        easyPayExpiry                                    // 15: EasyPay_Expiry_Date
+      ]);
       ss.getSheetByName('PAYMENTS').appendRow(['PAY-' + Utilities.getUuid().slice(0, 8), customerId, 'Pending', formData.promisedPaymentDate || "", '', '']);
-      ss.getSheetByName('ACTIVATIONS').appendRow(['ACT-' + Utilities.getUuid().slice(0, 8), customerId, 'Pending', '', '']);
+      ss.getSheetByName('ACTIVATIONS').appendRow(['ACT-' + Utilities.getUuid().slice(0, 8), customerId, isActivated ? 'Activated' : 'Pending', isActivated ? todayStr : '', '']);
     }
   } else {
     // Update existing lead
     let rowIndex = custData.findIndex(r => r[0] === customerId) + 1;
     if (rowIndex > 0) {
+      const existingRow = custData[rowIndex - 1];
+      const existingRef = existingRow[19] || generateReferralCode_();
+      const existingOrderNum = isSaleWon ? (existingRow[16] || orderId) : existingRow[16];
+      const existingEasyPay = isSaleWon ? (existingRow[17] || easyPayNumber) : existingRow[17];
+      const existingCycle = isSaleWon ? (existingRow[18] || 'Cycle 1 of 3') : existingRow[18];
+      const existingEPExpiry = isSaleWon ? (existingRow[21] || easyPayExpiry) : existingRow[21];
+
       custSheet.getRange(rowIndex, 5, 1, 9).setValues([[timestamp, formData.firstName, formData.surname, `${formData.firstName} ${formData.surname}`, formData.cellNumber, formData.alternateCell, formData.email, formData.address, formData.suburb]]);
       custSheet.getRange(rowIndex, 14, 1, 3).setValues([[formData.package || "", formData.paymentType || "", orderDate]]);
-      custSheet.getRange(rowIndex, 33, 1, 3).setValues([[formData.customerStatus, formData.nextAction, formData.nextActionDate]]);
+      custSheet.getRange(rowIndex, 17, 1, 6).setValues([[existingOrderNum, existingEasyPay, existingCycle, existingRef, (formData.referredByCode || existingRow[20] || ''), existingEPExpiry]]);
+      if (isActivated) {
+        custSheet.getRange(rowIndex, 23).setValue(todayStr); // Activation_Date
+      }
+      custSheet.getRange(rowIndex, 33, 1, 3).setValues([[formData.customerStatus, nextAction, nextActionDate]]);
       custSheet.getRange(rowIndex, 37, 1, 2).setValues([[todayStr, formData.lastContactOutcome || ""]]);
     }
   }
@@ -241,8 +351,8 @@ function handleAgentLeadUpdate(existingIdOverride, formData, token) {
     formData.lastContactOutcome || (isSaleWon ? "Sale Won" : "Details Captured"),
     formData.customerStatus || "New Lead",
     formData.promisedPaymentDate || "",
-    formData.nextAction || "",
-    formData.nextActionDate || "",
+    nextAction,
+    nextActionDate,
     "False",
     "None",
     "",
@@ -261,7 +371,7 @@ function handleAgentLeadUpdate(existingIdOverride, formData, token) {
 /**
  * Returns today's active leads and callbacks for the logged-in agent.
  * STRICT RULE: Only shows leads relevant for TODAY (scheduled for today or overdue).
- * Leads scheduled for a future day are excluded and will only show on their scheduled date.
+ * Includes Referral Code, Order Number, EasyPay validity, and 1-Week Activation flags.
  */
 function getAgentDailyQueue(token) {
   const session = getSessionUser(token);
@@ -273,7 +383,6 @@ function getAgentDailyQueue(token) {
 
   // Map latest activity for each customer by this agent
   const agentActivityMap = {};
-  // Count touches logged today by this agent
   let todayTouchCount = 0;
   for (let i = 1; i < actData.length; i++) {
     const row = actData[i];
@@ -304,13 +413,30 @@ function getAgentDailyQueue(token) {
     const lastContactDate = formatDateSafe_(row[36]);
 
     if (!custId || recordStatus === 'Archived' || recordStatus === 'Expired') continue;
-    if (status === 'Won' || status === 'Lost' || status.includes('Lost')) continue;
+    if (status === 'Lost' || status.includes('Lost')) continue;
 
     const ownsCustomer = (assignedAgent === session.agentId);
     if (!ownsCustomer) continue;
 
-    // Check if customer is scheduled for callback
+    // Referral & Order & EasyPay data
+    const orderNumber = String(row[16] || '');
+    const easyPayNumber = String(row[17] || '');
+    const easyPayCycle = String(row[18] || 'Cycle 1 of 3');
+    const referralCode = String(row[19] || '');
+    const referredByCode = String(row[20] || '');
+    const easyPayExpiryDate = formatDateSafe_(row[21]);
+    const activationDate = formatDateSafe_(row[22]);
     const promisedPaymentDate = formatDateSafe_(row[23]);
+
+    let easyPayDaysRemaining = null;
+    let isEasyPayExpired = false;
+    if (easyPayExpiryDate) {
+      const expDate = new Date(easyPayExpiryDate + 'T00:00:00');
+      easyPayDaysRemaining = Math.round((expDate - todayDate) / (1000 * 60 * 60 * 24));
+      isEasyPayExpired = easyPayDaysRemaining < 0;
+    }
+
+    const isActivationFollowUp = (status === 'Activated' || nextAction.includes('Activation Follow-Up') || nextAction.includes('Check Connection'));
 
     if (nextActionDate) {
       const scheduledDate = new Date(nextActionDate + 'T00:00:00');
@@ -331,10 +457,21 @@ function getAgentDailyQueue(token) {
         cellNumber: String(row[8] || ''),
         alternateCell: String(row[9] || ''),
         package: String(row[13] || ''),
+        paymentType: String(row[14] || ''),
         status: status,
         nextAction: nextAction,
         nextActionDate: nextActionDate,
         promisedPaymentDate: promisedPaymentDate,
+        orderNumber: orderNumber,
+        easyPayNumber: easyPayNumber,
+        easyPayCycle: easyPayCycle,
+        easyPayExpiryDate: easyPayExpiryDate,
+        easyPayDaysRemaining: easyPayDaysRemaining,
+        isEasyPayExpired: isEasyPayExpired,
+        referralCode: referralCode,
+        referredByCode: referredByCode,
+        activationDate: activationDate,
+        isActivationFollowUp: isActivationFollowUp,
         isOverdue: diffDays > 0,
         daysOverdue: Math.max(0, diffDays),
         isCompletedToday: isCompleted,
@@ -342,10 +479,9 @@ function getAgentDailyQueue(token) {
         lastOutcome: String(row[37] || (agentActivityMap[custId] ? agentActivityMap[custId][7] : ''))
       });
     } else if (promisedPaymentDate) {
-      // Promised Payment Date follow-up: appears when the payment date has arrived (today or overdue)
+      // Promised Payment Date follow-up
       const payDate = new Date(promisedPaymentDate + 'T00:00:00');
       const payDiffDays = Math.round((todayDate - payDate) / (1000 * 60 * 60 * 24));
-      // Only surface on or after the promised date
       if (payDiffDays >= 0) {
         totalScheduledToday++;
         const isCompleted = (lastContactDate === todayStr);
@@ -356,10 +492,21 @@ function getAgentDailyQueue(token) {
           cellNumber: String(row[8] || ''),
           alternateCell: String(row[9] || ''),
           package: String(row[13] || ''),
+          paymentType: String(row[14] || ''),
           status: status,
           nextAction: 'Payment Follow-Up',
           nextActionDate: promisedPaymentDate,
           promisedPaymentDate: promisedPaymentDate,
+          orderNumber: orderNumber,
+          easyPayNumber: easyPayNumber,
+          easyPayCycle: easyPayCycle,
+          easyPayExpiryDate: easyPayExpiryDate,
+          easyPayDaysRemaining: easyPayDaysRemaining,
+          isEasyPayExpired: isEasyPayExpired,
+          referralCode: referralCode,
+          referredByCode: referredByCode,
+          activationDate: activationDate,
+          isActivationFollowUp: false,
           isOverdue: payDiffDays > 0,
           daysOverdue: Math.max(0, payDiffDays),
           isCompletedToday: isCompleted,
@@ -367,7 +514,7 @@ function getAgentDailyQueue(token) {
           lastOutcome: String(row[37] || (agentActivityMap[custId] ? agentActivityMap[custId][7] : ''))
         });
       }
-    } else if (createdStr === todayStr) {
+    } else if (createdStr === todayStr && status !== 'Won') {
       // New lead assigned or captured today without scheduled action yet
       todayNewLeads.push({
         customerId: custId,
@@ -375,6 +522,7 @@ function getAgentDailyQueue(token) {
         cellNumber: String(row[8] || ''),
         package: String(row[13] || ''),
         status: status,
+        referralCode: referralCode,
         createdDate: createdStr,
         isCompletedToday: (lastContactDate === todayStr)
       });
@@ -402,18 +550,18 @@ function getAgentDailyQueue(token) {
 
 /**
  * 1-Click Call Outcome Logger for Agents.
- * Replaces spreadsheets: instantly records touchpoint, updates customer record,
- * auto-sets order date if won, and enforces the strict 8-day follow-up limit.
+ * Supports Sale Won (with Order & EasyPay generation), Activated (7-day follow-up),
+ * and standard outcomes.
  */
 function logCallOutcome(token, payload) {
   const session = getSessionUser(token);
-  const { customerId, outcome, notes, nextAction, nextActionDate, packageChoice, paymentType, newPromisedPaymentDate } = payload;
+  const { customerId, outcome, notes, nextAction, nextActionDate, packageChoice, paymentType, newPromisedPaymentDate, referralLead } = payload;
 
   if (!customerId) throw new Error("Customer ID is required.");
   if (!outcome) throw new Error("Call outcome is required.");
 
-  // Validate 8-day rule limit
-  if (nextActionDate) {
+  // Validate 8-day rule limit for manual callbacks
+  if (nextActionDate && outcome !== 'Activated' && outcome !== 'Activation Follow-Up Completed') {
     validateFollowUpDate_(nextActionDate);
   }
 
@@ -425,56 +573,110 @@ function logCallOutcome(token, payload) {
   const rowIndex = custData.findIndex(r => String(r[0]) === String(customerId)) + 1;
   if (rowIndex === 0) throw new Error("Customer not found.");
 
+  const custRow = custData[rowIndex - 1];
+  const customerName = custRow[7] || `${custRow[5]} ${custRow[6]}`;
+
   const isSaleWon = (outcome === 'Sale Won' || outcome === 'Sale Completed');
+  const isActivated = (outcome === 'Activated' || outcome === 'Customer Activated');
   const isLost = (outcome === 'Not Interested' || outcome === 'Lost' || outcome === 'Invalid Lead');
 
   let newStatus = 'In Progress';
-  if (isSaleWon) newStatus = 'Won';
-  else if (isLost) newStatus = 'Lost';
-  else if (outcome === 'Callback Rescheduled') newStatus = 'Callback Scheduled';
-  else if (outcome === 'No Answer / Voicemail') newStatus = 'Follow-Up Needed';
-  else if (outcome === 'Payment Received') newStatus = 'Payment Received';
-  else if (outcome === 'No Payment - Reschedule') newStatus = 'Payment Pending';
-  else if (outcome === 'New Payment Date') newStatus = 'Payment Pending';
+  let computedNextAction = nextAction || '';
+  let computedNextActionDate = nextActionDate || '';
 
-  const custRow = custData[rowIndex - 1];
-  const customerName = custRow[7] || `${custRow[5]} ${custRow[6]}`;
+  if (isSaleWon) {
+    newStatus = 'Won';
+  } else if (isActivated) {
+    newStatus = 'Activated';
+    // Automatic 1-Week Activation Follow-Up (Check Connection & Referrals)
+    computedNextAction = 'Activation Follow-Up (Check Connection)';
+    computedNextActionDate = addDaysSafe_(todayStr, 7);
+  } else if (outcome === 'Activation Follow-Up Completed') {
+    newStatus = 'Active - Retained';
+    computedNextAction = 'None (Active Customer)';
+    computedNextActionDate = '';
+  } else if (isLost) {
+    newStatus = 'Lost';
+  } else if (outcome === 'Callback Rescheduled') {
+    newStatus = 'Callback Scheduled';
+    computedNextAction = 'Call Back';
+  } else if (outcome === 'No Answer / Voicemail') {
+    newStatus = 'Follow-Up Needed';
+    computedNextAction = 'Call Back';
+  } else if (outcome === 'Payment Received') {
+    newStatus = 'Payment Received';
+  } else if (outcome === 'No Payment - Reschedule' || outcome === 'New Payment Date') {
+    newStatus = 'Payment Pending';
+  }
 
   // Update CUSTOMERS record
   custSheet.getRange(rowIndex, 5).setValue(timestamp); // Last_Updated_DateTime
   if (packageChoice) custSheet.getRange(rowIndex, 14).setValue(packageChoice);
   if (paymentType) custSheet.getRange(rowIndex, 15).setValue(paymentType);
 
-  // If sale won: Automatic Order Date = exact day (Order Date >= Created Date)
+  // Referral code guarantee
+  let referralCode = custRow[19];
+  if (!referralCode) {
+    referralCode = generateReferralCode_();
+    custSheet.getRange(rowIndex, 20).setValue(referralCode);
+  }
+
+  // If sale won: Generate EasyPay Number + 14-day expiry.
+  // NOTE: Order Number is NEVER auto-generated — it must be entered manually in the sale form.
   if (isSaleWon) {
+    const manualOrderId = (payload.orderNumber || '').trim();
+    const easyPayNum = generateEasyPayNumber_();
+    const easyPayCycle = 'Cycle 1 of 3';
+    const easyPayExpiry = addDaysSafe_(todayStr, 14);
+
     custSheet.getRange(rowIndex, 16).setValue(todayStr); // Order_Date
-    ss.getSheetByName('ORDERS').appendRow([
-      'ORD-' + Utilities.getUuid().slice(0, 8).toUpperCase(),
-      customerId,
-      customerName,
-      todayStr,
-      '',
-      '',
-      session.name,
-      'Sale Completed',
-      nextAction || '',
-      nextActionDate || '',
-      todayStr,
-      'Agent Portal Call'
-    ]);
-    ss.getSheetByName('PAYMENTS').appendRow(['PAY-' + Utilities.getUuid().slice(0, 8), customerId, 'Pending', '', '', '']);
+    // Col 17 = Order Number (manual), Col 18 = EasyPay Number, Col 19 = Cycle
+    if (manualOrderId) custSheet.getRange(rowIndex, 17).setValue(manualOrderId);
+    custSheet.getRange(rowIndex, 18, 1, 2).setValues([[easyPayNum, easyPayCycle]]);
+    custSheet.getRange(rowIndex, 22).setValue(easyPayExpiry); // EasyPay_Expiry_Date
+
+    if (manualOrderId || easyPayNum) {
+      ensureOrdersSheetHeaders_();
+      const isOvr = manualOrderId.toUpperCase().startsWith('OVR');
+      const isOvk = manualOrderId.toUpperCase().startsWith('OVK');
+      const ovrNum = isOvr ? manualOrderId : (!isOvk ? manualOrderId : '');
+      const ovkNum = isOvk ? manualOrderId : '';
+
+      ss.getSheetByName('ORDERS').appendRow([
+        manualOrderId || ('ORD-' + customerId),           // 1: Order_ID
+        customerId,                                       // 2: Customer_ID
+        customerName,                                     // 3: Customer_Name
+        todayStr,                                         // 4: Order_Date
+        ovrNum,                                           // 5: SADV_OVR_Number
+        ovkNum,                                           // 6: SADV_OVK_Number
+        session.name,                                     // 7: Agent Name
+        'Sale Completed',                                 // 8: Order Status
+        computedNextAction || 'Follow Up Payment',        // 9: Next Action
+        computedNextActionDate || easyPayExpiry,          // 10: Action Date
+        todayStr,                                         // 11: Import Date
+        'Agent Portal Call',                              // 12: Source
+        easyPayNum,                                       // 13: EasyPay_Number
+        easyPayCycle,                                     // 14: EasyPay_Cycle
+        easyPayExpiry                                     // 15: EasyPay_Expiry_Date
+      ]);
+    }
+    ss.getSheetByName('PAYMENTS').appendRow(['PAY-' + Utilities.getUuid().slice(0, 8), customerId, 'Pending', newPromisedPaymentDate || '', '', '']);
     ss.getSheetByName('ACTIVATIONS').appendRow(['ACT-' + Utilities.getUuid().slice(0, 8), customerId, 'Pending', '', '']);
+  }
+
+  // If activated, record activation date
+  if (isActivated) {
+    custSheet.getRange(rowIndex, 23).setValue(todayStr); // Activation_Date
   }
 
   // Update promised payment date if a new one was set by the agent
   if (newPromisedPaymentDate) {
-    custSheet.getRange(rowIndex, 24).setValue(newPromisedPaymentDate); // Promised_Payment_Date col
+    custSheet.getRange(rowIndex, 24).setValue(newPromisedPaymentDate);
   } else if (outcome === 'Payment Received') {
-    // Clear the promised payment date once payment is confirmed received
     custSheet.getRange(rowIndex, 24).setValue('');
   }
 
-  custSheet.getRange(rowIndex, 33, 1, 3).setValues([[newStatus, nextAction || (outcome === 'Callback Rescheduled' ? 'Call Back' : ''), nextActionDate || '']]);
+  custSheet.getRange(rowIndex, 33, 1, 3).setValues([[newStatus, computedNextAction, computedNextActionDate]]);
   custSheet.getRange(rowIndex, 37, 1, 2).setValues([[todayStr, outcome]]);
   // Reset escalation flag since contact occurred
   custSheet.getRange(rowIndex, 28, 1, 3).setValues([["False", "None", ""]]);
@@ -490,9 +692,9 @@ function logCallOutcome(token, payload) {
     "Phone Call",
     outcome,
     newStatus,
-    "",
-    nextAction || "",
-    nextActionDate || "",
+    newPromisedPaymentDate || "",
+    computedNextAction,
+    computedNextActionDate,
     "False",
     "None",
     "",
@@ -501,7 +703,138 @@ function logCallOutcome(token, payload) {
     timestamp
   ]);
 
-  return { success: true, customerId, newStatus };
+  // Create referral lead if provided (from 1-week activation follow-up)
+  let referralLeadCreated = false;
+  if (referralLead && referralLead.cellNumber && referralLead.firstName) {
+    try {
+      const refResult = handleAgentLeadUpdate(null, {
+        firstName: referralLead.firstName,
+        surname: referralLead.surname || '',
+        cellNumber: referralLead.cellNumber,
+        address: referralLead.address || '',
+        suburb: '',
+        email: '',
+        alternateCell: '',
+        package: custRow[13] || '',  // Inherit parent package as suggestion
+        paymentType: '',
+        orderDate: todayStr,
+        promisedPaymentDate: '',
+        referredByCode: referralCode,  // Link to referrer
+        customerStatus: 'New Lead',
+        lastContactOutcome: 'Referred by existing customer',
+        nextAction: 'Call Back',
+        nextActionDate: addDaysSafe_(todayStr, 1)
+      }, token);
+      if (refResult) referralLeadCreated = true;
+    } catch (refErr) {
+      // Non-fatal: log but don't block the main outcome
+      console.error('Failed to create referral lead: ' + refErr.message);
+    }
+  }
+
+  return { success: true, customerId, newStatus, referralCode, referralLeadCreated };
+}
+
+/**
+ * Issues a new EasyPay Number & Order for a customer (Max 3 Cycles, 14-day validity).
+ * When an EasyPay number expires or customer requests a new one, this increments cycle,
+ * generates a brand new Order Number (ORD-XXXX) and EasyPay Number (EP-XXXXX),
+ * and resets the 14-day timer.
+ */
+function issueNewEasyPay(token, customerId) {
+  const session = getSessionUser(token);
+  if (!customerId) throw new Error("Customer ID is required.");
+
+  const custSheet = ss.getSheetByName('CUSTOMERS');
+  const custData = custSheet.getDataRange().getValues();
+  const rowIndex = custData.findIndex(r => String(r[0]) === String(customerId)) + 1;
+  if (rowIndex === 0) throw new Error("Customer not found.");
+
+  const custRow = custData[rowIndex - 1];
+  const customerName = custRow[7] || `${custRow[5]} ${custRow[6]}`;
+  const currentCycleStr = String(custRow[18] || '');
+
+  let newCycleNumber = 1;
+  if (currentCycleStr.includes('Cycle 1')) newCycleNumber = 2;
+  else if (currentCycleStr.includes('Cycle 2')) newCycleNumber = 3;
+  else if (currentCycleStr.includes('Cycle 3')) {
+    // 3 Cycles max limit reached!
+    custSheet.getRange(rowIndex, 2).setValue('Expired');
+    custSheet.getRange(rowIndex, 33).setValue('Lost (EasyPay 3 Cycles Expired)');
+    throw new Error("Customer has already reached the maximum of 3 EasyPay numbers (Cycle 3 expired). This order has expired.");
+  }
+
+  const newCycleStr = `Cycle ${newCycleNumber} of 3`;
+  const todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  const timestamp = new Date().toISOString();
+
+  // Preserve existing Order Number (Order numbers are NEVER auto-generated)
+  const existingOrderId = String(custRow[16] || '').trim();
+  const newEasyPay = generateEasyPayNumber_();
+  const newExpiryDate = addDaysSafe_(todayStr, 14); // 14-day validity
+
+  // Update CUSTOMERS record
+  custSheet.getRange(rowIndex, 5).setValue(timestamp); // Last_Updated_DateTime
+  custSheet.getRange(rowIndex, 16).setValue(todayStr); // Order_Date
+  custSheet.getRange(rowIndex, 18, 1, 2).setValues([[newEasyPay, newCycleStr]]);
+  custSheet.getRange(rowIndex, 22).setValue(newExpiryDate); // EasyPay_Expiry_Date
+  custSheet.getRange(rowIndex, 33, 1, 3).setValues([['Payment Pending', 'Follow Up Payment (EasyPay Re-issued)', newExpiryDate]]);
+
+  // Append record in ORDERS sheet (with EasyPay number, cycle, and expiry)
+  ensureOrdersSheetHeaders_();
+  const isOvr = existingOrderId.toUpperCase().startsWith('OVR');
+  const isOvk = existingOrderId.toUpperCase().startsWith('OVK');
+  const ovrNum = isOvr ? existingOrderId : (!isOvk ? existingOrderId : '');
+  const ovkNum = isOvk ? existingOrderId : '';
+
+  ss.getSheetByName('ORDERS').appendRow([
+    existingOrderId || ('ORD-' + customerId),           // 1: Order_ID
+    customerId,                                         // 2: Customer_ID
+    customerName,                                       // 3: Customer_Name
+    todayStr,                                           // 4: Order_Date
+    ovrNum,                                             // 5: SADV_OVR_Number
+    ovkNum,                                             // 6: SADV_OVK_Number
+    session.name,                                       // 7: Agent Name
+    'Pending (Re-issued EP)',                           // 8: Order Status
+    'Follow Up Payment',                                // 9: Next Action
+    newExpiryDate,                                      // 10: Action Date
+    todayStr,                                           // 11: Import Date
+    'Agent Portal Re-issue',                            // 12: Source
+    newEasyPay,                                         // 13: EasyPay_Number
+    newCycleStr,                                        // 14: EasyPay_Cycle
+    newExpiryDate                                       // 15: EasyPay_Expiry_Date
+  ]);
+
+  // Log in ACTIVITY_LOG
+  ss.getSheetByName('ACTIVITY_LOG').appendRow([
+    'ACT-' + Utilities.getUuid().substring(0, 8).toUpperCase(),
+    timestamp,
+    customerId,
+    customerName,
+    session.agentId,
+    "EasyPay Re-issued",
+    "Web Portal",
+    `EasyPay ${newCycleStr} Generated`,
+    "Payment Pending",
+    "",
+    "Follow Up Payment",
+    newExpiryDate,
+    "False",
+    "None",
+    "",
+    `Generated new EasyPay Number ${newEasyPay} (${newCycleStr}) with new Order Number ${newOrderId}. Valid for 14 days until ${newExpiryDate}.`,
+    session.agentId,
+    timestamp
+  ]);
+
+  return {
+    success: true,
+    customerId: customerId,
+    orderId: newOrderId,
+    easyPayNumber: newEasyPay,
+    cycle: newCycleStr,
+    expiryDate: newExpiryDate
+  };
 }
 
 // ============================================================
@@ -792,13 +1125,14 @@ function getAdminCallbackReport(token, targetDate) {
 }
 
 // ============================================================
-// 7. AUTOMATED LEAD LIFECYCLE ENGINE (42-Day Lost & 7-Day Escalation)
+// 7. AUTOMATED LEAD LIFECYCLE ENGINE (42-Day Lost, 7-Day Escalation, EasyPay 3-Cycle Expiry)
 // ============================================================
 
 /**
  * Enforces automated lead lifecycle rules:
  * 1. 42-Day Auto-Lost: Any lead open > 42 days without win is flagged Lost (42-Day Expiry).
  * 2. 7-Day Escalation: Any lead with no contact for >= 7 days is escalated to supervisor.
+ * 3. EasyPay 3 Cycles Expired: Any lead with Cycle 3 of 3 past 14-day expiry without payment is flagged Lost.
  */
 function enforceLeadLifecycleRules(token) {
   requireAdmin_(token);
@@ -817,20 +1151,52 @@ function enforceLeadLifecycleRules(token) {
     if (!custId || row[1] === 'Archived' || row[1] === 'Expired') continue;
 
     const status = String(row[32] || '');
-    if (status === 'Won' || status === 'Lost' || status.includes('Lost')) continue;
+    if (status === 'Won' || status === 'Lost' || status.includes('Lost') || status === 'Payment Received') continue;
 
     const createdDateStr = formatDateSafe_(row[2]);
     const lastContactDateStr = formatDateSafe_(row[36]);
-    const nextActionDateStr = formatDateSafe_(row[34]);
+    const easyPayCycleStr = String(row[18] || '');
+    const easyPayExpiryStr = formatDateSafe_(row[21]);
 
     const createdDate = new Date(createdDateStr + 'T00:00:00');
     const ageDays = Math.round((today - createdDate) / (1000 * 60 * 60 * 24));
 
-    // Rule 1: 42-Day Auto-Lost Expiry
+    // Rule 1: EasyPay 3 Cycles Expired
+    if (easyPayCycleStr.includes('Cycle 3') && easyPayExpiryStr && easyPayExpiryStr < todayStr) {
+      const rowIndex = i + 1;
+      custSheet.getRange(rowIndex, 2).setValue('Expired');
+      custSheet.getRange(rowIndex, 33).setValue('Lost (EasyPay 3 Cycles Expired)');
+      custSheet.getRange(rowIndex, 5).setValue(timestamp);
+
+      ss.getSheetByName('ACTIVITY_LOG').appendRow([
+        'ACT-' + Utilities.getUuid().substring(0, 8).toUpperCase(),
+        timestamp,
+        custId,
+        row[7] || `${row[5]} ${row[6]}`,
+        'SYSTEM',
+        'Auto-Expiry',
+        'System Cron',
+        'Lost (EasyPay 3 Cycles Expired)',
+        'Lost (EasyPay 3 Cycles Expired)',
+        '',
+        'None',
+        '',
+        'False',
+        'None',
+        '',
+        `Customer exceeded maximum 3 EasyPay cycles without payment. Final cycle expired on ${easyPayExpiryStr}.`,
+        'SYSTEM',
+        timestamp
+      ]);
+      expiredCount++;
+      continue;
+    }
+
+    // Rule 2: 42-Day Auto-Lost Expiry
     if (ageDays > 42) {
       const rowIndex = i + 1;
-      custSheet.getRange(rowIndex, 2).setValue('Expired'); // Record_Status
-      custSheet.getRange(rowIndex, 33).setValue('Lost (42-Day Expiry)'); // Customer_Status
+      custSheet.getRange(rowIndex, 2).setValue('Expired');
+      custSheet.getRange(rowIndex, 33).setValue('Lost (42-Day Expiry)');
       custSheet.getRange(rowIndex, 5).setValue(timestamp);
 
       ss.getSheetByName('ACTIVITY_LOG').appendRow([
@@ -857,7 +1223,7 @@ function enforceLeadLifecycleRules(token) {
       continue;
     }
 
-    // Rule 2: 7-Day Uncontacted Escalation
+    // Rule 3: 7-Day Uncontacted Escalation
     let daysWithoutContact = ageDays;
     if (lastContactDateStr) {
       daysWithoutContact = Math.round((today - new Date(lastContactDateStr + 'T00:00:00')) / (1000 * 60 * 60 * 24));
@@ -969,7 +1335,11 @@ function getAdminPromisedPayments(token) {
       agentName: userMap.get(assignedAgentId) || 'Unassigned',
       promisedPaymentDate: promisedPaymentDate,
       daysUntilDue: daysUntilDue,
-      status: status
+      status: status,
+      orderNumber: String(row[16] || ''),
+      easyPayNumber: String(row[17] || ''),
+      easyPayCycle: String(row[18] || ''),
+      easyPayExpiry: formatDateSafe_(row[21])
     });
   }
 
@@ -1001,13 +1371,12 @@ function getAdminMasterGrid(token, offset, limit) {
     const agentName = agentMap.get(String(agentId)) || agentId;
 
     const rawPhone = custData[i][8];
-    let phone = "—"
+    let phone = "—";
 
-    if (rawPhone !== "" & rawPhone !== null && rawPhone !== undefined) {
-      let phoneStr = String(rawPhone).trim()
-
+    if (rawPhone !== "" && rawPhone !== null && rawPhone !== undefined) {
+      let phoneStr = String(rawPhone).trim();
       if (phoneStr !== "") {
-        phone = phoneStr.startsWith("0") ? phoneStr : "0" + phoneStr
+        phone = phoneStr.startsWith("0") ? phoneStr : "0" + phoneStr;
       }
     }
 
@@ -1017,6 +1386,13 @@ function getAdminMasterGrid(token, offset, limit) {
       cellNumber: phone,
       agent: agentName,
       status: custData[i][32],
+      orderNumber: custData[i][16] || '',
+      easyPayNumber: custData[i][17] || '',
+      easyPayCycle: custData[i][18] || '',
+      referralCode: custData[i][19] || '',
+      referredByCode: custData[i][20] || '',
+      easyPayExpiry: formatDateSafe_(custData[i][21]),
+      activationDate: formatDateSafe_(custData[i][22]),
       orderDate: formatDateSafe_(custData[i][15]),
       createdDate: formatDateSafe_(custData[i][2]),
       nextActionDate: formatDateSafe_(custData[i][34]),
@@ -1071,6 +1447,9 @@ function runAgilitySync(token) {
         updatedLeads++;
       } else {
         customerId = 'CUS-' + Utilities.getUuid().slice(0, 8).toUpperCase();
+        const referralCode = generateReferralCode_();
+        const easyPayNum = generateEasyPayNumber_();
+        const easyPayExpiry = addDaysSafe_(todayStr, 14);
 
         let agentName = '';
         if (AGENT_COL_INDEX !== -1 && row[AGENT_COL_INDEX]) {
@@ -1095,16 +1474,33 @@ function runAgilitySync(token) {
           else if (rawProduct.includes("fttr-10-10")) mappedPackage = "Vuma Reach 10Mbps/10Mbps";
         }
 
+        const nextAct = isActivated ? 'Activation Follow-Up (Check Connection)' : 'Call Back';
+        const nextActDate = isActivated ? addDaysSafe_(todayStr, 7) : todayStr;
+
         newCust.push([
           customerId, 'Active', timestamp, (agentName || 'Agility System'), timestamp,
           firstName, surname, fullName, '0000000000', '', '', 'Address Missing', 'Area Missing', mappedPackage,
-          '', todayStr, '', '', '', '', '', '', '', '', '', '', '', '', '', '', 'Agility System', '',
-          'New Lead', 'Call Back', todayStr, '', todayStr, 'Auto-Imported'
+          '', todayStr, orderNum, easyPayNum, 'Cycle 1 of 3',
+          referralCode, '', easyPayExpiry, isActivated ? todayStr : '', '', '', '', '', 'False', 'None', '',
+          'Agility System', '', isActivated ? 'Activated' : 'New Lead', nextAct, nextActDate, '', todayStr, 'Auto-Imported'
         ]);
 
         newOrd.push([
-          'ORD-' + Utilities.getUuid().slice(0, 8), customerId, fullName, todayStr, (isOvr ? orderNum : ''), (!isOvr ? orderNum : ''),
-          (agentName || 'Agility System'), row[11] || 'Imported via Agility', 'Update Missing Info', todayStr, todayStr, 'Auto-Imported'
+          orderNum,                                      // 1: Order_ID
+          customerId,                                    // 2: Customer_ID
+          fullName,                                      // 3: Customer_Name
+          todayStr,                                      // 4: Order_Date
+          (isOvr ? orderNum : ''),                       // 5: SADV_OVR_Number
+          (!isOvr ? orderNum : ''),                      // 6: SADV_OVK_Number
+          (agentName || 'Agility System'),               // 7: Agent Name
+          row[11] || 'Imported via Agility',             // 8: Order Status
+          nextAct,                                       // 9: Next Action
+          nextActDate,                                   // 10: Action Date
+          todayStr,                                      // 11: Import Date
+          'Auto-Imported',                               // 12: Source
+          easyPayNum,                                    // 13: EasyPay_Number
+          'Cycle 1 of 3',                                // 14: EasyPay_Cycle
+          easyPayExpiry                                  // 15: EasyPay_Expiry_Date
         ]);
 
         newPay.push(['PAY-' + Utilities.getUuid().slice(0, 8), customerId, (isPaid ? 'Paid' : 'Pending'), '', (isPaid ? row[5] : ''), (isPaid ? timestamp : '')]);
@@ -1118,7 +1514,10 @@ function runAgilitySync(token) {
     syncStatusArray[i][0] = 'Synced';
   }
   if (newCust.length > 0) ss.getSheetByName('CUSTOMERS').getRange(ss.getSheetByName('CUSTOMERS').getLastRow() + 1, 1, newCust.length, newCust[0].length).setValues(newCust);
-  if (newOrd.length > 0) ss.getSheetByName('ORDERS').getRange(ss.getSheetByName('ORDERS').getLastRow() + 1, 1, newOrd.length, newOrd[0].length).setValues(newOrd);
+  if (newOrd.length > 0) {
+    ensureOrdersSheetHeaders_();
+    ss.getSheetByName('ORDERS').getRange(ss.getSheetByName('ORDERS').getLastRow() + 1, 1, newOrd.length, newOrd[0].length).setValues(newOrd);
+  }
   if (newPay.length > 0) ss.getSheetByName('PAYMENTS').getRange(ss.getSheetByName('PAYMENTS').getLastRow() + 1, 1, newPay.length, newPay[0].length).setValues(newPay);
   if (newAct.length > 0) ss.getSheetByName('ACTIVATIONS').getRange(ss.getSheetByName('ACTIVATIONS').getLastRow() + 1, 1, newAct.length, newAct[0].length).setValues(newAct);
   agilitySheet.getRange(1, SYNC_COL_INDEX + 1, syncStatusArray.length, 1).setValues(syncStatusArray);

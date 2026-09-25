@@ -174,6 +174,36 @@ function setCallbackFilter(filter) {
   renderCallbackCards();
 }
 
+// (Old duplicate renderCallbackCards removed — see updated version below)
+
+function copyPhone(phone) {
+  if (!phone) return;
+  navigator.clipboard.writeText(phone).then(() => {
+    showToast(`Copied phone ${phone} to clipboard`);
+  });
+}
+
+function copyReferralCode(code) {
+  if (!code) return;
+  navigator.clipboard.writeText(code).then(() => {
+    showToast(`Copied referral code ${code} to clipboard! Share with customer.`);
+  });
+}
+
+async function triggerReissueEasyPay(customerId) {
+  if (!confirm("Are you sure you want to re-issue a new EasyPay number? This will generate a new Order Number and a new 14-day EasyPay number (up to 3 cycles maximum).")) {
+    return;
+  }
+
+  try {
+    const result = await callBackend('issueNewEasyPay', { customerId });
+    showToast(`Re-issued EasyPay: ${result.easyPayNumber} (${result.cycle}) with Order ${result.orderId}! Valid for 14 days.`);
+    refreshDailyData();
+  } catch (err) {
+    showToast(err.message, "error");
+  }
+}
+
 function renderCallbackCards() {
   const container = document.getElementById('callback-cards-container');
   if (!dailyQueueData) return;
@@ -209,73 +239,120 @@ function renderCallbackCards() {
     }
     const isOverdue = c.isOverdue && !c.isCompletedToday;
     const isPayment = c.isPromisedPayment;
+    const isActivation = c.isActivationFollowUp;
 
-    // Card border colors: purple for payment, amber for overdue, emerald for done, default otherwise
+    // Card border colors: blue for activation check, purple for payment, amber for overdue, emerald for done
     const cardBorder = c.isCompletedToday
       ? 'border-emerald-500/20 bg-emerald-950/10'
-      : isPayment
-        ? (isOverdue ? 'border-purple-500/60 bg-purple-950/20' : 'border-purple-500/30 bg-purple-950/10')
-        : (isOverdue ? 'border-amber-500/40 bg-amber-950/15' : 'border-white/10 bg-white/[0.02]');
+      : isActivation
+        ? 'border-blue-500/40 bg-blue-950/15'
+        : isPayment
+          ? (isOverdue ? 'border-purple-500/60 bg-purple-950/20' : 'border-purple-500/30 bg-purple-950/10')
+          : (isOverdue ? 'border-amber-500/40 bg-amber-950/15' : 'border-white/10 bg-white/[0.02]');
 
     const avatarColor = c.isCompletedToday
       ? 'bg-emerald-500/20 text-emerald-300'
-      : isPayment
-        ? 'bg-purple-500/20 text-purple-300'
-        : (isOverdue ? 'bg-amber-500/20 text-amber-300' : 'bg-fiber-500/20 text-fiber-300');
+      : isActivation
+        ? 'bg-blue-500/20 text-blue-300'
+        : isPayment
+          ? 'bg-purple-500/20 text-purple-300'
+          : (isOverdue ? 'bg-amber-500/20 text-amber-300' : 'bg-fiber-500/20 text-fiber-300');
 
     return `
       <div class="p-4 rounded-2xl border ${cardBorder} hover:border-fiber-500/50 transition-all shadow-sm">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           
-          <!-- Client Name & Phone (Minimal Focus) -->
-          <div class="flex items-start gap-3.5">
+          <!-- Client Name & Info -->
+          <div class="flex items-start gap-3.5 flex-1 min-w-0">
             <div class="w-11 h-11 rounded-xl ${avatarColor} flex items-center justify-center font-bold text-base flex-shrink-0">
               ${escHtml((c.name || 'C').charAt(0))}
             </div>
             
-            <div>
+            <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 flex-wrap">
                 <h4 class="text-base font-bold text-white tracking-tight">${escHtml(c.name)}</h4>
+                ${isActivation ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30 animate-pulse">🚀 1-Week Activation Check</span>` : ''}
                 ${isPayment ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">💳 Payment Follow-Up</span>` : ''}
-                ${isOverdue && !isPayment ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">⚠️ Overdue (${c.daysOverdue}d)</span>` : ''}
+                ${isOverdue && !isPayment && !isActivation ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">⚠️ Overdue (${c.daysOverdue}d)</span>` : ''}
                 ${isOverdue && isPayment ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/20 text-red-300 border border-red-500/30">🔴 Payment Overdue (${c.daysOverdue}d)</span>` : ''}
                 ${c.isCompletedToday ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">✓ Done Today</span>` : ''}
               </div>
 
-              <!-- Phone Number with 1-click Copy -->
-              <div class="flex items-center gap-3 mt-1.5">
-                <button onclick="copyPhone('${escJs(formattedPhone)}')" class="inline-flex items-center gap-1.5 text-sm font-semibold font-mono text-fiber-400 hover:text-fiber-300 transition-colors cursor-pointer text-left">
-                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
-                  </svg>
-                  ${escHtml(formattedPhone || 'No number')}
-                </button>
-                <button onclick="copyPhone('${escJs(formattedPhone)}')" title="Copy Phone Number" class="p-1 text-gray-500 hover:text-gray-300 transition-colors">
-                  <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
-                  </svg>
-                </button>
+              <!-- Phone Number & Referral Code with 1-click Copy -->
+              <div class="flex items-center gap-4 mt-1.5 flex-wrap">
+                <div class="flex items-center gap-1.5">
+                  <button onclick="copyPhone('${escJs(formattedPhone)}')" class="inline-flex items-center gap-1 text-sm font-semibold font-mono text-fiber-400 hover:text-fiber-300 transition-colors cursor-pointer text-left">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
+                    </svg>
+                    ${escHtml(formattedPhone || 'No number')}
+                  </button>
+                  <button onclick="copyPhone('${escJs(formattedPhone)}')" title="Copy Phone Number" class="p-1 text-gray-500 hover:text-gray-300 transition-colors">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
+                    </svg>
+                  </button>
+                </div>
+
+                <!-- Referral Code Chip -->
+                ${c.referralCode ? `
+                  <div class="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs font-mono">
+                    <span>🎁 Ref: <strong>${escHtml(c.referralCode)}</strong></span>
+                    <button onclick="copyReferralCode('${escJs(c.referralCode)}')" title="Copy Referral Code" class="hover:text-white">
+                      <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
+                      </svg>
+                    </button>
+                  </div>
+                ` : ''}
               </div>
 
-              <!-- Context pills -->
-              <div class="flex items-center gap-2 mt-2 text-[11px] text-gray-400">
-                <span>📦 ${escHtml(c.package || 'Standard')}</span>
+              <!-- Context pills (Order, EasyPay, Package, Action) -->
+              <div class="flex items-center gap-2 mt-2 text-[11px] text-gray-400 flex-wrap">
+                ${c.orderNumber ? `<span class="text-gray-300 font-mono">📦 <strong>${escHtml(c.orderNumber)}</strong></span><span>•</span>` : ''}
+                <span>${escHtml(c.package || 'Standard')}</span>
                 <span>•</span>
                 <span>Status: <strong class="text-white">${escHtml(c.status)}</strong></span>
+                
+                ${c.easyPayNumber ? `
+                  <span>•</span>
+                  <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono font-semibold ${c.isEasyPayExpired ? 'bg-red-500/20 text-red-300 border border-red-500/40' : 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20'}">
+                    <span>💳 EP: <strong>${escHtml(c.easyPayNumber)}</strong></span>
+                    <span class="text-gray-400">(${escHtml(c.easyPayCycle || 'Cycle 1 of 3')})</span>
+                    <span>•</span>
+                    <span class="${c.isEasyPayExpired ? 'text-red-400 font-bold' : 'text-emerald-400'}">
+                      ⌛ Exp: <strong>${escHtml(c.easyPayExpiryDate || '—')}</strong>${c.isEasyPayExpired ? ' (EXPIRED)' : (c.easyPayDaysRemaining !== null ? ` (${c.easyPayDaysRemaining}d left)` : '')}
+                    </span>
+                  </span>
+                ` : ''}
+
                 ${isPayment ? `<span>•</span><span class="text-purple-300 font-semibold">💳 Due: ${escHtml(c.promisedPaymentDate)}</span>` : ''}
                 ${c.lastOutcome && !isPayment ? `<span>•</span><span>Last: ${escHtml(c.lastOutcome)}</span>` : ''}
               </div>
+
+              ${isActivation ? `
+                <div class="mt-2 p-2 rounded-lg bg-blue-500/10 border border-blue-500/20 text-[11px] text-blue-300 flex items-center justify-between">
+                  <span>💡 <strong>1-Week Post-Activation Call:</strong> Check connection speed and share their referral code <strong>${escHtml(c.referralCode)}</strong> for rewards!</span>
+                </div>
+              ` : ''}
             </div>
           </div>
 
-          <!-- 1-Click Action Trigger -->
-          <div class="flex items-center gap-2.5 sm:self-center">
+          <!-- 1-Click Action Triggers -->
+          <div class="flex items-center gap-2 sm:self-center flex-wrap">
+            ${c.easyPayNumber && (c.isEasyPayExpired || c.status === 'Payment Pending') ? `
+              <button onclick="triggerReissueEasyPay('${escJs(c.customerId)}')" title="Re-issue EasyPay Number (Max 3 cycles)"
+                class="px-3 py-2 rounded-xl text-xs font-bold bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 transition-colors flex items-center gap-1">
+                🔄 Re-issue EP
+              </button>
+            ` : ''}
+
             <button onclick="copyPhone('${escJs(formattedPhone)}')" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-white/5 hover:bg-white/10 text-white border border-white/10 transition-colors flex items-center gap-1.5 cursor-pointer">
               📞 Call Now
             </button>
-            <button onclick="openCallOutcomeModal('${escHtml(c.customerId)}', '${escJs(c.name)}', '${escJs(formattedPhone)}', '${escJs(c.package || '')}', ${isPayment ? 'true' : 'false'})"
-              class="px-4 py-2 rounded-xl text-xs font-bold ${isPayment ? 'bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 shadow-md shadow-purple-500/20' : 'bg-gradient-to-r from-fiber-500 to-fiber-600 hover:from-fiber-600 hover:to-fiber-700 shadow-md shadow-fiber-500/20'} text-white transition-all flex items-center gap-1.5">
-              ${isPayment ? '💳 Log Payment' : '⚡ Log Outcome'}
+            <button onclick="openCallOutcomeModal('${escHtml(c.customerId)}', '${escJs(c.name)}', '${escJs(formattedPhone)}', '${escJs(c.package || '')}', ${isPayment ? 'true' : 'false'}, ${isActivation ? 'true' : 'false'}, '${escJs(c.paymentType || '')}', '${escJs(c.orderNumber || '')}', '${escJs(c.easyPayNumber || '')}', '${escJs(c.referralCode || '')}', '${escJs(c.easyPayExpiryDate || '')}', '${escJs(c.easyPayCycle || '')}')"
+              class="px-4 py-2 rounded-xl text-xs font-bold ${isActivation ? 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-md shadow-blue-500/20' : isPayment ? 'bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 shadow-md shadow-purple-500/20' : 'bg-gradient-to-r from-fiber-500 to-fiber-600 hover:from-fiber-600 hover:to-fiber-700 shadow-md shadow-fiber-500/20'} text-white transition-all flex items-center gap-1.5">
+              ${isActivation ? '🚀 Log Activation Check' : isPayment ? '💳 Log Payment' : '⚡ Log Outcome'}
             </button>
           </div>
 
@@ -285,18 +362,10 @@ function renderCallbackCards() {
   }).join('');
 }
 
-function copyPhone(phone) {
-  if (!phone) return;
-  navigator.clipboard.writeText(phone).then(() => {
-    showToast(`Copied ${phone} to clipboard`);
-  });
-}
-
 // ── 1-Click Call Outcome Drawer / Modal ──────────────────────
-function openCallOutcomeModal(customerId, name, phone, pkg, isPaymentFollowUp = false) {
-
-  const formattedPhone = phone !== null ? "0" + phone : "No Number";
-
+function openCallOutcomeModal(customerId, name, phone, pkg, isPaymentFollowUp = false, isActivation = false, existingPaymentType = '', existingOrderNumber = '', existingEasyPayNumber = '', referralCode = '', existingEasyPayExpiry = '', existingEasyPayCycle = '') {
+  // Phone may already have leading 0 from card rendering — avoid double-prefix
+  const formattedPhone = (phone && !phone.startsWith('0') && phone !== 'No number') ? '0' + phone : (phone || 'No Number');
   currentModalIsPayment = !!isPaymentFollowUp;
 
   document.getElementById('co-customer-id').value = customerId;
@@ -310,22 +379,70 @@ function openCallOutcomeModal(customerId, name, phone, pkg, isPaymentFollowUp = 
   if (currentModalIsPayment) {
     regularPresets.classList.add('hidden');
     paymentPresets.classList.remove('hidden');
-    // Update modal header label
     document.querySelector('#modal-call-outcome .text-fiber-400').textContent = '💳 Log Payment Outcome';
   } else {
     regularPresets.classList.remove('hidden');
     paymentPresets.classList.add('hidden');
-    document.querySelector('#modal-call-outcome .text-fiber-400').textContent = 'Log Call Outcome';
+    document.querySelector('#modal-call-outcome .text-fiber-400').textContent = isActivation ? '🚀 Log 1-Week Activation Check' : 'Log Call Outcome';
   }
 
+  // Pre-fill Package if provided
   if (pkg) {
     const pkgEl = document.getElementById('co-package');
     if (pkgEl) pkgEl.value = pkg;
   }
 
+  // Pre-fill Payment Type with existing value (default to it, allow change)
+  const payTypeEl = document.getElementById('co-payment-type');
+  if (payTypeEl && existingPaymentType) {
+    payTypeEl.value = existingPaymentType;
+  }
+
+  // Pre-fill Order Number with existing value
+  const orderInputEl = document.getElementById('co-order-number');
+  if (orderInputEl) {
+    orderInputEl.value = existingOrderNumber || '';
+  }
+
+  // Show existing Order & EasyPay & Expiry info in the modal context bar
+  const contextBar = document.getElementById('co-existing-order-bar');
+  if (contextBar) {
+    if (existingOrderNumber || existingEasyPayNumber) {
+      contextBar.classList.remove('hidden');
+      const orderEl = document.getElementById('co-existing-order-num');
+      const epEl = document.getElementById('co-existing-ep-num');
+      const cycleEl = document.getElementById('co-existing-ep-cycle');
+      const expiryEl = document.getElementById('co-existing-ep-expiry');
+
+      if (orderEl) orderEl.textContent = existingOrderNumber || '—';
+      if (epEl) epEl.textContent = existingEasyPayNumber || '—';
+      if (cycleEl) cycleEl.textContent = existingEasyPayCycle || 'Cycle 1 of 3';
+      if (expiryEl) {
+        expiryEl.textContent = existingEasyPayExpiry || '—';
+        const today = getTodayStr();
+        if (existingEasyPayExpiry && existingEasyPayExpiry < today) {
+          expiryEl.textContent = `${existingEasyPayExpiry} (EXPIRED)`;
+          expiryEl.className = 'font-mono font-bold text-red-400';
+        } else {
+          expiryEl.className = 'font-mono font-bold text-amber-300';
+        }
+      }
+    } else {
+      contextBar.classList.add('hidden');
+    }
+  }
+
+  // Store referral code for activation check modal
+  const refCodeEl = document.getElementById('co-referral-code-display');
+  if (refCodeEl) refCodeEl.textContent = referralCode || '';
+  const refSection = document.getElementById('co-activation-referral-section');
+  if (refSection) refSection.classList.toggle('hidden', !isActivation);
+
   // Default preset based on modal type
   if (currentModalIsPayment) {
     selectOutcomePreset('Payment Received');
+  } else if (isActivation) {
+    selectOutcomePreset('Activation Follow-Up Completed');
   } else {
     selectOutcomePreset('Callback Rescheduled');
     setOutcomeDateOffset(1);
@@ -342,12 +459,15 @@ function selectOutcomePreset(preset) {
   selectedOutcomePreset = preset;
 
   document.querySelectorAll('.outcome-preset-btn').forEach(b => {
-    b.classList.remove('ring-2', 'ring-fiber-400', 'ring-purple-400', 'ring-emerald-400');
+    b.classList.remove('ring-2', 'ring-fiber-400', 'ring-purple-400', 'ring-emerald-400', 'ring-blue-400', 'ring-teal-400');
   });
   const activeBtn = document.querySelector(`[data-outcome-btn="${preset}"]`);
   if (activeBtn) {
     const ringColor = preset === 'New Payment Date' ? 'ring-purple-400'
-      : preset === 'Payment Received' ? 'ring-emerald-400' : 'ring-fiber-400';
+      : preset === 'Payment Received' ? 'ring-emerald-400'
+      : preset === 'Activated' ? 'ring-blue-400'
+      : preset === 'Activation Follow-Up Completed' ? 'ring-teal-400'
+      : 'ring-fiber-400';
     activeBtn.classList.add('ring-2', ringColor);
   }
 
@@ -418,7 +538,15 @@ async function submitCallOutcome() {
   submitBtn.disabled = true;
   submitBtn.innerHTML = `<div class="spinner-sm mx-auto"></div>`;
 
+  // For 1-week activation check: capture referral lead details
+  const referralFirstName = (document.getElementById('co-ref-first-name') || {}).value || '';
+  const referralSurname = (document.getElementById('co-ref-surname') || {}).value || '';
+  const referralCell = (document.getElementById('co-ref-cell') || {}).value || '';
+  const referralAddress = (document.getElementById('co-ref-address') || {}).value || '';
+
   try {
+    const orderNumberVal = (document.getElementById('co-order-number') || {}).value || '';
+
     const payload = {
       customerId: customerId,
       outcome: selectedOutcomePreset,
@@ -426,13 +554,32 @@ async function submitCallOutcome() {
       nextAction: needsNextDate ? 'Call Back' : (selectedOutcomePreset === 'Payment Received' ? '' : ''),
       nextActionDate: needsNextDate ? nextDate : '',
       packageChoice: selectedOutcomePreset === 'Sale Won' ? pkgChoice : '',
-      paymentType: selectedOutcomePreset === 'Sale Won' ? payType : '',
-      newPromisedPaymentDate: selectedOutcomePreset === 'New Payment Date' ? newPromisedPayDate : (selectedOutcomePreset === 'Sale Won' ? salePromisedPayDate : '')
+      paymentType: payType || '',  // Always send payment type (pre-filled or updated)
+      orderNumber: orderNumberVal.trim().toUpperCase(), // Manual order number from agent
+      newPromisedPaymentDate: selectedOutcomePreset === 'New Payment Date' ? newPromisedPayDate : (selectedOutcomePreset === 'Sale Won' ? salePromisedPayDate : ''),
+      // Referral lead data from activation follow-up
+      referralLead: (selectedOutcomePreset === 'Activation Follow-Up Completed' && referralFirstName && referralCell) ? {
+        firstName: referralFirstName,
+        surname: referralSurname,
+        cellNumber: referralCell,
+        address: referralAddress
+      } : null
     };
 
-    await callBackend('logCallOutcome', payload);
+    const result = await callBackend('logCallOutcome', payload);
     showToast(`Call logged: ${selectedOutcomePreset}! Queue updated.`);
+    if (result && result.referralCode) {
+      showToast(`🎁 Referral Code: ${result.referralCode} — share with customer!`);
+    }
+    if (result && result.referralLeadCreated) {
+      showToast(`✅ Referral lead for ${referralFirstName} captured successfully!`);
+    }
     closeCallOutcomeModal();
+    // Clear modal fields
+    ['co-ref-first-name','co-ref-surname','co-ref-cell','co-ref-address','co-order-number'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
     refreshDailyData();
   } catch (err) {
     showToast(err.message, "error");
@@ -456,8 +603,9 @@ async function submitLead(overrideId = null) {
   const today = getTodayStr();
   const max8d = addDaysToToday(8);
 
+  const status = document.getElementById('nf-status').value;
   const nextActionDate = document.getElementById('nf-next-action-date').value;
-  if (nextActionDate) {
+  if (nextActionDate && status !== 'Activated') {
     if (nextActionDate > max8d) {
       showToast("Next action date cannot exceed 8 days from today (8-day limit).", "error");
       return;
@@ -479,8 +627,11 @@ async function submitLead(overrideId = null) {
     package: document.getElementById('nf-package').value,
     paymentType: document.getElementById('nf-payment-type').value,
     orderDate: today, // Automatic exact date stamping
+    orderNumber: (document.getElementById('nf-order-number') ? document.getElementById('nf-order-number').value.trim() : ''),
+    easyPayNumber: (document.getElementById('nf-easypay-number') ? document.getElementById('nf-easypay-number').value.trim() : ''),
     promisedPaymentDate: document.getElementById('nf-promised-pay-date').value,
-    customerStatus: document.getElementById('nf-status').value,
+    referredByCode: (document.getElementById('nf-referred-by') ? document.getElementById('nf-referred-by').value.trim() : ''),
+    customerStatus: status,
     lastContactOutcome: document.getElementById('nf-outcome').value.trim(),
     nextAction: document.getElementById('nf-next-action').value,
     nextActionDate: nextActionDate

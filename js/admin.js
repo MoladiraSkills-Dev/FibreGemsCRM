@@ -380,7 +380,7 @@ async function runLifecycleEngine() {
 async function loadMasterGrid() {
   const tbody = document.getElementById('grid-body');
   const countEl = document.getElementById('grid-count');
-  tbody.innerHTML = `<tr><td colspan="7" class="px-6 py-12 text-center"><div class="spinner mx-auto mb-2"></div><p class="text-gray-500 text-sm">Loading master records...</p></td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="8" class="px-6 py-12 text-center"><div class="spinner mx-auto mb-2"></div><p class="text-gray-500 text-sm">Loading master records...</p></td></tr>`;
   
   try {
     const result = await callBackend('getAdminMasterGrid', { offset: gridOffset, limit: GRID_LIMIT });
@@ -388,11 +388,17 @@ async function loadMasterGrid() {
     countEl.textContent = `${result.total} records`;
     
     if (result.data.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="7" class="px-6 py-12 text-center text-gray-500">No records found</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8" class="px-6 py-12 text-center text-gray-500">No records found</td></tr>`;
       return;
     }
     
-    tbody.innerHTML = result.data.map(r => `
+    tbody.innerHTML = result.data.map(r => {
+      let isEpExpired = false;
+      if (r.easyPayExpiry && r.easyPayExpiry < getTodayStr()) {
+        isEpExpired = true;
+      }
+
+      return `
       <tr class="border-b border-white/5 hover:bg-white/[0.03] transition-colors text-xs">
         <td class="px-4 py-3">
           <p class="font-semibold text-white">${escHtml(r.name)}</p>
@@ -400,14 +406,31 @@ async function loadMasterGrid() {
         </td>
         <td class="px-4 py-3 font-mono text-gray-300">${escHtml(r.cellNumber || '—')}</td>
         <td class="px-4 py-3 text-gray-300">${escHtml(r.agent || '—')}</td>
-        <td class="px-4 py-3 font-mono text-gray-400">${escHtml(r.createdDate || '—')}</td>
-        <td class="px-4 py-3 font-mono font-semibold text-fiber-400">${escHtml(r.orderDate || '—')}</td>
+        <td class="px-4 py-3">
+          ${r.referralCode ? `
+            <span class="px-2 py-0.5 rounded font-mono font-bold bg-amber-500/10 text-amber-300 border border-amber-500/20">${escHtml(r.referralCode)}</span>
+            ${r.referredByCode ? `<p class="text-[10px] text-gray-500 mt-0.5">Ref by: ${escHtml(r.referredByCode)}</p>` : ''}
+          ` : `<span class="text-gray-600">—</span>`}
+        </td>
+        <td class="px-4 py-3">
+          ${r.orderNumber ? `<p class="font-mono font-semibold text-fiber-400">${escHtml(r.orderNumber)}</p>` : `<span class="text-gray-600">—</span>`}
+          <p class="text-[11px] text-gray-400 font-mono">${escHtml(r.orderDate || r.createdDate || '—')}</p>
+        </td>
+        <td class="px-4 py-3">
+          ${r.easyPayNumber ? `
+            <p class="font-mono text-gray-200 font-semibold">${escHtml(r.easyPayNumber)} <span class="text-[10px] text-gray-400">(${escHtml(r.easyPayCycle || 'Cycle 1 of 3')})</span></p>
+            <p class="text-[10px] font-mono font-semibold ${isEpExpired ? 'text-red-400 font-bold' : 'text-emerald-400'}">
+              ${isEpExpired ? '🔴 EXPIRED: ' : '🟢 Exp: '}${escHtml(r.easyPayExpiry || '—')}
+            </p>
+          ` : `<span class="text-gray-600">—</span>`}
+        </td>
         <td class="px-4 py-3">${statusBadge(r.status)}</td>
         <td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-white/5 text-gray-300">${escHtml(r.payStatus)}</span></td>
       </tr>
-    `).join('');
+      `;
+    }).join('');
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="7" class="px-6 py-8 text-center text-red-400 text-xs">Failed to load grid: ${escHtml(err.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" class="px-6 py-8 text-center text-red-400 text-xs">Failed to load grid: ${escHtml(err.message)}</td></tr>`;
   }
 }
 
@@ -609,6 +632,9 @@ async function loadPromisedPayments() {
       if (p.daysUntilDue === 0) timeStatus = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">Due Today</span>`;
       else if (p.daysUntilDue > 0) timeStatus = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/20 text-red-300 border border-red-500/30">Overdue by ${p.daysUntilDue} days</span>`;
 
+      const today = new Date().toISOString().slice(0, 10);
+      const isEpExpired = p.easyPayExpiry && p.easyPayExpiry < today;
+
       return `
         <tr class="border-b border-white/5 hover:bg-purple-950/15 text-xs">
           <td class="px-4 py-3">
@@ -618,6 +644,14 @@ async function loadPromisedPayments() {
           <td class="px-4 py-3 font-mono text-gray-300">${escHtml(formattedPhone || '—')}</td>
           <td class="px-4 py-3 font-medium text-gray-300">${escHtml(p.agentName)}</td>
           <td class="px-4 py-3 font-mono font-bold text-purple-300">${escHtml(p.promisedPaymentDate)}</td>
+          <td class="px-4 py-3">
+            ${p.easyPayNumber ? `
+              <p class="font-mono font-bold text-emerald-300">${escHtml(p.easyPayNumber)} <span class="text-[10px] text-gray-400">(${escHtml(p.easyPayCycle || 'Cycle 1')})</span></p>
+              <p class="text-[10px] font-mono font-semibold ${isEpExpired ? 'text-red-400 font-bold' : 'text-emerald-400'}">
+                ${isEpExpired ? '🔴 EXPIRED: ' : '🟢 Exp: '}${escHtml(p.easyPayExpiry || '—')}
+              </p>
+            ` : `<span class="text-gray-600">—</span>`}
+          </td>
           <td class="px-4 py-3">${timeStatus}</td>
           <td class="px-4 py-3">${statusBadge(p.status)}</td>
           <td class="px-4 py-3 text-right">
@@ -627,7 +661,7 @@ async function loadPromisedPayments() {
       `;
     }).join('');
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="7" class="px-6 py-8 text-center text-red-400 text-xs">Failed to load promised payments: ${escHtml(err.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" class="px-6 py-8 text-center text-red-400 text-xs">Failed to load promised payments: ${escHtml(err.message)}</td></tr>`;
   }
 }
 
