@@ -274,9 +274,9 @@ async function loadCallbackReport(targetDate) {
             <td class="px-4 py-3 font-bold ${ag.missed > 0 ? 'text-red-400' : 'text-gray-500'}">${ag.missed}</td>
             <td class="px-4 py-3">
               <div class="flex items-center gap-2">
-                <span class="font-bold text-white">${ag.completionRate}%</span>
+                <span class="font-bold text-white">${ag.scheduled === 0 ? '-' : ag.completionRate + '%'}</span>
                 <div class="w-16 bg-white/10 rounded-full h-1.5 overflow-hidden">
-                  <div class="h-full rounded-full ${ag.completionRate === 100 ? 'bg-emerald-400' : (ag.completionRate >= 70 ? 'bg-amber-400' : 'bg-red-400')}" style="width: ${ag.completionRate}%"></div>
+                  <div class="h-full rounded-full ${ag.scheduled === 0 ? 'bg-transparent' : (ag.completionRate === 100 ? 'bg-emerald-400' : (ag.completionRate >= 70 ? 'bg-amber-400' : 'bg-red-400'))}" style="width: ${ag.scheduled === 0 ? 0 : ag.completionRate}%"></div>
                 </div>
               </div>
             </td>

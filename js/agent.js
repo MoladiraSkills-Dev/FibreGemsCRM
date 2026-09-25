@@ -157,7 +157,7 @@ async function refreshDailyData() {
 
     const rate = result.stats.totalScheduled > 0
       ? Math.round((result.stats.completedToday / result.stats.totalScheduled) * 100)
-      : 100;
+      : 0;
 
     document.getElementById('stat-progress-pct').textContent = `${rate}%`;
     document.getElementById('stat-progress-bar').style.width = `${rate}%`;
