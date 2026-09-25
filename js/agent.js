@@ -91,7 +91,22 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('agent-role').textContent = session.role || 'Agent';
 
   setupDatepickerLimits();
+
+  // Always load dashboard data on init — even if default view isn't callbacks
+  // This populates stat-scheduled, stat-completed etc. and avoids the 0 bug
   refreshDailyData();
+
+  // Auto-refresh every 60 seconds to surface same-day timed callbacks
+  // (the 5-min-before logic runs server-side in getAgentDailyQueue)
+  setInterval(() => {
+    // Only silently refresh if agent is on the callbacks view
+    // and no modal is open (avoids interrupting active work)
+    const modalOpen = !document.getElementById('modal-call-outcome').classList.contains('hidden')
+                   || !document.getElementById('modal-quick-edit').classList.contains('hidden');
+    if (currentView === 'callbacks' && !modalOpen) {
+      refreshDailyData();
+    }
+  }, 60000); // every 60 seconds
 });
 
 // ── View Switching ───────────────────────────────────────────
@@ -191,13 +206,23 @@ function copyReferralCode(code) {
 }
 
 async function triggerReissueEasyPay(customerId) {
-  if (!confirm("Are you sure you want to re-issue a new EasyPay number? This will generate a new Order Number and a new 14-day EasyPay number (up to 3 cycles maximum).")) {
+  // Prompt agent for the new EasyPay number (required)
+  const newEasyPayNumber = prompt("Enter the new EasyPay Number provided by the payment gateway (required):");
+  if (!newEasyPayNumber || !newEasyPayNumber.trim()) {
+    showToast("Re-issue cancelled. An EasyPay number is required.", "error");
     return;
   }
 
+  // Optionally update the Order Number
+  const newOrderNumber = prompt("Enter a new Order Number (optional — leave blank to keep existing):");
+
   try {
-    const result = await callBackend('issueNewEasyPay', { customerId });
-    showToast(`Re-issued EasyPay: ${result.easyPayNumber} (${result.cycle}) with Order ${result.orderId}! Valid for 14 days.`);
+    const result = await callBackend('issueNewEasyPay', {
+      customerId,
+      easyPayNumber: newEasyPayNumber.trim(),
+      orderNumber: (newOrderNumber || '').trim()
+    });
+    showToast(`✅ Re-issued EasyPay: ${result.easyPayNumber} (${result.cycle}). Expires: ${result.expiryDate}.`);
     refreshDailyData();
   } catch (err) {
     showToast(err.message, "error");
@@ -487,10 +512,16 @@ function selectOutcomePreset(preset) {
 
   if (preset === 'Sale Won') {
     saleSection.classList.remove('hidden');
+    // Pre-fill promised payment date to +14 days (EasyPay expiry)
+    const promDateEl = document.getElementById('co-sale-promised-pay-date');
+    if (promDateEl && !promDateEl.value) promDateEl.value = addDaysToToday(14);
   }
 
   if (preset === 'New Payment Date') {
     promisedPaySection.classList.remove('hidden');
+    // Pre-fill to EasyPay expiry if known, else +7 days
+    const el = document.getElementById('co-new-promised-pay-date');
+    if (el && !el.value) el.value = addDaysToToday(7);
   }
 }
 
@@ -506,10 +537,13 @@ async function submitCallOutcome() {
   const submitBtn = document.getElementById('co-submit-btn');
   const notes = document.getElementById('co-notes').value;
   const nextDate = document.getElementById('co-next-date').value;
+  const nextTime = document.getElementById('co-next-time') ? document.getElementById('co-next-time').value : '';
   const pkgChoice = document.getElementById('co-package').value;
   const payType = document.getElementById('co-payment-type').value;
   const newPromisedPayDate = document.getElementById('co-new-promised-pay-date').value;
   const salePromisedPayDate = document.getElementById('co-sale-promised-pay-date').value;
+  // NEW: EasyPay number from the Sale Won section
+  const easyPayNumberVal = (document.getElementById('co-easypay-number') || {}).value || '';
 
   if (!customerId) return;
 
@@ -553,9 +587,11 @@ async function submitCallOutcome() {
       notes: notes,
       nextAction: needsNextDate ? 'Call Back' : (selectedOutcomePreset === 'Payment Received' ? '' : ''),
       nextActionDate: needsNextDate ? nextDate : '',
+      nextActionTime: needsNextDate ? nextTime : '',
       packageChoice: selectedOutcomePreset === 'Sale Won' ? pkgChoice : '',
-      paymentType: payType || '',  // Always send payment type (pre-filled or updated)
-      orderNumber: orderNumberVal.trim().toUpperCase(), // Manual order number from agent
+      paymentType: payType || '',
+      easyPayNumber: easyPayNumberVal.trim(),
+      orderNumber: orderNumberVal.trim().toUpperCase(),
       newPromisedPaymentDate: selectedOutcomePreset === 'New Payment Date' ? newPromisedPayDate : (selectedOutcomePreset === 'Sale Won' ? salePromisedPayDate : ''),
       // Referral lead data from activation follow-up
       referralLead: (selectedOutcomePreset === 'Activation Follow-Up Completed' && referralFirstName && referralCell) ? {
@@ -634,7 +670,8 @@ async function submitLead(overrideId = null) {
     customerStatus: status,
     lastContactOutcome: document.getElementById('nf-outcome').value.trim(),
     nextAction: document.getElementById('nf-next-action').value,
-    nextActionDate: nextActionDate
+    nextActionDate: nextActionDate,
+    nextActionTime: document.getElementById('nf-next-action-time') ? document.getElementById('nf-next-action-time').value : ''
   };
 
   submitBtn.disabled = true;
@@ -828,11 +865,14 @@ async function submitQuickEdit() {
     }
   }
 
+  const nextTime = document.getElementById('qe-next-action-time') ? document.getElementById('qe-next-action-time').value : '';
+
   const payload = {
     package: document.getElementById('qe-package').value,
     status: document.getElementById('qe-status').value,
     nextAction: document.getElementById('qe-next-action').value,
-    nextActionDate: nextDate
+    nextActionDate: nextDate,
+    nextActionTime: nextTime
   };
 
   try {

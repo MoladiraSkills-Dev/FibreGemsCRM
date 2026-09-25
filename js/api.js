@@ -39,6 +39,10 @@ function clearSession() {
  * Uses Content-Type: text/plain to avoid CORS preflight on Apps Script.
  */
 async function callBackend(action, payload = {}) {
+  // Show global loader
+  const loader = document.getElementById('global-loader');
+  if (loader) loader.classList.remove('hidden');
+
   let response;
   try {
     response = await fetch(API_URL, {
@@ -54,7 +58,7 @@ async function callBackend(action, payload = {}) {
       })
     });
   } catch (networkError) {
-    // This fires when the browser blocks the response (CORS) or there's no network
+    if (loader) loader.classList.add('hidden');
     console.error("Network/CORS Error:", networkError);
     throw new Error(
       "Cannot reach the server. Check that your Apps Script Web App is deployed with access set to \"Anyone\" (not \"Anyone with Google account\")."
@@ -63,6 +67,7 @@ async function callBackend(action, payload = {}) {
 
   // If we got a response but it's not OK (e.g. 401, 403, 404)
   if (!response.ok) {
+    if (loader) loader.classList.add('hidden');
     console.error("HTTP Error:", response.status, response.statusText);
     throw new Error(`Server returned ${response.status}. Re-deploy your Apps Script Web App.`);
   }
@@ -71,9 +76,12 @@ async function callBackend(action, payload = {}) {
   try {
     result = await response.json();
   } catch (parseError) {
+    if (loader) loader.classList.add('hidden');
     console.error("JSON Parse Error — server may have returned an HTML error page");
     throw new Error("Unexpected server response. Check the Apps Script execution log for errors.");
   }
+
+  if (loader) loader.classList.add('hidden');
 
   if (result.status === 'error') {
     throw new Error(result.message || 'Unknown server error.');
