@@ -545,7 +545,7 @@ function getAgentDailyQueue(token) {
     const lastContactDate = formatDateSafe_(row[19]);
 
     if (!custId || recordStatus === 'Archived' || recordStatus === 'Expired') continue;
-    if (status === 'Lost' || status.includes('Lost')) continue;
+    if (status === 'Not Interested' || status === 'Cancelled' || status === 'Closed') continue;
 
     const ownsCustomer = (assignedAgent === session.agentId);
     if (!ownsCustomer) continue;
@@ -1220,7 +1220,7 @@ function getAdminCallbackReport(token, targetDate) {
     const escalationReason = String(row[30] || '');
 
     // Check scheduled callbacks on or before reportDate
-    if (nextActionDate && status !== 'Won' && status !== 'Lost' && !status.includes('Lost')) {
+    if (nextActionDate && status !== 'Order Placed' && status !== 'Not Interested' && status !== 'Closed' && status !== 'Cancelled') {
       const scheduledDate = new Date(nextActionDate + 'T00:00:00');
       const isDueOnReportDate = (nextActionDate === reportDateStr);
       const isOverdue = (scheduledDate < reportDate);
@@ -1255,7 +1255,7 @@ function getAdminCallbackReport(token, targetDate) {
       daysSinceContact = Math.round((reportDate - new Date(lastContactDate + 'T00:00:00')) / (1000 * 60 * 60 * 24));
     }
 
-    if (isEscalated || (daysSinceContact >= 7 && status !== 'Won' && status !== 'Lost' && !status.includes('Lost'))) {
+    if (isEscalated || (daysSinceContact >= 7 && status !== 'Order Placed' && status !== 'Not Interested' && status !== 'Closed' && status !== 'Cancelled')) {
       escalatedLeads.push({
         customerId: custId,
         name: customerName,
@@ -1271,7 +1271,7 @@ function getAdminCallbackReport(token, targetDate) {
 
   // Calculate completion rates
   const agentList = Object.values(agentReport).map(ag => {
-    ag.completionRate = ag.scheduled > 0 ? Math.round((ag.completed / ag.scheduled) * 100) : 100;
+    ag.completionRate = ag.scheduled > 0 ? Math.round((ag.completed / ag.scheduled) * 100) : 0;
     return ag;
   }).sort((a, b) => b.missed - a.missed);
 
