@@ -242,7 +242,7 @@ function handleAgentLeadUpdate(existingIdOverride, formData, token) {
     }
   }
 
-  const isSaleWon = (formData.customerStatus === 'Won' || formData.customerStatus === 'Sale Completed');
+  const isSaleWon = (formData.customerStatus === 'Order Placed' || formData.customerStatus === 'Won' || formData.customerStatus === 'Sale Completed');
   const isActivated = (formData.customerStatus === 'Activated');
 
   // Automatic Order Date: exact current day
@@ -724,35 +724,34 @@ function logCallOutcome(token, payload) {
   const isActivated = (outcome === 'Activated' || outcome === 'Customer Activated');
   const isLost = (outcome === 'Not Interested' || outcome === 'Lost' || outcome === 'Invalid Lead');
 
-  let newStatus = 'In Progress';
+  let newStatus = 'Contacted';          // default — agent made contact
   let computedNextAction = nextAction || '';
   let computedNextActionDate = nextActionDate || '';
 
   if (isSaleWon) {
-    newStatus = 'Won';
-    computedNextAction = 'Follow Up Payment';
+    newStatus = 'Order Placed';          // allowed: Order Placed
+    computedNextAction = 'Payment Follow-Up';
     computedNextActionDate = addDaysSafe_(todayStr, 14);
   } else if (isActivated) {
-    newStatus = 'Activated';
-    // Automatic 1-Week Activation Follow-Up (Check Connection & Referrals)
-    computedNextAction = 'Activation Follow-Up (Check Connection)';
+    newStatus = 'Activated';             // allowed: Activated
+    computedNextAction = 'After-Sales Call';
     computedNextActionDate = addDaysSafe_(todayStr, 7);
   } else if (outcome === 'Activation Follow-Up Completed') {
-    newStatus = 'Active - Retained';
-    computedNextAction = 'None (Active Customer)';
+    newStatus = 'After-Sales Completed'; // allowed: After-Sales Completed
+    computedNextAction = 'No Further Action';
     computedNextActionDate = '';
   } else if (isLost) {
-    newStatus = 'Lost';
+    newStatus = 'Not Interested';        // allowed: Not Interested
   } else if (outcome === 'Callback Rescheduled') {
-    newStatus = 'Callback Scheduled';
-    computedNextAction = 'Call Back';
+    newStatus = 'Contact Attempted';     // allowed: Contact Attempted
+    computedNextAction = 'Customer Callback';
   } else if (outcome === 'No Answer / Voicemail') {
-    newStatus = 'Follow-Up Needed';
-    computedNextAction = 'Call Back';
+    newStatus = 'Unable to Reach';       // allowed: Unable to Reach
+    computedNextAction = 'Customer Callback';
   } else if (outcome === 'Payment Received') {
-    newStatus = 'Payment Received';
+    newStatus = 'Payment Received';      // allowed: Payment Received
   } else if (outcome === 'No Payment - Reschedule' || outcome === 'New Payment Date') {
-    newStatus = 'Payment Pending';
+    newStatus = 'Payment Promised';      // allowed: Payment Promised
   }
 
   // Update CUSTOMERS record
