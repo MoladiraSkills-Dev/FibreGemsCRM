@@ -4,6 +4,20 @@
  * Survives page navigation, clears when the tab/window is closed.
  */
 
+// ── Path Helper ──────────────────────────────────────────────
+/**
+ * Returns the relative path prefix needed to reach the root.
+ * Pages at /admin/, /agent/, /support/ are one level deep → prefix is '../'
+ * Pages at root (index.html) are at depth 0 → prefix is ''
+ */
+function getRootPrefix_() {
+  const depth = window.location.pathname.split('/').filter(Boolean).length;
+  // If we're in a subfolder (e.g. /admin/index.html), we need to go up one level
+  // A depth of 1 on GitHub Pages could be the repo name, so we check for known portals
+  const inPortal = /\/(admin|agent|support)(\/|$)/.test(window.location.pathname);
+  return inPortal ? '../' : '';
+}
+
 // ── Session Guards ───────────────────────────────────────────
 
 /**
@@ -12,7 +26,7 @@
  */
 function requireAuth() {
   if (!session || !session.token) {
-    window.location.href = 'index.html';
+    window.location.href = getRootPrefix_() + 'index.html';
     return false;
   }
   return true;
@@ -25,7 +39,20 @@ function requireAdmin() {
   if (!requireAuth()) return false;
   if (session.role !== 'Admin') {
     alert('Access denied. Admin privileges required.');
-    window.location.href = 'index.html';
+    window.location.href = getRootPrefix_() + 'index.html';
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Redirect to login if not authenticated OR not a Support role.
+ */
+function requireSupport() {
+  if (!requireAuth()) return false;
+  if (session.role !== 'Support' && session.role !== 'Admin') {
+    alert('Access denied. Support privileges required.');
+    window.location.href = getRootPrefix_() + 'index.html';
     return false;
   }
   return true;
@@ -59,13 +86,20 @@ async function login() {
 
 /**
  * Route user to the correct dashboard based on their role.
+ * Called from root index.html, so no prefix needed for outbound routes.
  */
 function routeView() {
   if (!session) return;
-  if (session.role === 'Admin') {
-    window.location.href = 'admin.html';
-  } else {
-    window.location.href = 'agent.html';
+  switch (session.role) {
+    case 'Admin':
+      window.location.href = 'admin/index.html';
+      break;
+    case 'Support':
+      window.location.href = 'support/index.html';
+      break;
+    default:
+      window.location.href = 'agent/index.html';
+      break;
   }
 }
 
@@ -74,7 +108,7 @@ function routeView() {
  */
 function logout() {
   clearSession();  // Wipe sessionStorage + memory
-  window.location.href = 'index.html';
+  window.location.href = getRootPrefix_() + 'index.html';
 }
 
 // ── UI Helpers ───────────────────────────────────────────────
