@@ -20,6 +20,10 @@ const TICKET_PAGE_SIZE = 50;
 let activeProviderFilter = 'all';
 let activeStatusFilter = 'all';
 
+// Map of rendered-index → full ticket object for the detail modal
+let _ticketDetailMap = {};
+let _activeDetailTicket = null; // Stores currently viewed ticket
+
 // ─────────────────────────────────────────────
 // INIT
 // ─────────────────────────────────────────────
@@ -137,7 +141,7 @@ function renderProviderOverview(containerId, stats) {
     </div>
     <div class="flex justify-between text-xs">
       <span class="text-gray-500">Open Tickets</span>
-      <span class="text-support-400 font-semibold">${stats.openTickets ?? 0}</span>
+      <span class="text-fiber-400 font-semibold">${stats.openTickets ?? 0}</span>
     </div>
   `;
 }
@@ -211,6 +215,50 @@ function filterByStatus(status) {
 
 function renderCustomerTable() {
   const tbody = document.getElementById('customer-table-body');
+  const thead = document.getElementById('customer-table-head');
+  
+  // Dynamically update headers
+  if (thead) {
+    if (activeProviderFilter === 'SADV') {
+      thead.innerHTML = `
+        <tr>
+          <th class="text-left">Status</th>
+          <th class="text-left">Customer</th>
+          <th class="text-left">Provider</th>
+          <th class="text-left">Order #</th>
+          <th class="text-left">Product</th>
+          <th class="text-left">Actions</th>
+        </tr>
+      `;
+    } else if (activeProviderFilter === 'Infinifi') {
+      thead.innerHTML = `
+        <tr>
+          <th class="text-left">Status</th>
+          <th class="text-left">Customer</th>
+          <th class="text-left">Provider</th>
+          <th class="text-left">Lead #</th>
+          <th class="text-left">Contract Term</th>
+          <th class="text-left">MRC</th>
+          <th class="text-left">Region</th>
+          <th class="text-left">Actions</th>
+        </tr>
+      `;
+    } else {
+      thead.innerHTML = `
+        <tr>
+          <th class="text-left">Status</th>
+          <th class="text-left">Customer</th>
+          <th class="text-left">Provider</th>
+          <th class="text-left">Order / Lead #</th>
+          <th class="text-left">Product / Term</th>
+          <th class="text-left">MRC</th>
+          <th class="text-left">Region</th>
+          <th class="text-left">Actions</th>
+        </tr>
+      `;
+    }
+  }
+
   const start = customerPage * CUSTOMER_PAGE_SIZE;
   const slice = filteredCustomers.slice(start, start + CUSTOMER_PAGE_SIZE);
   const total = filteredCustomers.length;
@@ -222,7 +270,8 @@ function renderCustomerTable() {
   document.getElementById('btn-next-customers').disabled = start + CUSTOMER_PAGE_SIZE >= total;
 
   if (!slice.length) {
-    tbody.innerHTML = `<tr><td colspan="8" class="text-center text-gray-600 py-8 text-sm">No customers match your filters.</td></tr>`;
+    let colSpan = activeProviderFilter === 'SADV' ? 6 : 8;
+    tbody.innerHTML = `<tr><td colspan="${colSpan}" class="text-center text-gray-600 py-8 text-sm">No customers match your filters.</td></tr>`;
     return;
   }
 
@@ -234,21 +283,42 @@ function renderCustomerTable() {
       ? `<span class="badge-pending text-xs px-2 py-0.5 rounded-full font-semibold">Pending</span>`
       : `<span class="badge-inactive text-xs px-2 py-0.5 rounded-full font-semibold">Inactive</span>`;
 
-    return `
-      <tr class="${rowClass}">
-        <td>${statusBadge}</td>
-        <td class="font-medium text-white">${escHtml(c.customer || '—')}</td>
-        <td><span class="${getProviderBadgeClass(c.provider)} text-[11px] px-2 py-0.5 rounded-full font-semibold">${escHtml(c.provider || '—')}</span></td>
-        <td class="font-mono text-xs text-gray-400">${escHtml(c.orderNumber || c.leadNumber || '—')}</td>
+    let cellsHtml = `
+      <td>${statusBadge}</td>
+      <td class="font-medium text-white">${escHtml(c.customer || '—')}</td>
+      <td><span class="${getProviderBadgeClass(c.provider)} text-[11px] px-2 py-0.5 rounded-full font-semibold">${escHtml(c.provider || '—')}</span></td>
+    `;
+    
+    if (activeProviderFilter === 'SADV') {
+      cellsHtml += `
+        <td class="font-mono text-xs text-gray-400">${escHtml(c.orderNumber || '—')}</td>
+        <td class="text-gray-400 text-xs">${escHtml(c.product || '—')}</td>
+      `;
+    } else if (activeProviderFilter === 'Infinifi') {
+      cellsHtml += `
+        <td class="font-mono text-xs text-gray-400">${escHtml(c.orderNumber || '—')}</td>
         <td class="text-gray-400 text-xs">${escHtml(c.product || '—')}</td>
         <td class="text-gray-300">R${escHtml(c.mrc ?? '—')}</td>
         <td class="text-gray-400 text-xs">${escHtml(c.region || '—')}</td>
-        <td>
-          <button onclick="viewCustomerTickets('${escHtml(c.customer || '')}', '${escHtml(c.provider || '')}')"
-            class="text-xs text-support-400 hover:text-support-300 font-semibold">Tickets →</button>
-        </td>
-      </tr>
+      `;
+    } else {
+      // All providers
+      cellsHtml += `
+        <td class="font-mono text-xs text-gray-400">${escHtml(c.orderNumber || '—')}</td>
+        <td class="text-gray-400 text-xs">${escHtml(c.product || '—')}</td>
+        <td class="text-gray-300">${c.mrc ? 'R' + escHtml(c.mrc) : '—'}</td>
+        <td class="text-gray-400 text-xs">${escHtml(c.region || '—')}</td>
+      `;
+    }
+
+    cellsHtml += `
+      <td>
+        <button onclick="viewCustomerTickets('${escHtml(c.customer || '')}', '${escHtml(c.provider || '')}')"
+          class="text-xs text-fiber-400 hover:text-fiber-300 font-semibold">Tickets →</button>
+      </td>
     `;
+
+    return `<tr class="${rowClass}">${cellsHtml}</tr>`;
   }).join('');
 }
 
@@ -317,6 +387,18 @@ function filterTicketTable() { applyFilters_tickets(); }
 
 function renderTicketTable() {
   const tbody = document.getElementById('ticket-table-body');
+  const thead = document.getElementById('ticket-table-head');
+  
+  if (thead) {
+    if (activeProviderFilter === 'SADV') {
+      thead.innerHTML = `<tr><th class="text-left">Ticket #</th><th class="text-left">Created</th><th class="text-left">Customer</th><th class="text-left">Provider</th><th class="text-left">Status</th><th class="text-left">Description</th><th class="text-left">Channel</th><th class="text-left">Actions</th></tr>`;
+    } else if (activeProviderFilter === 'Infinifi') {
+      thead.innerHTML = `<tr><th class="text-left">Lead #</th><th class="text-left">Created</th><th class="text-left">Customer</th><th class="text-left">Provider</th><th class="text-left">Status</th><th class="text-left">Description</th><th class="text-left">Channel</th><th class="text-left">Actions</th></tr>`;
+    } else {
+      thead.innerHTML = `<tr><th class="text-left">Ticket / Lead #</th><th class="text-left">Created</th><th class="text-left">Customer</th><th class="text-left">Provider</th><th class="text-left">Status</th><th class="text-left">Description</th><th class="text-left">Channel</th><th class="text-left">Actions</th></tr>`;
+    }
+  }
+
   const start = ticketPage * TICKET_PAGE_SIZE;
   const slice = filteredTickets.slice(start, start + TICKET_PAGE_SIZE);
   const total = filteredTickets.length;
@@ -329,21 +411,25 @@ function renderTicketTable() {
     return;
   }
 
-  tbody.innerHTML = slice.map(t => `
+  tbody.innerHTML = slice.map((t, idx) => {
+    const globalIdx = start + idx;
+    _ticketDetailMap[globalIdx] = t;
+    return `
     <tr>
-      <td class="font-mono text-xs text-support-400">${escHtml(t.ticketNumber || '—')}</td>
+      <td class="font-mono text-xs text-fiber-400">${escHtml(t.ticketNumber || '—')}</td>
       <td class="text-xs text-gray-500">${formatDate_(t.createdDate)}</td>
       <td class="font-medium text-white">${escHtml(t.customer || '—')}</td>
       <td><span class="${getProviderBadgeClass(t.provider)} text-[11px] px-2 py-0.5 rounded-full font-semibold">${escHtml(t.provider || '—')}</span></td>
-      <td><span class="${getStatusBadgeClass(t.status)} text-[11px] px-2 py-0.5 rounded-full font-semibold">${escHtml(t.status || 'Open')}</span></td>
+      <td><span class="${getStatusBadgeClass(t.status)} text-[11px] px-2 py-0.5 rounded-full font-semibold">${escHtml(t.status || 'Unknown')}</span></td>
       <td class="text-xs text-gray-400 max-w-xs truncate">${escHtml(t.description || '—')}</td>
       <td class="text-xs text-gray-500">${escHtml(t.channelPartner || '—')}</td>
       <td>
-        <button onclick="openTicketDetail('${escHtml(t.ticketNumber || '')}')"
-          class="text-xs text-support-400 hover:text-support-300 font-semibold">View →</button>
+        <button onclick="openTicketDetail(${globalIdx})"
+          class="text-xs text-fiber-400 hover:text-fiber-300 font-semibold">View →</button>
       </td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
 }
 
 function renderTicketSkeleton() {
@@ -409,9 +495,92 @@ async function submitNewTicket() {
   }
 }
 
-// Placeholder — open ticket detail view/modal (to be expanded)
-function openTicketDetail(ticketNumber) {
-  showToast(`Ticket detail for ${ticketNumber} — coming soon.`, 'info');
+// Open full ticket detail modal
+function openTicketDetail(idx) {
+  const t = _ticketDetailMap[idx];
+  if (!t) { showToast('Ticket not found.', 'error'); return; }
+
+  _activeDetailTicket = t;
+  const modal = document.getElementById('modal-ticket-detail');
+  if (!modal) { showToast('Detail modal missing from HTML.', 'error'); return; }
+
+  const statusBadge = `<span class="${getStatusBadgeClass(t.status)} text-xs px-2.5 py-1 rounded-full font-semibold">${escHtml(t.status || 'Unknown')}</span>`;
+  const providerBadge = `<span class="${getProviderBadgeClass(t.provider)} text-xs px-2.5 py-1 rounded-full font-semibold">${escHtml(t.provider || '—')}</span>`;
+
+  const updatesHtml = t.updates && t.updates.length
+    ? t.updates.map((u, i) => `
+        <div class="flex gap-3 py-2.5 border-b border-white/5 last:border-0">
+          <span class="text-[10px] text-fiber-400 font-bold shrink-0 mt-0.5">UPD ${i + 1}</span>
+          <p class="text-xs text-gray-300 leading-relaxed">${escHtml(u)}</p>
+        </div>`).join('')
+    : '<p class="text-xs text-gray-600 italic">No update notes on this ticket.</p>';
+
+  document.getElementById('td-ticket-number').textContent = t.ticketNumber || '—';
+  document.getElementById('td-ticket2').textContent = t.ticket2 || '—';
+  document.getElementById('td-order-number').textContent = t.orderNumber || '—';
+  document.getElementById('td-customer').textContent = t.customer || '—';
+  document.getElementById('td-channel').textContent = t.channelPartner || '—';
+  document.getElementById('td-product').textContent = t.product || '—';
+  document.getElementById('td-created').textContent = formatDate_(t.createdDate);
+  document.getElementById('td-completed').textContent = t.completedDate ? formatDate_(t.completedDate) : 'Not completed';
+  document.getElementById('td-payment').textContent = t.paymentRec || '—';
+  document.getElementById('td-description').textContent = t.description || '—';
+  document.getElementById('td-status-badge').innerHTML = statusBadge;
+  document.getElementById('td-provider-badge').innerHTML = providerBadge;
+  document.getElementById('td-updates').innerHTML = updatesHtml;
+
+  // Reset update form
+  document.getElementById('update-status').value = '';
+  document.getElementById('update-note').value = '';
+  document.getElementById('btn-submit-update').disabled = false;
+  document.getElementById('btn-submit-update').textContent = 'Submit Update';
+
+  modal.classList.remove('hidden');
+}
+
+async function submitTicketUpdate(e) {
+  e.preventDefault();
+  if (!_activeDetailTicket) return;
+
+  const statusVal = document.getElementById('update-status').value;
+  const noteVal = document.getElementById('update-note').value.trim();
+
+  if (!statusVal && !noteVal) {
+    showToast('Please provide a new status or a note to update.', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('btn-submit-update');
+  btn.disabled = true;
+  btn.textContent = 'Updating...';
+
+  try {
+    const payload = {
+      ticketId: _activeDetailTicket.createdDate, // Use createdDate as unique identifier
+      provider: _activeDetailTicket.provider,
+      newStatus: statusVal,
+      newNote: noteVal,
+      agentName: 'Support Agent' // TODO: Get from auth context
+    };
+
+    const res = await callBackend('updateSupportTicket', payload);
+    
+    if (res.error) throw new Error(res.error);
+    
+    showToast('Ticket updated successfully!', 'success');
+    closeTicketDetail();
+    loadTickets(); // Refresh table
+  } catch (err) {
+    console.error(err);
+    showToast(err.message, 'error');
+    btn.disabled = false;
+    btn.textContent = 'Submit Update';
+  }
+}
+
+function closeTicketDetail() {
+  _activeDetailTicket = null;
+  document.getElementById('modal-ticket-detail')?.classList.add('hidden');
 }
 
 // ─────────────────────────────────────────────

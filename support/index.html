@@ -21,7 +21,6 @@
             navy: { 50: '#F3F1F1', 100: '#e0e0e0', 200: '#cccccc', 300: '#a3a3a3', 400: '#686a6f', 500: '#4a4a4a', 600: '#333333', 700: '#222429', 800: '#1A1A1A', 900: '#000000' },
             gem: { 50: '#fffcf0', 100: '#fdf1c2', 200: '#fae390', 300: '#f7d359', 400: '#F5B021', 500: '#ffaa17', 600: '#F1A328', 700: '#d98b16', 800: '#b07112', 900: '#8c590e' },
             fiber: { 50: '#fef1ec', 100: '#fcdcd2', 200: '#fac0b0', 300: '#f69d85', 400: '#F1A328', 500: '#E07C2A', 600: '#CE5926', 700: '#D44B2E', 800: '#94311f', 900: '#7a2b1d' },
-            support: { 50: '#f0f7ff', 100: '#e0effe', 200: '#b9ddfd', 300: '#7cc0fc', 400: '#37a3f8', 500: '#0d88ef', 600: '#0169cc', 700: '#0252a4', 800: '#064686', 900: '#0b3870' },
           }
         }
       }
@@ -116,16 +115,16 @@
     }
     .nav-item:hover { background: rgba(255,255,255,0.05); color: #d1d5db; }
     .nav-item.active {
-      background: linear-gradient(135deg, rgba(13,136,239,0.2), rgba(13,136,239,0.08));
-      color: #37a3f8;
-      border: 1px solid rgba(13,136,239,0.2);
+      background: linear-gradient(135deg, rgba(224,124,42,0.2), rgba(224,124,42,0.08));
+      color: #F1A328;
+      border: 1px solid rgba(224,124,42,0.2);
     }
 
     /* Spinner */
     .spinner {
       width: 36px; height: 36px;
-      border: 3px solid rgba(13, 136, 239, 0.2);
-      border-top-color: #0d88ef;
+      border: 3px solid rgba(224, 124, 42, 0.2);
+      border-top-color: #E07C2A;
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
     }
@@ -144,8 +143,8 @@
     }
     .search-bar:focus {
       background: rgba(255,255,255,0.08);
-      border-color: rgba(13,136,239,0.4);
-      box-shadow: 0 0 0 3px rgba(13,136,239,0.1);
+      border-color: rgba(224,124,42,0.4);
+      box-shadow: 0 0 0 3px rgba(224,124,42,0.1);
       outline: none;
     }
 
@@ -173,7 +172,7 @@
     }
 
     /* Stat card gradient accents */
-    .stat-accent-blue { border-top: 2px solid #0d88ef; }
+    .stat-accent-blue { border-top: 2px solid #E07C2A; }
     .stat-accent-green { border-top: 2px solid #10b981; }
     .stat-accent-amber { border-top: 2px solid #f59e0b; }
     .stat-accent-purple { border-top: 2px solid #a855f7; }
@@ -206,9 +205,9 @@
     }
     .tab-btn:hover { color: #d1d5db; background: rgba(255,255,255,0.05); }
     .tab-btn.active {
-      background: rgba(13,136,239,0.15);
-      color: #37a3f8;
-      border: 1px solid rgba(13,136,239,0.25);
+      background: rgba(224,124,42,0.15);
+      color: #F1A328;
+      border: 1px solid rgba(224,124,42,0.25);
     }
 
     /* Modal */
@@ -229,7 +228,7 @@
   <div id="global-loader" class="hidden fixed inset-0 z-50 loader-overlay flex items-center justify-center">
     <div class="text-center">
       <div class="spinner mx-auto mb-4"></div>
-      <p class="text-support-300 text-sm font-medium animate-pulse">Loading...</p>
+      <p class="text-fiber-300 text-sm font-medium animate-pulse">Loading...</p>
     </div>
   </div>
 
@@ -248,14 +247,14 @@
         <img src="../images/logo.jpg" alt="FibreGems" class="h-8 object-contain">
         <div>
           <p class="text-xs font-bold text-white leading-tight">FibreGems</p>
-          <p class="text-[10px] text-support-400 font-semibold tracking-widest uppercase">Support Portal</p>
+          <p class="text-[10px] text-fiber-400 font-semibold tracking-widest uppercase">Support Portal</p>
         </div>
       </div>
 
       <!-- Agent Info -->
       <div class="px-5 py-4 border-b border-white/5">
         <div class="flex items-center gap-3">
-          <div class="w-9 h-9 rounded-full bg-gradient-to-br from-support-500 to-support-700 flex items-center justify-center text-sm font-bold text-white" id="support-avatar">S</div>
+          <div class="w-9 h-9 rounded-full bg-gradient-to-br from-fiber-500 to-fiber-700 flex items-center justify-center text-sm font-bold text-white" id="support-avatar">S</div>
           <div>
             <p class="text-sm font-semibold text-white leading-tight" id="support-agent-name">Support Agent</p>
             <div class="flex items-center gap-1.5 mt-0.5">
@@ -341,7 +340,7 @@
         <div class="flex items-center gap-3">
           <!-- Provider filter -->
           <select id="provider-filter" onchange="applyProviderFilter()"
-            class="bg-white/5 border border-white/10 text-gray-300 text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-support-500">
+            class="bg-white/5 border border-white/10 text-gray-300 text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-fiber-500">
             <option value="all">All Providers</option>
             <option value="SADV">SADV</option>
             <option value="Infinifi">Infinifi</option>
@@ -373,7 +372,7 @@
             </div>
             <div class="glass-card rounded-2xl p-5 stat-accent-blue">
               <p class="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-3">Open Tickets</p>
-              <p class="text-3xl font-bold text-support-400" id="stat-tickets">—</p>
+              <p class="text-3xl font-bold text-fiber-400" id="stat-tickets">—</p>
               <p class="text-xs text-gray-600 mt-1">Logged today</p>
             </div>
             <div class="glass-card rounded-2xl p-5 stat-accent-purple">
@@ -413,7 +412,7 @@
           <div class="glass-card rounded-2xl overflow-hidden">
             <div class="flex items-center justify-between px-5 py-4 border-b border-white/5">
               <h3 class="text-sm font-bold text-white">Recent Ticket Activity</h3>
-              <button onclick="showView('tickets')" class="text-xs text-support-400 hover:text-support-300 font-semibold">View All →</button>
+              <button onclick="showView('tickets')" class="text-xs text-fiber-400 hover:text-fiber-300 font-semibold">View All →</button>
             </div>
             <div id="recent-tickets-list" class="p-5">
               <div class="space-y-3">
@@ -453,7 +452,7 @@
           <div class="glass-card rounded-2xl overflow-hidden">
             <div class="overflow-x-auto">
               <table class="support-table w-full">
-                <thead>
+                <thead id="customer-table-head">
                   <tr>
                     <th class="text-left">Status</th>
                     <th class="text-left">Customer</th>
@@ -499,7 +498,7 @@
                 oninput="filterTicketTable()">
             </div>
             <button onclick="openNewTicketModal()"
-              class="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-support-600 to-support-700 hover:from-support-500 hover:to-support-600 text-white text-sm font-semibold rounded-xl transition-all shadow-lg shrink-0">
+              class="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-fiber-600 to-fiber-700 hover:from-fiber-500 hover:to-fiber-600 text-white text-sm font-semibold rounded-xl transition-all shadow-lg shrink-0">
               <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
               </svg>
@@ -511,7 +510,7 @@
           <div class="glass-card rounded-2xl overflow-hidden">
             <div class="overflow-x-auto">
               <table class="support-table w-full">
-                <thead>
+                <thead id="ticket-table-head">
                   <tr>
                     <th class="text-left">Ticket #</th>
                     <th class="text-left">Created</th>
@@ -554,7 +553,7 @@
               <p class="text-xs text-gray-500 mb-5">Upload the latest SADV or Infinifi agility export. The parser will normalize and sync it automatically.</p>
               <div class="mb-4">
                 <label class="block text-xs font-semibold text-gray-400 mb-2">Provider</label>
-                <select id="agility-provider" class="w-full bg-white/5 border border-white/10 text-gray-300 text-sm rounded-xl px-4 py-2.5 focus:outline-none focus:border-support-500">
+                <select id="agility-provider" class="w-full bg-white/5 border border-white/10 text-gray-300 text-sm rounded-xl px-4 py-2.5 focus:outline-none focus:border-fiber-500">
                   <option value="SADV">SADV</option>
                   <option value="Infinifi">Infinifi</option>
                 </select>
@@ -562,10 +561,10 @@
               <div class="mb-5">
                 <label class="block text-xs font-semibold text-gray-400 mb-2">Spreadsheet File (.xlsx / .csv)</label>
                 <input type="file" id="agility-file" accept=".xlsx,.csv,.xls"
-                  class="w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-support-600/20 file:text-support-400 hover:file:bg-support-600/30 cursor-pointer">
+                  class="w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-fiber-600/20 file:text-fiber-400 hover:file:bg-fiber-600/30 cursor-pointer">
               </div>
               <button onclick="uploadAgilityReport()"
-                class="w-full py-3 bg-gradient-to-r from-support-600 to-support-700 hover:from-support-500 text-white text-sm font-semibold rounded-xl transition-all">
+                class="w-full py-3 bg-gradient-to-r from-fiber-600 to-fiber-700 hover:from-fiber-500 text-white text-sm font-semibold rounded-xl transition-all">
                 Upload & Parse
               </button>
             </div>
@@ -579,7 +578,7 @@
                 <div class="skeleton h-12 rounded-lg"></div>
               </div>
               <div class="mt-4 pt-4 border-t border-white/5">
-                <p class="text-xs text-gray-600">⏰ Auto-sync is scheduled daily at <span class="text-support-400 font-semibold">06:00 SAST</span></p>
+                <p class="text-xs text-gray-600">&#9200; Auto-sync is scheduled daily at <span class="text-fiber-400 font-semibold">06:00 SAST</span></p>
               </div>
             </div>
           </div>
@@ -644,8 +643,8 @@
             </div>
 
             <div class="glass-card glass-card-hover rounded-2xl p-5 cursor-pointer" onclick="openSopModal('infinifi-link')">
-              <div class="w-10 h-10 rounded-xl bg-support-500/15 border border-support-500/20 flex items-center justify-center mb-4">
-                <svg class="w-5 h-5 text-support-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+              <div class="w-10 h-10 rounded-xl bg-fiber-500/15 border border-fiber-500/20 flex items-center justify-center mb-4">
+                <svg class="w-5 h-5 text-fiber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                 </svg>
               </div>
@@ -677,7 +676,7 @@
         <div class="grid grid-cols-2 gap-4">
           <div>
             <label class="block text-xs font-semibold text-gray-400 mb-1.5">Provider *</label>
-            <select id="nt-provider" class="w-full bg-white/5 border border-white/10 text-gray-300 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:border-support-500">
+            <select id="nt-provider" class="w-full bg-white/5 border border-white/10 text-gray-300 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:border-fiber-500">
               <option value="">Select...</option>
               <option value="SADV">SADV</option>
               <option value="Infinifi">Infinifi</option>
@@ -685,7 +684,7 @@
           </div>
           <div>
             <label class="block text-xs font-semibold text-gray-400 mb-1.5">Status</label>
-            <select id="nt-status" class="w-full bg-white/5 border border-white/10 text-gray-300 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:border-support-500">
+            <select id="nt-status" class="w-full bg-white/5 border border-white/10 text-gray-300 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:border-fiber-500">
               <option value="Open">Open</option>
               <option value="In Progress">In Progress</option>
               <option value="Escalated">Escalated</option>
@@ -696,34 +695,34 @@
         <div>
           <label class="block text-xs font-semibold text-gray-400 mb-1.5">Customer Name *</label>
           <input type="text" id="nt-customer" placeholder="Full name..."
-            class="w-full bg-white/5 border border-white/10 text-gray-300 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:border-support-500 placeholder-gray-600">
+            class="w-full bg-white/5 border border-white/10 text-gray-300 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:border-fiber-500 placeholder-gray-600">
         </div>
         <div class="grid grid-cols-2 gap-4">
           <div>
             <label class="block text-xs font-semibold text-gray-400 mb-1.5">Order / Ticket #</label>
             <input type="text" id="nt-order" placeholder="Order or ticket number..."
-              class="w-full bg-white/5 border border-white/10 text-gray-300 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:border-support-500 placeholder-gray-600">
+              class="w-full bg-white/5 border border-white/10 text-gray-300 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:border-fiber-500 placeholder-gray-600">
           </div>
           <div>
             <label class="block text-xs font-semibold text-gray-400 mb-1.5">Channel Partner</label>
             <input type="text" id="nt-channel" placeholder="Channel partner..."
-              class="w-full bg-white/5 border border-white/10 text-gray-300 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:border-support-500 placeholder-gray-600">
+              class="w-full bg-white/5 border border-white/10 text-gray-300 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:border-fiber-500 placeholder-gray-600">
           </div>
         </div>
         <div>
           <label class="block text-xs font-semibold text-gray-400 mb-1.5">Product / Package</label>
           <input type="text" id="nt-product" placeholder="Contract product name..."
-            class="w-full bg-white/5 border border-white/10 text-gray-300 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:border-support-500 placeholder-gray-600">
+            class="w-full bg-white/5 border border-white/10 text-gray-300 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:border-fiber-500 placeholder-gray-600">
         </div>
         <div>
           <label class="block text-xs font-semibold text-gray-400 mb-1.5">Description *</label>
           <textarea id="nt-description" rows="3" placeholder="Describe the issue or action taken..."
-            class="w-full bg-white/5 border border-white/10 text-gray-300 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:border-support-500 placeholder-gray-600 resize-none"></textarea>
+            class="w-full bg-white/5 border border-white/10 text-gray-300 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:border-fiber-500 placeholder-gray-600 resize-none"></textarea>
         </div>
       </div>
       <div class="flex gap-3 px-6 pb-5">
         <button onclick="submitNewTicket()"
-          class="flex-1 py-2.5 bg-gradient-to-r from-support-600 to-support-700 hover:from-support-500 text-white text-sm font-semibold rounded-xl transition-all">
+          class="flex-1 py-2.5 bg-gradient-to-r from-fiber-600 to-fiber-700 hover:from-fiber-500 text-white text-sm font-semibold rounded-xl transition-all">
           Log Ticket
         </button>
         <button onclick="closeNewTicketModal()"
@@ -749,6 +748,129 @@
       </div>
       <div class="flex-1 overflow-y-auto px-6 py-5" id="sop-content">
         <!-- Dynamic content injected by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════ -->
+  <!-- MODAL: Ticket Detail                   -->
+  <!-- ══════════════════════════════════════ -->
+  <div id="modal-ticket-detail" class="hidden fixed inset-0 z-50 modal-bg flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="modal-card rounded-t-2xl sm:rounded-2xl w-full sm:max-w-2xl max-h-[90vh] flex flex-col shadow-2xl">
+      <!-- Header -->
+      <div class="flex items-center justify-between px-6 py-4 border-b border-white/5 shrink-0">
+        <div>
+          <p class="text-[10px] text-fiber-400 font-bold uppercase tracking-widest mb-0.5">Ticket Detail</p>
+          <h3 class="text-sm font-bold text-white font-mono" id="td-ticket-number">—</h3>
+        </div>
+        <button onclick="closeTicketDetail()" class="text-gray-500 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/5">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Scrollable Content -->
+      <div class="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+
+        <!-- Badges row -->
+        <div class="flex items-center gap-3 flex-wrap">
+          <span id="td-status-badge"></span>
+          <span id="td-provider-badge"></span>
+        </div>
+
+        <!-- Core fields grid -->
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <p class="text-[10px] text-gray-600 uppercase tracking-widest font-semibold mb-1">Customer</p>
+            <p class="text-sm text-white font-medium" id="td-customer">—</p>
+          </div>
+          <div>
+            <p class="text-[10px] text-gray-600 uppercase tracking-widest font-semibold mb-1">Channel Partner</p>
+            <p class="text-sm text-gray-300" id="td-channel">—</p>
+          </div>
+          <div>
+            <p class="text-[10px] text-gray-600 uppercase tracking-widest font-semibold mb-1">Ticket #</p>
+            <p class="text-sm text-fiber-400 font-mono" id="td-ticket-number2">—</p>
+          </div>
+          <div>
+            <p class="text-[10px] text-gray-600 uppercase tracking-widest font-semibold mb-1">Ticket 2 (Legacy)</p>
+            <p class="text-sm text-gray-500 font-mono" id="td-ticket2">—</p>
+          </div>
+          <div>
+            <p class="text-[10px] text-gray-600 uppercase tracking-widest font-semibold mb-1">Order Number</p>
+            <p class="text-sm text-gray-300 font-mono" id="td-order-number">—</p>
+          </div>
+          <div>
+            <p class="text-[10px] text-gray-600 uppercase tracking-widest font-semibold mb-1">Payment Record</p>
+            <p class="text-sm text-gray-300" id="td-payment">—</p>
+          </div>
+          <div>
+            <p class="text-[10px] text-gray-600 uppercase tracking-widest font-semibold mb-1">Created</p>
+            <p class="text-sm text-gray-300" id="td-created">—</p>
+          </div>
+          <div>
+            <p class="text-[10px] text-gray-600 uppercase tracking-widest font-semibold mb-1">Completed</p>
+            <p class="text-sm text-gray-300" id="td-completed">—</p>
+          </div>
+        </div>
+
+        <!-- Product -->
+        <div>
+          <p class="text-[10px] text-gray-600 uppercase tracking-widest font-semibold mb-1">Product / Package</p>
+          <p class="text-sm text-gray-300" id="td-product">—</p>
+        </div>
+
+        <!-- Description -->
+        <div class="glass-card rounded-xl p-4">
+          <p class="text-[10px] text-gray-600 uppercase tracking-widest font-semibold mb-2">Description</p>
+          <p class="text-sm text-gray-200 leading-relaxed" id="td-description">—</p>
+        </div>
+
+        <!-- Update notes -->
+        <div>
+          <p class="text-[10px] text-gray-600 uppercase tracking-widest font-semibold mb-3">Update Notes</p>
+          <div class="glass-card rounded-xl px-4 divide-y divide-white/5 max-h-60 overflow-y-auto" id="td-updates">
+            <p class="text-xs text-gray-600 italic py-3">No update notes on this ticket.</p>
+          </div>
+        </div>
+        
+        <!-- Add Update Form -->
+        <div class="mt-6 pt-6 border-t border-white/10">
+          <h4 class="text-xs font-bold text-white mb-3">Add Update</h4>
+          <form id="form-update-ticket" onsubmit="submitTicketUpdate(event)" class="space-y-4">
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-semibold text-gray-400 mb-1.5">Update Status</label>
+                <select id="update-status" class="w-full bg-white/5 border border-white/10 text-gray-300 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:border-fiber-500">
+                  <option value="" class="bg-gray-800 text-white">Leave Unchanged</option>
+                  <option value="Open" class="bg-gray-800 text-white">Open</option>
+                  <option value="Pending" class="bg-gray-800 text-white">Pending</option>
+                  <option value="Active" class="bg-gray-800 text-white">Active (Complete)</option>
+                  <option value="Cancelled" class="bg-gray-800 text-white">Cancelled</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-400 mb-1.5">New Note</label>
+              <textarea id="update-note" rows="2" class="w-full bg-white/5 border border-white/10 text-gray-300 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:border-fiber-500 placeholder-gray-500 resize-none" placeholder="Type your update here..."></textarea>
+            </div>
+            <div class="flex justify-end gap-3">
+              <button type="submit" id="btn-submit-update" class="px-5 py-2.5 bg-gradient-to-r from-fiber-600 to-fiber-700 hover:from-fiber-500 text-white text-sm font-semibold rounded-xl transition-all">
+                Submit Update
+              </button>
+            </div>
+          </form>
+        </div>
+
+      </div>
+
+      <!-- Footer -->
+      <div class="px-6 py-4 border-t border-white/5 shrink-0">
+        <button onclick="closeTicketDetail()"
+          class="w-full py-2.5 bg-white/5 text-gray-400 hover:bg-white/10 text-sm font-medium rounded-xl transition-colors">
+          Close
+        </button>
       </div>
     </div>
   </div>
