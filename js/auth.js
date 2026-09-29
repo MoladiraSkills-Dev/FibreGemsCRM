@@ -157,5 +157,5 @@ function showToast(message, type = 'info') {
   setTimeout(() => {
     toast.classList.add('animate-slide-out');
     setTimeout(() => toast.remove(), 300);
-  }, 4000);
+  }, 9000);
 }

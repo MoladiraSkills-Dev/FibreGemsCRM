@@ -2043,7 +2043,9 @@ function getSupportCustomers(token) {
         orderNumber: row[19] ? row[19].toString() : '',
         product:     row[5] ? row[5].toString() : '',
         provider:    'SADV',
-        region:      ''
+        region:      '',
+        createdDate: row[0] ? row[0].toString() : '',
+        completedDate: ''
       });
       if (customers.length >= 250) break; // Limit for performance
     }
@@ -2068,7 +2070,9 @@ function getSupportCustomers(token) {
         product:     row[3] ? `Term: ${row[3]}` : '', // Contract Term
         mrc:         row[4] ? row[4].toString() : '', // Total MRC Excl
         region:      row[6] ? row[6].toString() : '', // Region
-        provider:    'Infinifi'
+        provider:    'Infinifi',
+        createdDate: row[0] ? row[0].toString() : '',
+        completedDate: row[1] ? row[1].toString() : ''
       });
     }
   }

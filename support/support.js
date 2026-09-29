@@ -186,6 +186,7 @@ async function loadCustomers() {
 
 function applyFilters_customers() {
   const search = (document.getElementById('customer-search')?.value || '').toLowerCase();
+  const dateFilter = document.getElementById('customer-date-filter')?.value; // YYYY-MM-DD
 
   filteredCustomers = allCustomers.filter(c => {
     const matchProvider = activeProviderFilter === 'all' || c.provider === activeProviderFilter;
@@ -196,7 +197,27 @@ function applyFilters_customers() {
       (c.customer || '').toLowerCase().includes(search) ||
       (c.orderNumber || '').toLowerCase().includes(search) ||
       (c.phone || '').toLowerCase().includes(search);
-    return matchProvider && matchStatus && matchSearch;
+      
+    // Match date if selected (checks created_da/completedDate matching YYYY-MM-DD)
+    let matchDate = true;
+    if (dateFilter) {
+      const rawDate = c.createdDate || c.completedDate;
+      if (!rawDate) {
+        matchDate = false;
+      } else {
+        const s = String(rawDate).trim();
+        const ddmm = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+        if (ddmm) {
+          const isoStr = `${ddmm[3]}-${ddmm[2].padStart(2,'0')}-${ddmm[1].padStart(2,'0')}`;
+          matchDate = isoStr === dateFilter;
+        } else {
+          try { matchDate = new Date(s).toISOString().split('T')[0] === dateFilter; } 
+          catch(e) { matchDate = false; }
+        }
+      }
+    }
+
+    return matchProvider && matchStatus && matchSearch && matchDate;
   });
 
   customerPage = 0;
@@ -318,7 +339,7 @@ function renderCustomerTable() {
       </td>
     `;
 
-    return `<tr class="${rowClass}">${cellsHtml}</tr>`;
+    return `<tr class="${rowClass} cursor-pointer hover:bg-white/5 transition-colors" onclick="viewCustomerTickets('${escHtml(c.customer || '').replace(/'/g, "\\'")}', '${escHtml(c.provider || '')}')">${cellsHtml}</tr>`;
   }).join('');
 }
 
@@ -369,6 +390,7 @@ async function loadTickets() {
 
 function applyFilters_tickets() {
   const search = (document.getElementById('ticket-search')?.value || '').toLowerCase();
+  const dateFilter = document.getElementById('ticket-date-filter')?.value; // YYYY-MM-DD
 
   filteredTickets = allTickets.filter(t => {
     const matchProvider = activeProviderFilter === 'all' || t.provider === activeProviderFilter;
@@ -376,7 +398,25 @@ function applyFilters_tickets() {
       (t.customer || '').toLowerCase().includes(search) ||
       (t.ticketNumber || '').toLowerCase().includes(search) ||
       (t.description || '').toLowerCase().includes(search);
-    return matchProvider && matchSearch;
+      
+    let matchDate = true;
+    if (dateFilter) {
+      if (!t.createdDate) {
+        matchDate = false;
+      } else {
+        const s = String(t.createdDate).trim();
+        const ddmm = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+        if (ddmm) {
+          const isoStr = `${ddmm[3]}-${ddmm[2].padStart(2,'0')}-${ddmm[1].padStart(2,'0')}`;
+          matchDate = isoStr === dateFilter;
+        } else {
+          try { matchDate = new Date(s).toISOString().split('T')[0] === dateFilter; } 
+          catch(e) { matchDate = false; }
+        }
+      }
+    }
+
+    return matchProvider && matchSearch && matchDate;
   });
 
   ticketPage = 0;
@@ -415,7 +455,7 @@ function renderTicketTable() {
     const globalIdx = start + idx;
     _ticketDetailMap[globalIdx] = t;
     return `
-    <tr>
+    <tr class="cursor-pointer hover:bg-white/5 transition-colors" onclick="openTicketDetail(${globalIdx})">
       <td class="font-mono text-xs text-fiber-400">${escHtml(t.ticketNumber || '—')}</td>
       <td class="text-xs text-gray-500">${formatDate_(t.createdDate)}</td>
       <td class="font-medium text-white">${escHtml(t.customer || '—')}</td>
@@ -424,8 +464,7 @@ function renderTicketTable() {
       <td class="text-xs text-gray-400 max-w-xs truncate">${escHtml(t.description || '—')}</td>
       <td class="text-xs text-gray-500">${escHtml(t.channelPartner || '—')}</td>
       <td>
-        <button onclick="openTicketDetail(${globalIdx})"
-          class="text-xs text-fiber-400 hover:text-fiber-300 font-semibold">View →</button>
+        <button class="text-xs text-fiber-400 font-semibold pointer-events-none">View →</button>
       </td>
     </tr>
   `;

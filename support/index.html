@@ -233,7 +233,7 @@
   </div>
 
   <!-- Toast Container -->
-  <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-3"></div>
+  <div id="toast-container" class="fixed top-4 right-4 z-[9999] flex flex-col gap-3"></div>
 
   <!-- Layout Wrapper -->
   <div class="flex h-screen overflow-hidden">
@@ -437,6 +437,10 @@
                 class="search-bar w-full pl-10 pr-4 py-2.5 rounded-xl text-sm text-white placeholder-gray-600"
                 oninput="filterCustomerTable()">
             </div>
+            <div class="w-40">
+              <input type="date" id="customer-date-filter" onchange="filterCustomerTable()"
+                class="w-full bg-white/5 border border-white/10 text-gray-300 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:border-fiber-500">
+            </div>
             <div class="flex gap-2">
               <button onclick="filterByStatus('all')" class="tab-btn active" id="status-tab-all">All</button>
               <button onclick="filterByStatus('active')" class="tab-btn" id="status-tab-active">
@@ -496,6 +500,10 @@
               <input type="text" id="ticket-search" placeholder="Search by ticket number, customer, or description..."
                 class="search-bar w-full pl-10 pr-4 py-2.5 rounded-xl text-sm text-white placeholder-gray-600"
                 oninput="filterTicketTable()">
+            </div>
+            <div class="w-40">
+              <input type="date" id="ticket-date-filter" onchange="filterTicketTable()"
+                class="w-full bg-white/5 border border-white/10 text-gray-300 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:border-fiber-500">
             </div>
             <button onclick="openNewTicketModal()"
               class="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-fiber-600 to-fiber-700 hover:from-fiber-500 hover:to-fiber-600 text-white text-sm font-semibold rounded-xl transition-all shadow-lg shrink-0">
