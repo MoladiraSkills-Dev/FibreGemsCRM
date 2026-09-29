@@ -14,15 +14,70 @@ function getSupportDb_() {
 // 1. API ROUTER
 // ============================================================
 
+function getCacheVersion_() {
+  const cache = CacheService.getScriptCache();
+  let v = cache.get('CRM_CACHE_VERSION');
+  if (!v) {
+    v = Date.now().toString();
+    cache.put('CRM_CACHE_VERSION', v, 21600); // 6 hours
+  }
+  return v;
+}
+
+function incrementCacheVersion_() {
+  const cache = CacheService.getScriptCache();
+  cache.put('CRM_CACHE_VERSION', Date.now().toString(), 21600);
+}
+
 function doPost(e) {
   try {
-    // Note: To bypass CORS preflight issues in browsers, the frontend must send
-    // Content-Type: text/plain, but the payload will be a JSON string.
     const body = JSON.parse(e.postData.contents);
     const action = body.action;
     const payload = body.payload || {};
     const token = body.token;
     let result;
+    
+    // --- SMART CACHE IMPLEMENTATION ---
+    const cacheableActions = [
+      'getAgentWorklist', 'getAgentDailyQueue', 'getAgentActivityLog',
+      'getAdminDashboard', 'getAdminMasterGrid', 'getAdminCallbackReport', 
+      'getAgentList', 'getAdminPromisedPayments', 'getSupportDashboard', 
+      'getSupportCustomers', 'getSupportTickets'
+    ];
+    
+    const mutatingActions = [
+      'handleAgentLeadUpdate', 'logCallOutcome', 'quickUpdateSalesData', 'issueNewEasyPay',
+      'createAgent', 'updateAgent', 'setAgentTempPassword', 'deleteAgent',
+      'adminUpdateFollowUp', 'logSupportTicket', 'updateSupportTicket', 'runAgilitySync', 'uploadAgilityReport'
+    ];
+
+    let cacheKey = null;
+    let cache = null;
+
+    if (cacheableActions.includes(action)) {
+       cache = CacheService.getScriptCache();
+       const version = getCacheVersion_();
+       const payloadStr = JSON.stringify(payload);
+       // Base64 can be long, so we use a simple hash for the payload to ensure key < 250 chars
+       const payloadHash = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, payloadStr)
+                            .map(byte => ('0' + (byte & 0xFF).toString(16)).slice(-2)).join('');
+                            
+       cacheKey = `${version}_${action}_${(token || '').substring(0, 20)}_${payloadHash}`;
+       
+       if (cacheKey.length < 250) {
+         const cached = cache.get(cacheKey);
+         if (cached) {
+            return ContentService.createTextOutput(cached).setMimeType(ContentService.MimeType.JSON);
+         }
+       } else {
+         cacheKey = null;
+       }
+    }
+
+    if (mutatingActions.includes(action)) {
+      incrementCacheVersion_(); // Bust cache before executing mutation to ensure subsequent fetches are fresh
+    }
+    // -----------------------------------
 
     switch (action) {
       case 'handleLogin':
@@ -110,8 +165,14 @@ function doPost(e) {
         throw new Error("Invalid API action requested: " + action);
     }
 
-    return ContentService.createTextOutput(JSON.stringify({ status: 'success', data: result }))
-      .setMimeType(ContentService.MimeType.JSON);
+    const responseJson = JSON.stringify({ status: 'success', data: result });
+    
+    // Cache the response if it's read-only and under the 100KB AppScript limit
+    if (cacheKey && cache && responseJson.length < 90000) {
+      cache.put(cacheKey, responseJson, 300); // 5 minutes cache
+    }
+    
+    return ContentService.createTextOutput(responseJson).setMimeType(ContentService.MimeType.JSON);
 
   } catch (err) {
     return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: err.message }))
@@ -2092,12 +2153,18 @@ function getSupportTickets(token, payload) {
     }
   }
   
+  // Helper: parse DD/MM/YYYY or ISO date strings correctly
+  function parseDate_(str) {
+    if (!str) return 0;
+    const s = str.toString().trim();
+    const ddmm = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (ddmm) return new Date(`${ddmm[3]}-${ddmm[2].padStart(2,'0')}-${ddmm[1].padStart(2,'0')}T00:00:00`).getTime();
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? 0 : d.getTime();
+  }
+  
   // Sort all tickets by created date descending (newest first)
-  tickets.sort((a, b) => {
-    const dateA = new Date(a.createdDate).getTime() || 0;
-    const dateB = new Date(b.createdDate).getTime() || 0;
-    return dateB - dateA;
-  });
+  tickets.sort((a, b) => parseDate_(b.createdDate) - parseDate_(a.createdDate));
 
   // Limit to 400 total to prevent payload bloat
   return { tickets: tickets.slice(0, 400) };

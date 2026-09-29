@@ -794,10 +794,23 @@ function getStatusBadgeClass(status) {
 function formatDate_(val) {
   if (!val) return '—';
   try {
-    const d = new Date(val);
+    let d;
+    const str = String(val).trim();
+
+    // Detect DD/MM/YYYY or DD/MM/YYYY HH:MM:SS (South African / Google Sheets format)
+    const ddmmyyyy = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (ddmmyyyy) {
+      // ddmmyyyy[1]=day, [2]=month, [3]=year — construct ISO to avoid ambiguity
+      d = new Date(`${ddmmyyyy[3]}-${ddmmyyyy[2].padStart(2,'0')}-${ddmmyyyy[1].padStart(2,'0')}T00:00:00`);
+    } else {
+      d = new Date(str);
+    }
+
+    if (isNaN(d.getTime())) return str.slice(0, 10);
     return d.toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' });
   } catch { return String(val).slice(0, 10); }
 }
+
 
 function setEl(id, value) {
   const el = document.getElementById(id);
