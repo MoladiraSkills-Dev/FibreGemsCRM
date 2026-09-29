@@ -1,6 +1,15 @@
 const SHEET_ID = SpreadsheetApp.getActiveSpreadsheet().getId();
 const ss = SpreadsheetApp.openById(SHEET_ID);
 
+const SUPPORT_SHEET_ID = '10JgMtPtvQp3dfe9g9wtZSah6D2K8jyofuftyEVdEg9M'; // TODO: User needs to update this
+
+function getSupportDb_() {
+  if (SUPPORT_SHEET_ID === 'YOUR_SUPPORT_FILE_ID_HERE') {
+    throw new Error('Support Spreadsheet ID not configured. Please add it at the top of Code.gs.');
+  }
+  return SpreadsheetApp.openById(SUPPORT_SHEET_ID);
+}
+
 // ============================================================
 // 1. API ROUTER
 // ============================================================
@@ -76,6 +85,27 @@ function doPost(e) {
       case 'getAdminPromisedPayments':
         result = getAdminPromisedPayments(token);
         break;
+      case 'getSupportDashboard':
+        result = getSupportDashboard(token);
+        break;
+      case 'getSupportCustomers':
+        result = getSupportCustomers(token);
+        break;
+      case 'getSupportTickets':
+        result = getSupportTickets(token, payload);
+        break;
+      case 'logSupportTicket':
+        result = logSupportTicket(token, payload);
+        break;
+      case 'updateSupportTicket':
+        result = updateSupportTicket(token, payload);
+        break;
+      case 'getAgilitySyncHistory':
+        result = getAgilitySyncHistory(token);
+        break;
+      case 'uploadAgilityReport':
+        result = uploadAgilityReport(token, payload);
+        break;
       default:
         throw new Error("Invalid API action requested: " + action);
     }
@@ -140,6 +170,12 @@ function getSessionUser(token) {
 function requireAdmin_(token) {
   const s = getSessionUser(token);
   if (s.role !== 'Admin') throw new Error('Admin privileges required.');
+  return s;
+}
+
+function requireSupport_(token) {
+  const s = getSessionUser(token);
+  if (s.role !== 'Support' && s.role !== 'Admin') throw new Error('Support or Admin privileges required.');
   return s;
 }
 
@@ -1829,3 +1865,378 @@ function extendDatabaseHeaders() {
   
   return "Database headers successfully extended to 34 columns!";
 }
+
+// ============================================================
+// 10. SUPPORT PORTAL ENDPOINTS
+// ============================================================
+
+/**
+ * AUGSEP Column Map (0-indexed):
+ * 0  created_da
+ * 1  completed_
+ * 2  channel_partner_user_name
+ * 3  status
+ * 4  paymentrec
+ * 5  contractproductname
+ * 6  description
+ * 7  customer
+ * 8  Update 1
+ * 9  Update 2
+ * 10 Update 3
+ * 11 Update 4
+ * 12 Update 5
+ * 13 Update 6
+ * 14 Update 7
+ * 15 Update 8
+ * 16 Update 9
+ * 17 Ticket number
+ * 18 Ticket 2
+ * 19 Order Number
+ */
+
+function getSupportDashboard(token) {
+  requireSupport_(token);
+  const supportDb = getSupportDb_();
+  const ticketsSheet = supportDb.getSheetByName('AUGSEP');
+  if (!ticketsSheet) throw new Error("Could not find 'AUGSEP' sheet.");
+
+  const rows = ticketsSheet.getDataRange().getValues();
+  let sadvActive = 0, sadvInactive = 0, sadvPending = 0, sadvOpen = 0;
+
+  for (let i = 1; i < rows.length; i++) {
+    const status = (rows[i][3] || '').toString().trim().toLowerCase();
+    if (status === 'active' || status.includes('complete')) sadvActive++;
+    else if (status === 'expired' || status === 'inactive' || status.includes('cancel')) sadvInactive++;
+    else if (status === 'pending' || status === 'scheduled' || status.includes('progress')) sadvPending++;
+    if (!status || status === 'new' || status === 'open') sadvOpen++;
+  }
+
+  // Get 5 most recent tickets for the dashboard list
+  const recentTickets = [];
+  for (let i = rows.length - 1; i > 0 && recentTickets.length < 5; i--) {
+    const row = rows[i];
+    if (!row[0]) continue;
+    recentTickets.push({
+      ticketNumber: row[17] ? row[17].toString() : '—',
+      customer: row[7] ? row[7].toString() : '—',
+      status: row[3] ? row[3].toString() : 'Unknown',
+      provider: 'SADV',
+      createdDate: row[0] ? row[0].toString() : ''
+    });
+  }
+
+  // Infinifi Stats
+  let infActive = 0, infInactive = 0, infPending = 0, infOpen = 0;
+  const infSheet = supportDb.getSheetByName('Infinifi customers');
+  if (infSheet) {
+    const infRows = infSheet.getDataRange().getValues();
+    for (let i = 1; i < infRows.length; i++) {
+       const row = infRows[i];
+       if (!row[2]) continue; // Skip if no customer name
+       const actionType = (row[11] || '').toString().trim().toLowerCase();
+       const completedDate = row[1];
+       
+       if (completedDate) {
+         infActive++;
+       } else if (actionType === 'preorder' || actionType.includes('pending')) {
+         infPending++;
+       } else {
+         infOpen++;
+       }
+    }
+  }
+
+  return {
+    activeCount: sadvActive + infActive,
+    inactiveCount: sadvInactive + infInactive,
+    openTickets: sadvOpen + infOpen,
+    lastSync: 'Live from Support DB',
+    sadvStats: { active: sadvActive, inactive: sadvInactive, pending: sadvPending, openTickets: sadvOpen },
+    infinifiStats: { active: infActive, inactive: infInactive, pending: infPending, openTickets: infOpen },
+    recentTickets
+  };
+}
+
+function getSupportCustomers(token) {
+  requireSupport_(token);
+  const supportDb = getSupportDb_();
+  const customers = [];
+
+  // 1. Pull SADV Customers from AUGSEP
+  const ticketsSheet = supportDb.getSheetByName('AUGSEP');
+  if (ticketsSheet) {
+    const rows = ticketsSheet.getDataRange().getValues();
+    // Use a Set to track unique customers so we don't return 100 tickets for the same person
+    const seenSadv = new Set();
+    
+    // Read backwards to get the most recent status for each customer
+    for (let i = rows.length - 1; i > 0; i--) {
+      const row = rows[i];
+      const customerName = row[7] ? row[7].toString().trim() : '';
+      if (!customerName || seenSadv.has(customerName)) continue;
+      
+      seenSadv.add(customerName);
+      customers.push({
+        customer:    customerName,
+        status:      row[3] ? row[3].toString() : 'Unknown',
+        orderNumber: row[19] ? row[19].toString() : '',
+        product:     row[5] ? row[5].toString() : '',
+        provider:    'SADV',
+        region:      ''
+      });
+      if (customers.length >= 250) break; // Limit for performance
+    }
+  }
+
+  // 2. Pull Infinifi Customers from 'Infinifi customers'
+  const infSheet = supportDb.getSheetByName('Infinifi customers');
+  if (infSheet) {
+    const rows = infSheet.getDataRange().getValues();
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      const customerName = row[2] ? row[2].toString().trim() : '';
+      if (!customerName) continue;
+      
+      let status = 'Pending';
+      if (row[1]) status = 'Active'; // Completed Date exists
+      
+      customers.push({
+        customer:    customerName,
+        status:      status,
+        orderNumber: row[5] ? row[5].toString() : '', // Lead Number
+        product:     row[3] ? `Term: ${row[3]}` : '', // Contract Term
+        mrc:         row[4] ? row[4].toString() : '', // Total MRC Excl
+        region:      row[6] ? row[6].toString() : '', // Region
+        provider:    'Infinifi'
+      });
+    }
+  }
+
+  return { customers };
+}
+
+function getSupportTickets(token, payload) {
+  requireSupport_(token);
+  const supportDb = getSupportDb_();
+  const ticketsSheet = supportDb.getSheetByName('AUGSEP');
+  if (!ticketsSheet) throw new Error("Could not find 'AUGSEP' sheet in Support Database.");
+
+  const ticketData = ticketsSheet.getDataRange().getValues();
+  const tickets = [];
+
+  // 1. Pull SADV Tickets from AUGSEP
+  // Read from bottom (newest first), up to 200 rows
+  for (let i = ticketData.length - 1; i > 0 && tickets.length < 200; i--) {
+    const row = ticketData[i];
+    if (!row[0]) continue;
+
+    // Collect all update notes, filter out blanks
+    const updates = [];
+    for (let u = 8; u <= 16; u++) {
+      if (row[u] && row[u].toString().trim()) {
+        updates.push(row[u].toString().trim());
+      }
+    }
+
+    tickets.push({
+      createdDate:   row[0]  ? row[0].toString()  : '',
+      completedDate: row[1]  ? row[1].toString()  : '',
+      channelPartner: row[2] ? row[2].toString()  : '',
+      status:        row[3]  ? row[3].toString()  : '',
+      paymentRec:    row[4]  ? row[4].toString()  : '',
+      product:       row[5]  ? row[5].toString()  : '',
+      description:   row[6]  ? row[6].toString()  : '',
+      customer:      row[7]  ? row[7].toString()  : '',
+      updates:       updates,
+      ticketNumber:  row[17] ? row[17].toString() : '—',
+      ticket2:       row[18] ? row[18].toString() : '',
+      orderNumber:   row[19] ? row[19].toString() : '',
+      provider:      'SADV'
+    });
+  }
+
+  // 2. Pull Infinifi Tickets from 'Infinifi customers'
+  // (Infinifi doesn't have a separate ticket log, so their orders/fulfillment acts as the ticket)
+  const infSheet = supportDb.getSheetByName('Infinifi customers');
+  if (infSheet) {
+    const infRows = infSheet.getDataRange().getValues();
+    for (let i = infRows.length - 1; i > 0; i--) {
+      const row = infRows[i];
+      if (!row[2]) continue; // Skip if no customer name
+      
+      const actionType = (row[11] || '').toString().trim().toLowerCase();
+      const completedDate = row[1];
+      
+      let status = 'Open';
+      if (completedDate) {
+        status = 'Active';
+      } else if (actionType === 'preorder' || actionType.includes('pending')) {
+        status = 'Pending';
+      }
+      
+      tickets.push({
+        createdDate:   row[0] ? row[0].toString() : '',
+        completedDate: row[1] ? row[1].toString() : '',
+        channelPartner: row[8] ? row[8].toString() : 'Fibre Gems',
+        status:        status,
+        paymentRec:    row[4] ? 'MRC: R' + row[4] : '',
+        product:       row[3] ? `Term: ${row[3]}` : '',
+        description:   row[6] ? row[6].toString() : 'Infinifi Fulfillment',
+        customer:      row[2] ? row[2].toString() : '',
+        updates:       [],
+        ticketNumber:  row[5] ? row[5].toString() : '—', // Lead Number
+        ticket2:       row[10] ? row[10].toString() : '', // Premise ID
+        orderNumber:   row[5] ? row[5].toString() : '',
+        provider:      'Infinifi'
+      });
+    }
+  }
+  
+  // Sort all tickets by created date descending (newest first)
+  tickets.sort((a, b) => {
+    const dateA = new Date(a.createdDate).getTime() || 0;
+    const dateB = new Date(b.createdDate).getTime() || 0;
+    return dateB - dateA;
+  });
+
+  // Limit to 400 total to prevent payload bloat
+  return { tickets: tickets.slice(0, 400) };
+}
+
+function logSupportTicket(token, payload) {
+  requireSupport_(token);
+  const supportDb = getSupportDb_();
+  const ticketsSheet = supportDb.getSheetByName('AUGSEP');
+
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+    const newRow = Array(20).fill('');
+    newRow[0]  = new Date();                            // created_da
+    newRow[1]  = '';                                    // completed_ (empty on open)
+    newRow[2]  = payload.agentName || 'System';         // channel_partner_user_name
+    newRow[3]  = payload.status || 'Open';              // status
+    newRow[4]  = '';                                    // paymentrec
+    newRow[5]  = payload.product || '';                 // contractproductname
+    newRow[6]  = payload.description || '';             // description
+    newRow[7]  = payload.customer || '';                // customer
+    newRow[17] = payload.ticketNumber || '';            // Ticket number
+    newRow[19] = payload.orderNumber || '';             // Order Number
+    ticketsSheet.appendRow(newRow);
+  } finally {
+    lock.releaseLock();
+  }
+  return true;
+}
+
+function updateSupportTicket(token, payload) {
+  requireSupport_(token);
+  const supportDb = getSupportDb_();
+  
+  if (!payload.ticketId) throw new Error("Ticket ID (createdDate) required.");
+
+  if (payload.provider === 'SADV') {
+    const sheet = supportDb.getSheetByName('AUGSEP');
+    const data = sheet.getDataRange().getValues();
+    let rowIndex = -1;
+    for (let i = data.length - 1; i > 0; i--) {
+      if (data[i][0] && data[i][0].toString() === payload.ticketId) {
+        rowIndex = i + 1; // 1-based for sheet
+        break;
+      }
+    }
+    if (rowIndex === -1) throw new Error("Ticket not found in SADV database.");
+
+    const lock = LockService.getScriptLock();
+    try {
+      lock.waitLock(10000);
+      const rowData = sheet.getRange(rowIndex, 1, 1, 20).getValues()[0];
+      
+      // Update status (col 3)
+      if (payload.newStatus) {
+         rowData[3] = payload.newStatus;
+         if (payload.newStatus.toLowerCase() === 'active' || payload.newStatus.toLowerCase().includes('complete')) {
+            rowData[1] = new Date();
+         }
+      }
+      
+      // Append note (cols 8 to 16)
+      if (payload.newNote) {
+         const timestamp = new Date().toLocaleString();
+         const agent = payload.agentName || 'System';
+         const noteString = `[${timestamp} - ${agent}] ${payload.newNote}`;
+         
+         let noteAdded = false;
+         for (let c = 8; c <= 16; c++) {
+           if (!rowData[c] || rowData[c].toString().trim() === '') {
+             rowData[c] = noteString;
+             noteAdded = true;
+             break;
+           }
+         }
+         if (!noteAdded) {
+           rowData[16] = rowData[16] + "\n" + noteString;
+         }
+      }
+      
+      sheet.getRange(rowIndex, 1, 1, 20).setValues([rowData]);
+    } finally {
+      lock.releaseLock();
+    }
+  } else if (payload.provider === 'Infinifi') {
+    const sheet = supportDb.getSheetByName('Infinifi customers');
+    if (!sheet) throw new Error("Infinifi sheet not found.");
+    const data = sheet.getDataRange().getValues();
+    let rowIndex = -1;
+    for (let i = data.length - 1; i > 0; i--) {
+      if (data[i][0] && data[i][0].toString() === payload.ticketId) {
+        rowIndex = i + 1;
+        break;
+      }
+    }
+    if (rowIndex === -1) throw new Error("Ticket not found in Infinifi database.");
+
+    const lock = LockService.getScriptLock();
+    try {
+      lock.waitLock(10000);
+      const rowData = sheet.getRange(rowIndex, 1, 1, 12).getValues()[0];
+      
+      if (payload.newStatus) {
+         const s = payload.newStatus.toLowerCase();
+         if (s === 'active' || s.includes('complete')) {
+           rowData[1] = new Date(); 
+           rowData[9] = new Date().getDate(); 
+         } else {
+           rowData[11] = payload.newStatus;
+         }
+      }
+
+      if (payload.newNote) {
+         const timestamp = new Date().toLocaleString();
+         const agent = payload.agentName || 'System';
+         const noteString = `[${timestamp} - ${agent}] ${payload.newNote}`;
+         rowData[6] = (rowData[6] ? rowData[6] + "\n" : "") + noteString;
+      }
+      
+      sheet.getRange(rowIndex, 1, 1, 12).setValues([rowData]);
+    } finally {
+      lock.releaseLock();
+    }
+  } else {
+    throw new Error("Invalid provider for update.");
+  }
+  
+  return true;
+}
+
+function getAgilitySyncHistory(token) {
+  requireSupport_(token);
+  return { history: [] };
+}
+
+function uploadAgilityReport(token, payload) {
+  requireSupport_(token);
+  throw new Error("Agility parsing logic not yet implemented.");
+}
+
+
