@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FibreGems — Support Portal</title>
+  <meta name="description"
+    content="FibreGems Support Portal — customer ticket management, active status monitoring, and provider workflow for SADV and Infinifi.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { 'inter': ['Montserrat', 'sans-serif'] },
+          colors: {
+            navy: { 50: '#F3F1F1', 100: '#e0e0e0', 200: '#cccccc', 300: '#a3a3a3', 400: '#686a6f', 500: '#4a4a4a', 600: '#333333', 700: '#222429', 800: '#1A1A1A', 900: '#000000' },
+            gem: { 50: '#fffcf0', 100: '#fdf1c2', 200: '#fae390', 300: '#f7d359', 400: '#F5B021', 500: '#ffaa17', 600: '#F1A328', 700: '#d98b16', 800: '#b07112', 900: '#8c590e' },
+            fiber: { 50: '#fef1ec', 100: '#fcdcd2', 200: '#fac0b0', 300: '#f69d85', 400: '#F1A328', 500: '#E07C2A', 600: '#CE5926', 700: '#D44B2E', 800: '#94311f', 900: '#7a2b1d' },
+            support: { 50: '#f0f7ff', 100: '#e0effe', 200: '#b9ddfd', 300: '#7cc0fc', 400: '#37a3f8', 500: '#0d88ef', 600: '#0169cc', 700: '#0252a4', 800: '#064686', 900: '#0b3870' },
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    * { font-family: 'Montserrat', sans-serif; }
+
+    @keyframes slide-in { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    @keyframes slide-out { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+    @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+    @keyframes fade-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+    .animate-slide-in { animation: slide-in 0.3s ease-out; }
+    .animate-slide-out { animation: slide-out 0.3s ease-in; }
+    .animate-fade-in { animation: fade-in 0.4s ease-out; }
+
+    body {
+      background: #0d0f12;
+      min-height: 100vh;
+    }
+
+    /* Sidebar */
+    .support-sidebar {
+      background: linear-gradient(180deg, #0f1117 0%, #131720 100%);
+      border-right: 1px solid rgba(255,255,255,0.06);
+    }
+
+    /* Main content area */
+    .support-main { background: #0d0f12; }
+
+    /* Glass cards */
+    .glass-card {
+      background: rgba(255,255,255,0.04);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255,255,255,0.07);
+    }
+
+    .glass-card-hover:hover {
+      background: rgba(255,255,255,0.06);
+      border-color: rgba(255,255,255,0.12);
+      transition: all 0.25s ease;
+    }
+
+    /* Active status badge */
+    .badge-active {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: #10b981;
+    }
+    .badge-inactive {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #ef4444;
+    }
+    .badge-pending {
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      color: #f59e0b;
+    }
+    .badge-sadv {
+      background: rgba(13, 136, 239, 0.15);
+      border: 1px solid rgba(13, 136, 239, 0.3);
+      color: #37a3f8;
+    }
+    .badge-infinifi {
+      background: rgba(168, 85, 247, 0.15);
+      border: 1px solid rgba(168, 85, 247, 0.3);
+      color: #a855f7;
+    }
+
+    /* Row highlight for active customers */
+    .row-active { background: rgba(16, 185, 129, 0.05); border-left: 3px solid #10b981; }
+    .row-inactive { background: rgba(239, 68, 68, 0.04); border-left: 3px solid rgba(239, 68, 68, 0.4); }
+    .row-pending { background: rgba(245, 158, 11, 0.04); border-left: 3px solid rgba(245, 158, 11, 0.4); }
+
+    /* Nav item */
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 16px;
+      border-radius: 10px;
+      color: #6b7280;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .nav-item:hover { background: rgba(255,255,255,0.05); color: #d1d5db; }
+    .nav-item.active {
+      background: linear-gradient(135deg, rgba(13,136,239,0.2), rgba(13,136,239,0.08));
+      color: #37a3f8;
+      border: 1px solid rgba(13,136,239,0.2);
+    }
+
+    /* Spinner */
+    .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid rgba(13, 136, 239, 0.2);
+      border-top-color: #0d88ef;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    /* Loader overlay */
+    .loader-overlay {
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(8px);
+    }
+
+    /* Search bar */
+    .search-bar {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      transition: all 0.2s;
+    }
+    .search-bar:focus {
+      background: rgba(255,255,255,0.08);
+      border-color: rgba(13,136,239,0.4);
+      box-shadow: 0 0 0 3px rgba(13,136,239,0.1);
+      outline: none;
+    }
+
+    /* Table */
+    .support-table thead th {
+      background: rgba(255,255,255,0.03);
+      font-size: 0.7rem;
+      letter-spacing: 0.08em;
+      color: #6b7280;
+      text-transform: uppercase;
+      padding: 12px 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .support-table tbody tr {
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      transition: background 0.15s;
+    }
+    .support-table tbody tr:hover { background: rgba(255,255,255,0.04); }
+    .support-table tbody td { padding: 12px 16px; font-size: 0.82rem; color: #d1d5db; }
+
+    /* Sidebar toggle for mobile */
+    @media (max-width: 768px) {
+      .support-sidebar { transform: translateX(-100%); transition: transform 0.3s ease; }
+      .support-sidebar.open { transform: translateX(0); }
+    }
+
+    /* Stat card gradient accents */
+    .stat-accent-blue { border-top: 2px solid #0d88ef; }
+    .stat-accent-green { border-top: 2px solid #10b981; }
+    .stat-accent-amber { border-top: 2px solid #f59e0b; }
+    .stat-accent-purple { border-top: 2px solid #a855f7; }
+
+    /* Pulse dot */
+    .pulse-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #10b981;
+      animation: pulse-dot 2s ease-in-out infinite;
+    }
+
+    /* Shimmer skeleton */
+    .skeleton {
+      background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+      border-radius: 6px;
+    }
+
+    /* Tab buttons */
+    .tab-btn {
+      padding: 8px 18px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #6b7280;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .tab-btn:hover { color: #d1d5db; background: rgba(255,255,255,0.05); }
+    .tab-btn.active {
+      background: rgba(13,136,239,0.15);
+      color: #37a3f8;
+      border: 1px solid rgba(13,136,239,0.25);
+    }
+
+    /* Modal */
+    .modal-bg {
+      background: rgba(0,0,0,0.75);
+      backdrop-filter: blur(8px);
+    }
+    .modal-card {
+      background: #131720;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+  </style>
+</head>
+
+<body class="font-inter text-white">
+
+  <!-- Global Loader -->
+  <div id="global-loader" class="hidden fixed inset-0 z-50 loader-overlay flex items-center justify-center">
+    <div class="text-center">
+      <div class="spinner mx-auto mb-4"></div>
+      <p class="text-support-300 text-sm font-medium animate-pulse">Loading...</p>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-3"></div>
+
+  <!-- Layout Wrapper -->
+  <div class="flex h-screen overflow-hidden">
+
+    <!-- ═══ SIDEBAR ═══ -->
+    <aside id="support-sidebar"
+      class="support-sidebar fixed md:relative z-40 w-64 h-full flex flex-col shrink-0">
+
+      <!-- Brand -->
+      <div class="flex items-center gap-3 px-5 py-5 border-b border-white/5">
+        <img src="../images/logo.jpg" alt="FibreGems" class="h-8 object-contain">
+        <div>
+          <p class="text-xs font-bold text-white leading-tight">FibreGems</p>
+          <p class="text-[10px] text-support-400 font-semibold tracking-widest uppercase">Support Portal</p>
+        </div>
+      </div>
+
+      <!-- Agent Info -->
+      <div class="px-5 py-4 border-b border-white/5">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-full bg-gradient-to-br from-support-500 to-support-700 flex items-center justify-center text-sm font-bold text-white" id="support-avatar">S</div>
+          <div>
+            <p class="text-sm font-semibold text-white leading-tight" id="support-agent-name">Support Agent</p>
+            <div class="flex items-center gap-1.5 mt-0.5">
+              <div class="pulse-dot"></div>
+              <span class="text-[11px] text-emerald-400 font-medium">Active</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Navigation -->
+      <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        <p class="text-[10px] text-gray-600 font-semibold uppercase tracking-widest px-3 mb-2">Main</p>
+        <div class="nav-item active" id="nav-dashboard" onclick="showView('dashboard')">
+          <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+          </svg>
+          Dashboard
+        </div>
+        <div class="nav-item" id="nav-customers" onclick="showView('customers')">
+          <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0" />
+          </svg>
+          Customer Status
+        </div>
+        <div class="nav-item" id="nav-tickets" onclick="showView('tickets')">
+          <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
+          </svg>
+          Support Tickets
+        </div>
+        <div class="nav-item" id="nav-agility" onclick="showView('agility')">
+          <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+          Agility Reports
+        </div>
+
+        <div class="my-3 border-t border-white/5"></div>
+        <p class="text-[10px] text-gray-600 font-semibold uppercase tracking-widest px-3 mb-2">Workflows</p>
+
+        <div class="nav-item" id="nav-sops" onclick="showView('sops')">
+          <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          SOPs & Guides
+        </div>
+      </nav>
+
+      <!-- Logout -->
+      <div class="px-3 py-4 border-t border-white/5">
+        <button onclick="logout()"
+          class="nav-item w-full text-red-400 hover:bg-red-500/10 hover:text-red-300">
+          <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          </svg>
+          Sign Out
+        </button>
+      </div>
+    </aside>
+
+    <!-- Mobile sidebar overlay -->
+    <div id="support-sidebar-overlay" class="hidden fixed inset-0 z-30 bg-black/60 md:hidden"
+      onclick="toggleSupportSidebar()"></div>
+
+    <!-- ═══ MAIN CONTENT ═══ -->
+    <main class="support-main flex-1 flex flex-col overflow-hidden">
+
+      <!-- Top Bar -->
+      <header class="flex items-center justify-between px-6 py-4 border-b border-white/5 shrink-0">
+        <div class="flex items-center gap-4">
+          <!-- Mobile menu -->
+          <button class="md:hidden text-gray-400 hover:text-white" onclick="toggleSupportSidebar()">
+            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+          <div>
+            <h1 id="page-title" class="text-base font-bold text-white">Dashboard</h1>
+            <p class="text-xs text-gray-500" id="page-subtitle">Support overview for today</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <!-- Provider filter -->
+          <select id="provider-filter" onchange="applyProviderFilter()"
+            class="bg-white/5 border border-white/10 text-gray-300 text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-support-500">
+            <option value="all">All Providers</option>
+            <option value="SADV">SADV</option>
+            <option value="Infinifi">Infinifi</option>
+          </select>
+          <!-- Date badge -->
+          <span class="hidden sm:block text-xs text-gray-500 bg-white/5 px-3 py-2 rounded-lg" id="today-date"></span>
+        </div>
+      </header>
+
+      <!-- ─── SCROLLABLE CONTENT ─── -->
+      <div class="flex-1 overflow-y-auto px-6 py-6">
+
+        <!-- ══════════════════════════════════════ -->
+        <!-- VIEW: DASHBOARD                        -->
+        <!-- ══════════════════════════════════════ -->
+        <div id="view-dashboard" class="animate-fade-in">
+
+          <!-- Stat Cards Row -->
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div class="glass-card rounded-2xl p-5 stat-accent-green">
+              <p class="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-3">Active Customers</p>
+              <p class="text-3xl font-bold text-emerald-400" id="stat-active">—</p>
+              <p class="text-xs text-gray-600 mt-1">Highlighted green ✓</p>
+            </div>
+            <div class="glass-card rounded-2xl p-5 stat-accent-amber">
+              <p class="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-3">Inactive / Expired</p>
+              <p class="text-3xl font-bold text-amber-400" id="stat-inactive">—</p>
+              <p class="text-xs text-gray-600 mt-1">Requires action</p>
+            </div>
+            <div class="glass-card rounded-2xl p-5 stat-accent-blue">
+              <p class="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-3">Open Tickets</p>
+              <p class="text-3xl font-bold text-support-400" id="stat-tickets">—</p>
+              <p class="text-xs text-gray-600 mt-1">Logged today</p>
+            </div>
+            <div class="glass-card rounded-2xl p-5 stat-accent-purple">
+              <p class="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-3">Last Agility Sync</p>
+              <p class="text-sm font-bold text-purple-400" id="stat-sync">Not synced</p>
+              <p class="text-xs text-gray-600 mt-1">Auto-updates at 06:00</p>
+            </div>
+          </div>
+
+          <!-- Quick Provider Split -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div class="glass-card rounded-2xl p-5">
+              <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-bold text-white">SADV Overview</h3>
+                <span class="badge-sadv text-xs px-2.5 py-1 rounded-full font-semibold">SADV</span>
+              </div>
+              <div class="space-y-2.5" id="sadv-overview">
+                <div class="skeleton h-4 w-3/4"></div>
+                <div class="skeleton h-4 w-1/2"></div>
+                <div class="skeleton h-4 w-2/3"></div>
+              </div>
+            </div>
+            <div class="glass-card rounded-2xl p-5">
+              <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-bold text-white">Infinifi Overview</h3>
+                <span class="badge-infinifi text-xs px-2.5 py-1 rounded-full font-semibold">Infinifi</span>
+              </div>
+              <div class="space-y-2.5" id="infinifi-overview">
+                <div class="skeleton h-4 w-3/4"></div>
+                <div class="skeleton h-4 w-1/2"></div>
+                <div class="skeleton h-4 w-2/3"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recent Tickets Quick View -->
+          <div class="glass-card rounded-2xl overflow-hidden">
+            <div class="flex items-center justify-between px-5 py-4 border-b border-white/5">
+              <h3 class="text-sm font-bold text-white">Recent Ticket Activity</h3>
+              <button onclick="showView('tickets')" class="text-xs text-support-400 hover:text-support-300 font-semibold">View All →</button>
+            </div>
+            <div id="recent-tickets-list" class="p-5">
+              <div class="space-y-3">
+                <div class="skeleton h-10 rounded-lg"></div>
+                <div class="skeleton h-10 rounded-lg"></div>
+                <div class="skeleton h-10 rounded-lg"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ══════════════════════════════════════ -->
+        <!-- VIEW: CUSTOMER STATUS                  -->
+        <!-- ══════════════════════════════════════ -->
+        <div id="view-customers" class="hidden animate-fade-in">
+          <div class="flex flex-col sm:flex-row gap-3 mb-5">
+            <div class="relative flex-1">
+              <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input type="text" id="customer-search" placeholder="Search by name, phone, or order number..."
+                class="search-bar w-full pl-10 pr-4 py-2.5 rounded-xl text-sm text-white placeholder-gray-600"
+                oninput="filterCustomerTable()">
+            </div>
+            <div class="flex gap-2">
+              <button onclick="filterByStatus('all')" class="tab-btn active" id="status-tab-all">All</button>
+              <button onclick="filterByStatus('active')" class="tab-btn" id="status-tab-active">
+                <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 mr-1.5"></span>Active
+              </button>
+              <button onclick="filterByStatus('inactive')" class="tab-btn" id="status-tab-inactive">
+                <span class="inline-block w-2 h-2 rounded-full bg-red-400 mr-1.5"></span>Inactive
+              </button>
+            </div>
+          </div>
+
+          <!-- Customer Table -->
+          <div class="glass-card rounded-2xl overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="support-table w-full">
+                <thead>
+                  <tr>
+                    <th class="text-left">Status</th>
+                    <th class="text-left">Customer</th>
+                    <th class="text-left">Provider</th>
+                    <th class="text-left">Order / Lead #</th>
+                    <th class="text-left">Product</th>
+                    <th class="text-left">MRC</th>
+                    <th class="text-left">Region</th>
+                    <th class="text-left">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="customer-table-body">
+                  <tr>
+                    <td colspan="8" class="text-center text-gray-600 py-10">
+                      <div class="spinner mx-auto mb-3"></div>
+                      <p class="text-sm">Loading customer data...</p>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="flex items-center justify-between px-5 py-3 border-t border-white/5">
+              <span class="text-xs text-gray-500" id="customer-count-label">Loading...</span>
+              <div class="flex gap-2">
+                <button onclick="prevCustomerPage()" class="text-xs text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-lg transition-colors" id="btn-prev-customers">← Prev</button>
+                <button onclick="nextCustomerPage()" class="text-xs text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-lg transition-colors" id="btn-next-customers">Next →</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ══════════════════════════════════════ -->
+        <!-- VIEW: SUPPORT TICKETS                  -->
+        <!-- ══════════════════════════════════════ -->
+        <div id="view-tickets" class="hidden animate-fade-in">
+          <div class="flex flex-col sm:flex-row gap-3 mb-5">
+            <div class="relative flex-1">
+              <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input type="text" id="ticket-search" placeholder="Search by ticket number, customer, or description..."
+                class="search-bar w-full pl-10 pr-4 py-2.5 rounded-xl text-sm text-white placeholder-gray-600"
+                oninput="filterTicketTable()">
+            </div>
+            <button onclick="openNewTicketModal()"
+              class="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-support-600 to-support-700 hover:from-support-500 hover:to-support-600 text-white text-sm font-semibold rounded-xl transition-all shadow-lg shrink-0">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+              Log Ticket
+            </button>
+          </div>
+
+          <!-- Ticket Table -->
+          <div class="glass-card rounded-2xl overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="support-table w-full">
+                <thead>
+                  <tr>
+                    <th class="text-left">Ticket #</th>
+                    <th class="text-left">Created</th>
+                    <th class="text-left">Customer</th>
+                    <th class="text-left">Provider</th>
+                    <th class="text-left">Status</th>
+                    <th class="text-left">Description</th>
+                    <th class="text-left">Channel</th>
+                    <th class="text-left">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="ticket-table-body">
+                  <tr>
+                    <td colspan="8" class="text-center text-gray-600 py-10">
+                      <div class="spinner mx-auto mb-3"></div>
+                      <p class="text-sm">Loading tickets...</p>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="flex items-center justify-between px-5 py-3 border-t border-white/5">
+              <span class="text-xs text-gray-500" id="ticket-count-label">Loading...</span>
+              <div class="flex gap-2">
+                <button onclick="prevTicketPage()" class="text-xs text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-lg transition-colors">← Prev</button>
+                <button onclick="nextTicketPage()" class="text-xs text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-lg transition-colors">Next →</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ══════════════════════════════════════ -->
+        <!-- VIEW: AGILITY REPORTS                  -->
+        <!-- ══════════════════════════════════════ -->
+        <div id="view-agility" class="hidden animate-fade-in">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <!-- Upload card -->
+            <div class="glass-card rounded-2xl p-6">
+              <h3 class="text-sm font-bold text-white mb-1">Upload Agility Report</h3>
+              <p class="text-xs text-gray-500 mb-5">Upload the latest SADV or Infinifi agility export. The parser will normalize and sync it automatically.</p>
+              <div class="mb-4">
+                <label class="block text-xs font-semibold text-gray-400 mb-2">Provider</label>
+                <select id="agility-provider" class="w-full bg-white/5 border border-white/10 text-gray-300 text-sm rounded-xl px-4 py-2.5 focus:outline-none focus:border-support-500">
+                  <option value="SADV">SADV</option>
+                  <option value="Infinifi">Infinifi</option>
+                </select>
+              </div>
+              <div class="mb-5">
+                <label class="block text-xs font-semibold text-gray-400 mb-2">Spreadsheet File (.xlsx / .csv)</label>
+                <input type="file" id="agility-file" accept=".xlsx,.csv,.xls"
+                  class="w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-support-600/20 file:text-support-400 hover:file:bg-support-600/30 cursor-pointer">
+              </div>
+              <button onclick="uploadAgilityReport()"
+                class="w-full py-3 bg-gradient-to-r from-support-600 to-support-700 hover:from-support-500 text-white text-sm font-semibold rounded-xl transition-all">
+                Upload & Parse
+              </button>
+            </div>
+
+            <!-- Last sync info -->
+            <div class="glass-card rounded-2xl p-6">
+              <h3 class="text-sm font-bold text-white mb-4">Sync History</h3>
+              <div id="sync-history" class="space-y-3">
+                <div class="skeleton h-12 rounded-lg"></div>
+                <div class="skeleton h-12 rounded-lg"></div>
+                <div class="skeleton h-12 rounded-lg"></div>
+              </div>
+              <div class="mt-4 pt-4 border-t border-white/5">
+                <p class="text-xs text-gray-600">⏰ Auto-sync is scheduled daily at <span class="text-support-400 font-semibold">06:00 SAST</span></p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ══════════════════════════════════════ -->
+        <!-- VIEW: SOPs & GUIDES                    -->
+        <!-- ══════════════════════════════════════ -->
+        <div id="view-sops" class="hidden animate-fade-in">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+
+            <!-- SOP Cards -->
+            <div class="glass-card glass-card-hover rounded-2xl p-5 cursor-pointer" onclick="openSopModal('ss')">
+              <div class="w-10 h-10 rounded-xl bg-blue-500/15 border border-blue-500/20 flex items-center justify-center mb-4">
+                <svg class="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <h4 class="text-sm font-bold text-white mb-1.5">Self-Scheduling (SS)</h4>
+              <p class="text-xs text-gray-500">ISP self-scheduling policy, 24-hour ETAs, and regional routing rules.</p>
+            </div>
+
+            <div class="glass-card glass-card-hover rounded-2xl p-5 cursor-pointer" onclick="openSopModal('refund')">
+              <div class="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/20 flex items-center justify-center mb-4">
+                <svg class="w-5 h-5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                </svg>
+              </div>
+              <h4 class="text-sm font-bold text-white mb-1.5">Refund Process</h4>
+              <p class="text-xs text-gray-500">Step-by-step ticketing and finance workflow for incorrect payment refunds.</p>
+            </div>
+
+            <div class="glass-card glass-card-hover rounded-2xl p-5 cursor-pointer" onclick="openSopModal('moving-funds')">
+              <div class="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center mb-4">
+                <svg class="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                </svg>
+              </div>
+              <h4 class="text-sm font-bold text-white mb-1.5">Moving Funds</h4>
+              <p class="text-xs text-gray-500">SOP for transferring funds across different order numbers for the same customer.</p>
+            </div>
+
+            <div class="glass-card glass-card-hover rounded-2xl p-5 cursor-pointer" onclick="openSopModal('premise')">
+              <div class="w-10 h-10 rounded-xl bg-purple-500/15 border border-purple-500/20 flex items-center justify-center mb-4">
+                <svg class="w-5 h-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </div>
+              <h4 class="text-sm font-bold text-white mb-1.5">Premise Creation</h4>
+              <p class="text-xs text-gray-500">How to log tickets for missing or unregistered premises/addresses.</p>
+            </div>
+
+            <div class="glass-card glass-card-hover rounded-2xl p-5 cursor-pointer" onclick="openSopModal('ticketing')">
+              <div class="w-10 h-10 rounded-xl bg-red-500/15 border border-red-500/20 flex items-center justify-center mb-4">
+                <svg class="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
+                </svg>
+              </div>
+              <h4 class="text-sm font-bold text-white mb-1.5">Ticketing SOP</h4>
+              <p class="text-xs text-gray-500">Guidelines for logging, routing, and updating support tickets correctly.</p>
+            </div>
+
+            <div class="glass-card glass-card-hover rounded-2xl p-5 cursor-pointer" onclick="openSopModal('infinifi-link')">
+              <div class="w-10 h-10 rounded-xl bg-support-500/15 border border-support-500/20 flex items-center justify-center mb-4">
+                <svg class="w-5 h-5 text-support-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                </svg>
+              </div>
+              <h4 class="text-sm font-bold text-white mb-1.5">Infinifi Registration</h4>
+              <p class="text-xs text-gray-500">Links and registration procedures for Infinifi order submissions.</p>
+            </div>
+
+          </div>
+        </div>
+
+      </div><!-- end scrollable content -->
+    </main>
+  </div>
+
+  <!-- ══════════════════════════════════════ -->
+  <!-- MODAL: Log New Ticket                  -->
+  <!-- ══════════════════════════════════════ -->
+  <div id="modal-new-ticket" class="hidden fixed inset-0 z-50 modal-bg flex items-center justify-center p-4">
+    <div class="modal-card rounded-2xl w-full max-w-lg shadow-2xl">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-white/5">
+        <h3 class="text-sm font-bold text-white">Log New Support Ticket</h3>
+        <button onclick="closeNewTicketModal()" class="text-gray-500 hover:text-white transition-colors">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <div class="px-6 py-5 space-y-4">
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-gray-400 mb-1.5">Provider *</label>
+            <select id="nt-provider" class="w-full bg-white/5 border border-white/10 text-gray-300 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:border-support-500">
+              <option value="">Select...</option>
+              <option value="SADV">SADV</option>
+              <option value="Infinifi">Infinifi</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-400 mb-1.5">Status</label>
+            <select id="nt-status" class="w-full bg-white/5 border border-white/10 text-gray-300 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:border-support-500">
+              <option value="Open">Open</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Escalated">Escalated</option>
+              <option value="Resolved">Resolved</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-400 mb-1.5">Customer Name *</label>
+          <input type="text" id="nt-customer" placeholder="Full name..."
+            class="w-full bg-white/5 border border-white/10 text-gray-300 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:border-support-500 placeholder-gray-600">
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-gray-400 mb-1.5">Order / Ticket #</label>
+            <input type="text" id="nt-order" placeholder="Order or ticket number..."
+              class="w-full bg-white/5 border border-white/10 text-gray-300 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:border-support-500 placeholder-gray-600">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-400 mb-1.5">Channel Partner</label>
+            <input type="text" id="nt-channel" placeholder="Channel partner..."
+              class="w-full bg-white/5 border border-white/10 text-gray-300 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:border-support-500 placeholder-gray-600">
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-400 mb-1.5">Product / Package</label>
+          <input type="text" id="nt-product" placeholder="Contract product name..."
+            class="w-full bg-white/5 border border-white/10 text-gray-300 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:border-support-500 placeholder-gray-600">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-400 mb-1.5">Description *</label>
+          <textarea id="nt-description" rows="3" placeholder="Describe the issue or action taken..."
+            class="w-full bg-white/5 border border-white/10 text-gray-300 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:border-support-500 placeholder-gray-600 resize-none"></textarea>
+        </div>
+      </div>
+      <div class="flex gap-3 px-6 pb-5">
+        <button onclick="submitNewTicket()"
+          class="flex-1 py-2.5 bg-gradient-to-r from-support-600 to-support-700 hover:from-support-500 text-white text-sm font-semibold rounded-xl transition-all">
+          Log Ticket
+        </button>
+        <button onclick="closeNewTicketModal()"
+          class="px-5 py-2.5 bg-white/5 text-gray-400 hover:bg-white/10 text-sm font-medium rounded-xl transition-colors">
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════ -->
+  <!-- MODAL: SOP Content                     -->
+  <!-- ══════════════════════════════════════ -->
+  <div id="modal-sop" class="hidden fixed inset-0 z-50 modal-bg flex items-center justify-center p-4">
+    <div class="modal-card rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-white/5">
+        <h3 class="text-sm font-bold text-white" id="sop-title">SOP Guide</h3>
+        <button onclick="closeSopModal()" class="text-gray-500 hover:text-white transition-colors">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <div class="flex-1 overflow-y-auto px-6 py-5" id="sop-content">
+        <!-- Dynamic content injected by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="../js/api.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="support.js"></script>
+  <script>
+    function toggleSupportSidebar() {
+      const sidebar = document.getElementById('support-sidebar');
+      const overlay = document.getElementById('support-sidebar-overlay');
+      sidebar.classList.toggle('open');
+      overlay.classList.toggle('hidden');
+    }
+  </script>
+</body>
+
+</html>

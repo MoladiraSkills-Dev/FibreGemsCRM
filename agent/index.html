@@ -1,10 +1,10 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FibreGems CRM — Agent Command & Daily Queue</title>
+  <title>FibreGems CRM â€” Agent Command & Daily Queue</title>
   <meta name="description"
     content="FibreGems CRM agent dashboard for field lead capture, daily call backs, and customer management.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -183,9 +183,9 @@
     </div>
   </div>
 
-  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
   <!-- Mobile Header                                              -->
-  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
   <header
     class="lg:hidden fixed top-0 left-0 right-0 z-30 bg-navy-900/95 backdrop-blur-lg border-b border-white/5 px-4 py-3 flex items-center justify-between">
     <div class="flex items-center gap-3">
@@ -195,7 +195,7 @@
         </svg>
       </button>
       <div class="bg-white rounded px-2 py-1 flex items-center shadow">
-        <img src="images/logo.png" alt="FibreGems" class="h-5 object-contain">
+        <img src="../images/logo.png" alt="FibreGems" class="h-5 object-contain">
       </div>
     </div>
     <div class="flex items-center gap-2">
@@ -203,16 +203,16 @@
     </div>
   </header>
 
-  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
   <!-- Sidebar                                                     -->
-  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
   <aside id="sidebar"
     class="fixed top-0 left-0 bottom-0 w-64 bg-navy-800/80 backdrop-blur-xl border-r border-white/5 z-40 sidebar-transition -translate-x-full lg:translate-x-0">
     <!-- Brand -->
     <div class="px-6 py-6 border-b border-white/5">
       <div class="flex flex-col gap-2">
         <div class="rounded-lg p-2 inline-block shadow-lg">
-          <img src="images/logo.jpg" alt="FibreGems" class="h-8 object-contain">
+          <img src="../images/logo.jpg" alt="FibreGems" class="h-8 object-contain">
         </div>
         <p class="text-xs text-gray-400 font-semibold tracking-wider uppercase">Agent Daily Workspace</p>
       </div>
@@ -289,12 +289,12 @@
   <!-- Sidebar overlay for mobile -->
   <div id="sidebar-overlay" onclick="toggleSidebar()" class="hidden fixed inset-0 bg-black/60 z-30 lg:hidden"></div>
 
-  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
   <!-- Main Content                                                -->
-  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
   <main class="lg:ml-64 pt-16 lg:pt-0 min-h-screen pb-12">
 
-    <!-- ─── DAILY GOAL & PROGRESS HEADER ─────────────────────── -->
+    <!-- â”€â”€â”€ DAILY GOAL & PROGRESS HEADER â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
     <section class="bg-gradient-to-r from-navy-800/90 to-navy-900 border-b border-white/10 px-6 lg:px-8 py-6">
       <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -304,7 +304,7 @@
               class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-fiber-500/20 text-fiber-400 border border-fiber-500/30"
               id="current-today-badge">Today</span>
           </div>
-          <p class="text-xs text-gray-400 mt-1">Direct daily workflow — leads scheduled for future dates remain hidden
+          <p class="text-xs text-gray-400 mt-1">Direct daily workflow â€” leads scheduled for future dates remain hidden
             until their exact day.</p>
         </div>
 
@@ -373,7 +373,7 @@
       </div>
     </section>
 
-    <!-- ─── 1. TODAY'S CALL BACKS VIEW (PRIMARY WORKFLOW) ──────── -->
+    <!-- â”€â”€â”€ 1. TODAY'S CALL BACKS VIEW (PRIMARY WORKFLOW) â”€â”€â”€â”€â”€â”€â”€â”€ -->
     <div id="view-callbacks" class="px-6 lg:px-8 py-6">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
@@ -406,7 +406,7 @@
       </div>
     </div>
 
-    <!-- ─── 2. ALL ASSIGNED LEADS VIEW (TABULAR WORKLIST) ──────── -->
+    <!-- â”€â”€â”€ 2. ALL ASSIGNED LEADS VIEW (TABULAR WORKLIST) â”€â”€â”€â”€â”€â”€â”€â”€ -->
     <div id="view-worklist" class="hidden">
       <!-- Header bar -->
       <div
@@ -441,7 +441,7 @@
       <div id="pagination" class="px-6 py-4 flex items-center justify-center gap-4 border-t border-white/5"></div>
     </div>
 
-    <!-- ─── 3. NEW LEAD VIEW ──────────────────────────────────── -->
+    <!-- â”€â”€â”€ 3. NEW LEAD VIEW â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
     <div id="view-newlead" class="hidden">
       <div class="px-6 lg:px-8 py-6 border-b border-white/5">
         <div class="flex items-center gap-3">
@@ -556,7 +556,7 @@
             </div>
             <div>
               <label for="nf-easypay-number" class="field-label">EasyPay Number
-                <span class="text-gray-500 font-normal normal-case ml-1">(optional — if already issued)</span>
+                <span class="text-gray-500 font-normal normal-case ml-1">(optional â€” if already issued)</span>
               </label>
               <input type="text" id="nf-easypay-number" placeholder="e.g. EP-123456789" class="input-field font-mono uppercase"
                 oninput="this.value = this.value.toUpperCase()">
@@ -657,7 +657,7 @@
       </form>
     </div>
 
-    <!-- ─── 4. AGENT ACTIVITY LOG VIEW ────────────────────────── -->
+    <!-- â”€â”€â”€ 4. AGENT ACTIVITY LOG VIEW â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
     <div id="view-activity" class="hidden px-6 lg:px-8 py-6">
       <div class="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -695,9 +695,9 @@
 
   </main>
 
-  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
   <!-- 1-CLICK CALL OUTCOME DRAWER / MODAL                         -->
-  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
   <div id="modal-call-outcome" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
     <div class="modal-overlay absolute inset-0" onclick="closeCallOutcomeModal()"></div>
     <div class="relative bg-navy-800 border border-white/15 rounded-2xl shadow-2xl w-full max-w-lg p-6 z-10 animate-slide-in max-h-[90vh] overflow-y-auto custom-scrollbar">
@@ -729,7 +729,7 @@
             data-outcome-btn="No Answer / Voicemail"
             class="outcome-preset-btn p-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-left transition-all">
             <div class="flex items-center gap-2">
-              <span class="text-base">📵</span>
+              <span class="text-base">ðŸ“µ</span>
               <span class="text-xs font-semibold text-white">No Answer</span>
             </div>
             <p class="text-[11px] text-gray-400 mt-1">Left voicemail / Retry tomorrow</p>
@@ -739,7 +739,7 @@
             data-outcome-btn="Callback Rescheduled"
             class="outcome-preset-btn p-3 rounded-xl border border-fiber-500/40 bg-fiber-500/10 hover:bg-fiber-500/20 text-left transition-all">
             <div class="flex items-center gap-2">
-              <span class="text-base">🗓️</span>
+              <span class="text-base">ðŸ—“ï¸</span>
               <span class="text-xs font-semibold text-fiber-300">Reschedule Call</span>
             </div>
             <p class="text-[11px] text-gray-400 mt-1">Pick date (Max 8 days)</p>
@@ -748,7 +748,7 @@
           <button type="button" onclick="selectOutcomePreset('Sale Won')" data-outcome-btn="Sale Won"
             class="outcome-preset-btn p-3 rounded-xl border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-left transition-all">
             <div class="flex items-center gap-2">
-              <span class="text-base">🏆</span>
+              <span class="text-base">ðŸ†</span>
               <span class="text-xs font-semibold text-emerald-300">Sale Won!</span>
             </div>
             <p class="text-[11px] text-gray-400 mt-1">Order + EasyPay Cycle 1 (14d)</p>
@@ -757,7 +757,7 @@
           <button type="button" onclick="selectOutcomePreset('Activated')" data-outcome-btn="Activated"
             class="outcome-preset-btn p-3 rounded-xl border border-blue-500/40 bg-blue-500/10 hover:bg-blue-500/20 text-left transition-all">
             <div class="flex items-center gap-2">
-              <span class="text-base">🚀</span>
+              <span class="text-base">ðŸš€</span>
               <span class="text-xs font-semibold text-blue-300">Activated</span>
             </div>
             <p class="text-[11px] text-gray-400 mt-1">Auto schedules 1-week check (+7d)</p>
@@ -766,7 +766,7 @@
           <button type="button" onclick="selectOutcomePreset('Activation Follow-Up Completed')" data-outcome-btn="Activation Follow-Up Completed"
             class="outcome-preset-btn p-3 rounded-xl border border-teal-500/40 bg-teal-500/10 hover:bg-teal-500/20 text-left transition-all">
             <div class="flex items-center gap-2">
-              <span class="text-base">🤝</span>
+              <span class="text-base">ðŸ¤</span>
               <span class="text-xs font-semibold text-teal-300">1-Wk Check Done</span>
             </div>
             <p class="text-[11px] text-gray-400 mt-1">Connection verified & referral asked</p>
@@ -775,7 +775,7 @@
           <button type="button" onclick="selectOutcomePreset('Not Interested')" data-outcome-btn="Not Interested"
             class="outcome-preset-btn p-3 rounded-xl border border-red-500/40 bg-red-500/10 hover:bg-red-500/20 text-left transition-all">
             <div class="flex items-center gap-2">
-              <span class="text-base">❌</span>
+              <span class="text-base">âŒ</span>
               <span class="text-xs font-semibold text-red-300">Not Interested</span>
             </div>
             <p class="text-[11px] text-gray-400 mt-1">Flag as lost lead</p>
@@ -787,16 +787,16 @@
           <button type="button" onclick="selectOutcomePreset('Payment Received')" data-outcome-btn="Payment Received"
             class="outcome-preset-btn p-3 rounded-xl border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-left transition-all">
             <div class="flex items-center gap-2">
-              <span class="text-base">✅</span>
+              <span class="text-base">âœ…</span>
               <span class="text-xs font-semibold text-emerald-300">Payment Received</span>
             </div>
-            <p class="text-[11px] text-gray-400 mt-1">Client paid — mark resolved</p>
+            <p class="text-[11px] text-gray-400 mt-1">Client paid â€” mark resolved</p>
           </button>
 
           <button type="button" onclick="selectOutcomePreset('New Payment Date')" data-outcome-btn="New Payment Date"
             class="outcome-preset-btn p-3 rounded-xl border border-purple-500/40 bg-purple-500/10 hover:bg-purple-500/20 text-left transition-all">
             <div class="flex items-center gap-2">
-              <span class="text-base">📅</span>
+              <span class="text-base">ðŸ“…</span>
               <span class="text-xs font-semibold text-purple-300">New Payment Date</span>
             </div>
             <p class="text-[11px] text-gray-400 mt-1">Client promises payment on a new date</p>
@@ -805,16 +805,16 @@
           <button type="button" onclick="selectOutcomePreset('No Payment - Reschedule')" data-outcome-btn="No Payment - Reschedule"
             class="outcome-preset-btn p-3 rounded-xl border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-left transition-all">
             <div class="flex items-center gap-2">
-              <span class="text-base">📵</span>
+              <span class="text-base">ðŸ“µ</span>
               <span class="text-xs font-semibold text-amber-300">No Payment - Reschedule</span>
             </div>
-            <p class="text-[11px] text-gray-400 mt-1">No answer / not ready — reschedule call back</p>
+            <p class="text-[11px] text-gray-400 mt-1">No answer / not ready â€” reschedule call back</p>
           </button>
 
           <button type="button" onclick="selectOutcomePreset('No Answer / Voicemail')" data-outcome-btn="No Answer / Voicemail"
             class="outcome-preset-btn p-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-left transition-all">
             <div class="flex items-center gap-2">
-              <span class="text-base">📵</span>
+              <span class="text-base">ðŸ“µ</span>
               <span class="text-xs font-semibold text-white">No Answer / VM</span>
             </div>
         </div>
@@ -862,7 +862,7 @@
       <div id="co-promised-pay-section" class="hidden mt-4 p-3.5 bg-purple-500/5 border border-purple-500/20 rounded-xl">
         <label class="field-label text-purple-300">New Promised Payment Date *</label>
         <input type="date" id="co-new-promised-pay-date" class="input-field">
-        <p class="text-[11px] text-purple-400 mt-1">⚡ No date limit — client will automatically appear in your queue on this date.</p>
+        <p class="text-[11px] text-purple-400 mt-1">âš¡ No date limit â€” client will automatically appear in your queue on this date.</p>
       </div>
 
       <!-- Existing Order Context Bar (shown when customer already has an order/EasyPay) -->
@@ -871,19 +871,19 @@
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
           <div>
             <span class="text-gray-400 block text-[10px] uppercase">Order No.</span>
-            <span id="co-existing-order-num" class="font-mono font-bold text-white">—</span>
+            <span id="co-existing-order-num" class="font-mono font-bold text-white">â€”</span>
           </div>
           <div>
             <span class="text-gray-400 block text-[10px] uppercase">EasyPay No.</span>
-            <span id="co-existing-ep-num" class="font-mono font-bold text-emerald-300">—</span>
+            <span id="co-existing-ep-num" class="font-mono font-bold text-emerald-300">â€”</span>
           </div>
           <div>
             <span class="text-gray-400 block text-[10px] uppercase">Cycle</span>
-            <span id="co-existing-ep-cycle" class="font-mono text-gray-300">—</span>
+            <span id="co-existing-ep-cycle" class="font-mono text-gray-300">â€”</span>
           </div>
           <div>
             <span class="text-gray-400 block text-[10px] uppercase">Expiry Date</span>
-            <span id="co-existing-ep-expiry" class="font-mono font-bold text-amber-300">—</span>
+            <span id="co-existing-ep-expiry" class="font-mono font-bold text-amber-300">â€”</span>
           </div>
         </div>
       </div>
@@ -905,7 +905,7 @@
           </label>
           <input type="text" id="co-easypay-number" placeholder="e.g. 123456789" class="input-field font-mono"
             oninput="this.value = this.value.replace(/[^0-9]/g,'')">
-          <p class="text-[11px] text-amber-400 mt-1">⚡ Entering a new EasyPay number restarts the 14-day expiry cycle.</p>
+          <p class="text-[11px] text-amber-400 mt-1">âš¡ Entering a new EasyPay number restarts the 14-day expiry cycle.</p>
         </div>
         <div>
           <label class="field-label text-emerald-300">Package Sold *</label>
@@ -927,7 +927,7 @@
         </div>
         <div>
           <label class="field-label text-emerald-300">Promised Payment Date (Optional)
-            <span class="text-gray-400 font-normal normal-case ml-1">— pre-set to +14 days (EasyPay expiry)</span>
+            <span class="text-gray-400 font-normal normal-case ml-1">â€” pre-set to +14 days (EasyPay expiry)</span>
           </label>
           <input type="date" id="co-sale-promised-pay-date" class="input-field">
           <p class="text-[11px] text-gray-500 mt-1">Leave blank if no payment date has been promised.</p>
@@ -937,7 +937,7 @@
       <!-- 1-Week Activation Check: Referral Lead Capture -->
       <div id="co-activation-referral-section" class="hidden mt-4 p-3.5 bg-blue-500/5 border border-blue-500/20 rounded-xl">
         <div class="flex items-start gap-2.5 mb-3">
-          <span class="text-lg mt-0.5">🎁</span>
+          <span class="text-lg mt-0.5">ðŸŽ</span>
           <div>
             <p class="text-xs font-bold text-blue-300">Add a Referral Lead (Optional)</p>
             <p class="text-[11px] text-blue-400/80 mt-0.5">
@@ -989,9 +989,9 @@
     </div>
   </div>
 
-  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
   <!-- Quick Edit Modal                                            -->
-  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
   <div id="modal-quick-edit" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
     <div class="modal-overlay absolute inset-0" onclick="closeQuickEdit()"></div>
     <div class="relative bg-navy-800 border border-white/10 rounded-2xl shadow-2xl w-full max-w-md p-6 z-10 max-h-[90vh] overflow-y-auto custom-scrollbar">
@@ -1074,9 +1074,9 @@
     </div>
   </div>
 
-  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
   <!-- Duplicate Warning Modal                                     -->
-  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
   <div id="modal-duplicate" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
     <div class="modal-overlay absolute inset-0" onclick="closeDuplicate()"></div>
     <div class="relative bg-navy-800 border border-amber-500/30 rounded-2xl shadow-2xl w-full max-w-md p-6 z-10">
@@ -1110,9 +1110,9 @@
   </div>
 
   <!-- Scripts -->
-  <script src="js/api.js"></script>
-  <script src="js/auth.js"></script>
-  <script src="js/agent.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="agent.js"></script>
   <script>
     function toggleSidebar() {
       const sidebar = document.getElementById('sidebar');
