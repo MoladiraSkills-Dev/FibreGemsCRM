@@ -60,7 +60,7 @@ function showToast(msg, type = 'success') {
     toast.style.opacity = '0';
     toast.style.transform = 'translateY(-10px)';
     setTimeout(() => toast.remove(), 300);
-  }, 4000);
+  }, 9000);
 }
 
 function setupDatepickerLimits() {
