@@ -725,8 +725,9 @@
         <div>
           <label class="field-label">New Temporary Password *</label>
           <input type="text" id="am-temp-password" placeholder="Enter password" class="input-field">
+          <button type="button" onclick="resetAgentPassword()" class="mt-3 w-full py-2 bg-fiber-500/20 text-fiber-300 rounded-lg text-sm font-bold hover:bg-fiber-500 hover:text-white transition-all">Set Temporary Password</button>
         </div>
-        <div id="temp-pass-result" class="hidden bg-emerald-500/10 border border-emerald-500/25 rounded-xl p-4">
+        <div id="temp-pass-result" class="hidden mt-4 bg-emerald-500/10 border border-emerald-500/25 rounded-xl p-4">
           <p class="text-xs text-emerald-400 font-semibold mb-1">Temporary password set:</p>
           <p class="text-base font-mono text-white tracking-widest" id="temp-pass-value"></p>
         </div>
