@@ -430,6 +430,12 @@ function openCallOutcomeModal(customerId, name, phone, pkg, isPaymentFollowUp = 
     orderInputEl.value = existingOrderNumber || '';
   }
 
+  // Pre-fill EasyPay Number with existing value
+  const epInputEl = document.getElementById('co-easypay-number');
+  if (epInputEl) {
+    epInputEl.value = existingEasyPayNumber || '';
+  }
+
   // Show existing Order & EasyPay & Expiry info in the modal context bar
   const contextBar = document.getElementById('co-existing-order-bar');
   if (contextBar) {
@@ -653,9 +659,11 @@ async function submitLead(overrideId = null) {
     }
   }
 
+  const fullNameVal = document.getElementById('nf-full-name').value.trim();
+  const nameParts = fullNameVal.split(' ');
   const formData = {
-    firstName: document.getElementById('nf-first-name').value.trim(),
-    surname: document.getElementById('nf-surname').value.trim(),
+    firstName: nameParts[0] || fullNameVal,
+    surname: nameParts.length > 1 ? nameParts.slice(1).join(' ') : '',
     cellNumber: document.getElementById('nf-cell').value.trim(),
     alternateCell: document.getElementById('nf-alt-cell').value.trim(),
     email: document.getElementById('nf-email').value.trim(),
