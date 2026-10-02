@@ -67,7 +67,7 @@ function formatTime(isoOrDate) {
 // ── Initialization ───────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   if (!requireAdmin()) return;
-  
+
   document.getElementById('admin-name').textContent = session.name || 'Admin';
   document.getElementById('admin-role').textContent = session.role || 'Admin';
   const avatarEl = document.getElementById('admin-avatar');
@@ -75,7 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const picker = document.getElementById('admin-report-date-picker');
   if (picker) picker.value = currentReportDate;
-  
+
   loadDashboard();
   checkMissedCallbacksBadge();
 
@@ -90,7 +90,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // ── View Switching ───────────────────────────────────────────
 function switchAdminView(view) {
   currentAdminView = view;
-  
+
   document.querySelectorAll('[data-admin-nav]').forEach(el => {
     el.classList.remove('bg-fiber-500/20', 'text-fiber-300', 'border-fiber-500', 'border-l-4');
     el.classList.add('text-gray-400', 'hover:text-white', 'hover:bg-white/5', 'border-transparent', 'border-l-4');
@@ -100,13 +100,13 @@ function switchAdminView(view) {
     activeNav.classList.add('bg-fiber-500/20', 'text-fiber-300', 'border-fiber-500');
     activeNav.classList.remove('text-gray-400', 'hover:text-white', 'hover:bg-white/5', 'border-transparent');
   }
-  
+
   document.getElementById('view-dashboard').classList.toggle('hidden', view !== 'dashboard');
   document.getElementById('view-callbacks').classList.toggle('hidden', view !== 'callbacks');
   document.getElementById('view-grid').classList.toggle('hidden', view !== 'grid');
   document.getElementById('view-sync').classList.toggle('hidden', view !== 'sync');
   document.getElementById('view-agents').classList.toggle('hidden', view !== 'agents');
-  
+
   if (view === 'dashboard') loadDashboard();
   else if (view === 'callbacks') {
     loadCallbackReport(currentReportDate);
@@ -138,7 +138,7 @@ async function checkMissedCallbacksBadge() {
 async function loadDashboard(silent = false) {
   const agentTableBody = document.getElementById('agent-activity-body');
   const statsContainer = document.getElementById('status-stats');
-  
+
   if (!silent) {
     agentTableBody.innerHTML = `
       <tr><td colspan="3" class="px-6 py-8 text-center">
@@ -146,16 +146,16 @@ async function loadDashboard(silent = false) {
         <p class="text-gray-500 text-sm">Loading dashboard...</p>
       </td></tr>`;
   }
-  
+
   try {
     const data = await callBackend('getAdminDashboard', {}, { skipCache: silent });
-    
+
     document.getElementById('stat-active-agents').textContent = data.activeCount || 0;
     const totalCustomers = Object.values(data.statuses).reduce((a, b) => a + b, 0);
     document.getElementById('stat-total-customers').textContent = totalCustomers;
     const todayTouches = data.agents.reduce((a, ag) => a + ag.touches, 0);
     document.getElementById('stat-today-touches').textContent = todayTouches;
-    
+
     if (data.agents.length === 0) {
       agentTableBody.innerHTML = `
         <tr><td colspan="3" class="px-6 py-8 text-center text-gray-500 text-sm">
@@ -185,7 +185,7 @@ async function loadDashboard(silent = false) {
         </tr>
       `).join('');
     }
-    
+
     // Status breakdown
     statsContainer.innerHTML = Object.entries(data.statuses).map(([status, count]) => {
       const pct = totalCustomers > 0 ? Math.round((count / totalCustomers) * 100) : 0;
@@ -201,7 +201,7 @@ async function loadDashboard(silent = false) {
         </div>
       `;
     }).join('');
-    
+
   } catch (err) {
     if (!silent) {
       agentTableBody.innerHTML = `
@@ -215,7 +215,7 @@ async function loadDashboard(silent = false) {
 // ── Call Back Performance & Accountability Report ────────────
 function setReportDateOffset(offsetDays) {
   currentReportDate = addDaysToToday(offsetDays);
-  
+
   const btnToday = document.getElementById('btn-report-today');
   const btnYesterday = document.getElementById('btn-report-yesterday');
   const picker = document.getElementById('admin-report-date-picker');
@@ -389,21 +389,27 @@ async function runLifecycleEngine() {
 }
 
 // ── Master Grid ──────────────────────────────────────────────
+let masterGridRecordsMap = new Map();
+let currentViewingCustomerId = null;
+
 async function loadMasterGrid() {
   const tbody = document.getElementById('grid-body');
   const countEl = document.getElementById('grid-count');
   tbody.innerHTML = `<tr><td colspan="8" class="px-6 py-12 text-center"><div class="spinner mx-auto mb-2"></div><p class="text-gray-500 text-sm">Loading master records...</p></td></tr>`;
-  
+
   try {
     const result = await callBackend('getAdminMasterGrid', { offset: gridOffset, limit: GRID_LIMIT });
     gridTotal = result.total;
     countEl.textContent = `${result.total} records`;
-    
+
     if (result.data.length === 0) {
       tbody.innerHTML = `<tr><td colspan="8" class="px-6 py-12 text-center text-gray-500">No records found</td></tr>`;
       return;
     }
-    
+
+    masterGridRecordsMap.clear();
+    result.data.forEach(r => masterGridRecordsMap.set(String(r.id), r));
+
     tbody.innerHTML = result.data.map(r => {
       let isEpExpired = false;
       if (r.easyPayExpiry && r.easyPayExpiry < getTodayStr()) {
@@ -411,10 +417,15 @@ async function loadMasterGrid() {
       }
 
       return `
-      <tr class="border-b border-white/5 hover:bg-white/[0.03] transition-colors text-xs">
-        <td class="px-4 py-3">
-          <p class="font-semibold text-white">${escHtml(r.name)}</p>
-          <p class="text-[11px] text-gray-500 font-mono">${escHtml(r.id)}</p>
+      <tr class="border-b border-white/5 hover:bg-white/[0.04] transition-colors text-xs">
+        <td class="px-4 py-3 cursor-pointer group" onclick="openCustomerDetail('${escHtml(r.id)}')" title="Click to view full customer details from Team Lead perspective">
+          <p class="font-semibold text-fiber-400 group-hover:text-fiber-300 group-hover:underline flex items-center gap-1.5 transition-colors">
+            ${escHtml(r.name || 'Unnamed Customer')}
+            <svg class="w-3.5 h-3.5 opacity-60 group-hover:opacity-100 transition-opacity text-fiber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+          </p>
+          <p class="text-[11px] text-gray-500 font-mono group-hover:text-gray-400">${escHtml(r.id)}</p>
         </td>
         <td class="px-4 py-3 font-mono text-gray-300">${escHtml(r.cellNumber || '—')}</td>
         <td class="px-4 py-3 text-gray-300">${escHtml(r.agent || '—')}</td>
@@ -446,6 +457,229 @@ async function loadMasterGrid() {
   }
 }
 
+// ── Customer Detail Modal (Team Lead Perspective) ─────────────
+function openCustomerDetail(customerId) {
+  const c = masterGridRecordsMap.get(String(customerId));
+  currentViewingCustomerId = customerId;
+  const modal = document.getElementById('modal-customer-detail');
+  if (!modal) return;
+
+  // Set avatar initials
+  const initials = (c && c.name) ? c.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'CD';
+  document.getElementById('cdm-avatar').textContent = initials;
+  document.getElementById('cdm-name').textContent = (c && c.name) || 'Customer Details';
+  document.getElementById('cdm-id').textContent = customerId;
+  document.getElementById('cdm-cell').textContent = (c && c.cellNumber) || '—';
+  document.getElementById('cdm-agent').textContent = (c && c.agent) || 'Unassigned';
+
+  // Badges
+  document.getElementById('cdm-status-badge').innerHTML = statusBadge(c ? c.status : '');
+  document.getElementById('cdm-pay-status-badge').innerHTML = `<span class="px-2.5 py-0.5 rounded text-[10px] font-semibold bg-white/5 text-gray-300 border border-white/10">${escHtml((c && c.payStatus) || 'Pending')}</span>`;
+
+  // Quick Action Contact Buttons
+  const phone = (c && c.cellNumber) ? c.cellNumber.replace(/\s+/g, '') : '';
+  const callBtn = document.getElementById('cdm-call-btn');
+  const waBtn = document.getElementById('cdm-wa-btn');
+  const emailBtn = document.getElementById('cdm-email-btn');
+
+  if (phone && phone !== '—') {
+    callBtn.href = `tel:${phone}`;
+    callBtn.classList.remove('opacity-50', 'pointer-events-none');
+    const waPhone = phone.startsWith('0') ? '27' + phone.slice(1) : phone.replace('+', '');
+    waBtn.href = `https://wa.me/${waPhone}`;
+    waBtn.classList.remove('opacity-50', 'pointer-events-none');
+  } else {
+    callBtn.href = '#';
+    callBtn.classList.add('opacity-50', 'pointer-events-none');
+    waBtn.href = '#';
+    waBtn.classList.add('opacity-50', 'pointer-events-none');
+  }
+
+  if (c && c.email) {
+    emailBtn.href = `mailto:${c.email}`;
+    emailBtn.classList.remove('opacity-50', 'pointer-events-none');
+  } else {
+    emailBtn.href = '#';
+    emailBtn.classList.add('opacity-50', 'pointer-events-none');
+  }
+
+  // Populate Overview Tab Fields
+  document.getElementById('cdm-d-name').textContent = (c && c.name) || '—';
+  document.getElementById('cdm-d-cell').textContent = (c && c.cellNumber) || '—';
+  document.getElementById('cdm-d-altcell').textContent = (c && c.alternateCell) || '—';
+  document.getElementById('cdm-d-email').textContent = (c && c.email) || '—';
+  document.getElementById('cdm-d-suburb').textContent = (c && c.suburb) || '—';
+  const addrEl = document.getElementById('cdm-d-address');
+  addrEl.textContent = (c && c.address) || '—';
+  addrEl.title = (c && c.address) || '';
+
+  document.getElementById('cdm-d-agent').textContent = (c && c.agent) || 'Unassigned';
+  document.getElementById('cdm-d-status').textContent = (c && c.status) || '—';
+  document.getElementById('cdm-d-nextaction').textContent = (c && c.nextAction) || '—';
+  document.getElementById('cdm-d-nextdate').textContent = (c && c.nextActionDate) || '—';
+  document.getElementById('cdm-d-lastcontact').textContent = (c && c.lastContactDate) || '—';
+  document.getElementById('cdm-d-created').textContent = (c && (c.createdDate || c.orderDate)) || '—';
+
+  // Populate Orders & EasyPay Tab Fields
+  document.getElementById('cdm-d-ordernum').textContent = (c && c.orderNumber) || '—';
+  document.getElementById('cdm-d-package').textContent = (c && c.package) || '—';
+  document.getElementById('cdm-d-paytype').textContent = (c && c.paymentType) || '—';
+  document.getElementById('cdm-d-orderdate').textContent = (c && c.orderDate) || '—';
+  document.getElementById('cdm-d-activation').textContent = (c && c.activationDate) || '—';
+  document.getElementById('cdm-d-refcode').textContent = (c && c.referralCode) || '—';
+
+  document.getElementById('cdm-d-easypay').textContent = (c && c.easyPayNumber) || '—';
+  document.getElementById('cdm-d-cycle').textContent = (c && c.easyPayCycle) || 'Cycle 1 of 3';
+  
+  const expiryEl = document.getElementById('cdm-d-expiry');
+  if (c && c.easyPayExpiry) {
+    const isEpExpired = c.easyPayExpiry < getTodayStr();
+    expiryEl.textContent = `${isEpExpired ? '🔴 EXPIRED: ' : '🟢 Active: '}${c.easyPayExpiry}`;
+    expiryEl.className = isEpExpired ? 'font-mono font-bold text-red-400' : 'font-mono font-semibold text-emerald-400';
+  } else {
+    expiryEl.textContent = '—';
+    expiryEl.className = 'font-mono text-gray-400';
+  }
+
+  document.getElementById('cdm-d-paystatus').textContent = (c && c.payStatus) || 'Pending';
+  document.getElementById('cdm-d-promised').textContent = (c && c.promisedPaymentDate) || '—';
+
+  // Switch to Overview Tab by default
+  switchCustomerDetailTab('overview');
+
+  // Reset History tab
+  document.getElementById('cdm-history-count').textContent = 'Loading...';
+  document.getElementById('cdm-history-tab-count').textContent = '...';
+  document.getElementById('cdm-history-list').innerHTML = `
+    <div class="py-8 text-center"><div class="spinner mx-auto mb-2"></div><p class="text-xs text-gray-400">Loading call history & agent discussion notes...</p></div>
+  `;
+
+  // Show Modal
+  modal.classList.remove('hidden');
+
+  // Fetch full details and activity history asynchronously
+  fetchCustomerDetailHistory(customerId);
+}
+
+function closeCustomerDetailModal() {
+  const modal = document.getElementById('modal-customer-detail');
+  if (modal) modal.classList.add('hidden');
+}
+
+function switchCustomerDetailTab(tab) {
+  ['overview', 'orders', 'history'].forEach(t => {
+    const btn = document.getElementById(`cdm-tab-${t}`);
+    const panel = document.getElementById(`cdm-panel-${t}`);
+    if (btn && panel) {
+      if (t === tab) {
+        btn.classList.add('border-fiber-500', 'text-fiber-400');
+        btn.classList.remove('border-transparent', 'text-gray-400');
+        panel.classList.remove('hidden');
+      } else {
+        btn.classList.remove('border-fiber-500', 'text-fiber-400');
+        btn.classList.add('border-transparent', 'text-gray-400');
+        panel.classList.add('hidden');
+      }
+    }
+  });
+}
+
+async function fetchCustomerDetailHistory(customerId) {
+  try {
+    const res = await callBackend('getAdminCustomerDetail', { customerId });
+    if (!res || !res.customer) return;
+
+    const c = res.customer;
+    masterGridRecordsMap.set(String(c.id), { ...masterGridRecordsMap.get(String(c.id)), ...c });
+
+    // Sync latest server values into UI
+    document.getElementById('cdm-name').textContent = c.fullName || document.getElementById('cdm-name').textContent;
+    document.getElementById('cdm-agent').textContent = c.currentOwnerName || c.agentName || document.getElementById('cdm-agent').textContent;
+    document.getElementById('cdm-d-name').textContent = c.fullName || '—';
+    document.getElementById('cdm-d-cell').textContent = c.cellNumber || '—';
+    document.getElementById('cdm-d-altcell').textContent = c.alternateCell || '—';
+    document.getElementById('cdm-d-email').textContent = c.email || '—';
+    document.getElementById('cdm-d-address').textContent = c.address || '—';
+    document.getElementById('cdm-d-suburb').textContent = c.suburb || '—';
+    document.getElementById('cdm-d-package').textContent = c.productPackage || '—';
+    document.getElementById('cdm-d-paytype').textContent = c.paymentType || '—';
+    document.getElementById('cdm-d-agent').textContent = c.currentOwnerName || c.agentName || '—';
+    document.getElementById('cdm-d-status').textContent = c.status || '—';
+    document.getElementById('cdm-d-nextaction').textContent = c.nextAction || '—';
+    document.getElementById('cdm-d-nextdate').textContent = c.nextActionDate || '—';
+    document.getElementById('cdm-d-lastcontact').textContent = c.lastContactDate || '—';
+    document.getElementById('cdm-d-ordernum').textContent = c.orderNumber || '—';
+    document.getElementById('cdm-d-easypay').textContent = c.easyPayNumber || '—';
+    document.getElementById('cdm-d-cycle').textContent = c.easyPayCycle || '—';
+
+    // Render activity list
+    const acts = res.activities || [];
+    document.getElementById('cdm-history-count').textContent = `${acts.length} event${acts.length === 1 ? '' : 's'}`;
+    document.getElementById('cdm-history-tab-count').textContent = acts.length;
+
+    const listEl = document.getElementById('cdm-history-list');
+    if (acts.length === 0) {
+      listEl.innerHTML = `
+        <div class="py-8 text-center text-gray-500 text-xs bg-white/[0.01] rounded-xl border border-white/5">
+          No call logs or recorded activity yet for this customer.
+        </div>
+      `;
+      return;
+    }
+
+    listEl.innerHTML = acts.map(act => {
+      let badgeClass = "bg-blue-500/10 text-blue-400 border border-blue-500/20";
+      const o = (act.outcome || '').toLowerCase();
+      if (o.includes('won') || o.includes('activated') || o.includes('payment')) {
+        badgeClass = "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+      } else if (o.includes('not interested') || o.includes('lost') || o.includes('cancel')) {
+        badgeClass = "bg-red-500/10 text-red-400 border border-red-500/20";
+      } else if (o.includes('reschedule') || o.includes('callback') || o.includes('no answer')) {
+        badgeClass = "bg-amber-500/10 text-amber-400 border border-amber-500/20";
+      }
+
+      return `
+        <div class="p-3.5 bg-white/[0.025] hover:bg-white/[0.04] transition-colors border border-white/5 rounded-xl space-y-2 text-xs">
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 rounded text-[11px] font-semibold ${badgeClass}">
+                ${escHtml(act.outcome || act.actionType || 'Call')}
+              </span>
+              <span class="text-gray-300 font-medium">Logged by <strong class="text-fiber-300">${escHtml(act.agentName || 'Agent')}</strong></span>
+            </div>
+            <span class="text-[11px] text-gray-400 font-mono">${escHtml(act.dateTime || '—')}</span>
+          </div>
+
+          ${act.notes ? `
+            <div class="bg-black/25 p-2.5 rounded-lg border border-white/5 text-gray-300 font-sans leading-relaxed">
+              ${escHtml(act.notes)}
+            </div>
+          ` : `<p class="text-gray-500 italic text-[11px]">No discussion notes entered.</p>`}
+
+          <div class="flex items-center gap-3 text-[11px] text-gray-400 pt-1 border-t border-white/5 flex-wrap">
+            ${act.statusAfter ? `<span>Status: <strong class="text-white">${escHtml(act.statusAfter)}</strong></span>` : ''}
+            ${act.nextAction ? `<span>•</span><span>Next: <strong class="text-amber-300">${escHtml(act.nextAction)}</strong></span>` : ''}
+            ${act.nextActionDate ? `<span>(${escHtml(act.nextActionDate)})</span>` : ''}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+  } catch (err) {
+    document.getElementById('cdm-history-list').innerHTML = `
+      <div class="py-6 text-center text-red-400 text-xs">
+        Failed to load activity logs: ${escHtml(err.message)}
+      </div>
+    `;
+  }
+}
+
+function openReassignModalFromDetail() {
+  if (!currentViewingCustomerId) return;
+  const c = masterGridRecordsMap.get(String(currentViewingCustomerId)) || {};
+  openAdminFollowUpModal(currentViewingCustomerId, c.fullName || c.name || 'Customer', c.cellNumber || '');
+}
+
 function statusBadge(status) {
   const s = (status || '').toLowerCase();
   if (s.includes('won') || s.includes('activated')) return `<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">${escHtml(status)}</span>`;
@@ -458,11 +692,11 @@ function statusBadge(status) {
 async function triggerAgilitySync() {
   const btn = document.getElementById('sync-btn');
   const resultBox = document.getElementById('sync-result');
-  
+
   btn.disabled = true;
   btn.innerHTML = `<div class="spinner-sm mx-auto"></div>`;
   resultBox.classList.add('hidden');
-  
+
   try {
     const result = await callBackend('runAgilitySync');
     resultBox.classList.remove('hidden');
@@ -517,7 +751,6 @@ async function loadAgentList() {
         <td class="px-4 py-3 font-mono text-gray-400">${escHtml(a.tempPass || '—')}</td>
         <td class="px-4 py-3">
           <button onclick="openEditAgent('${escHtml(a.agentId)}', '${escJs(a.name)}', '${escJs(a.email)}', '${escJs(a.status)}')" class="px-2.5 py-1 bg-white/5 hover:bg-white/10 text-gray-300 rounded text-[11px] font-semibold transition-colors mr-1">Edit</button>
-          <button onclick="deleteAgentBtn('${escHtml(a.agentId)}', '${escJs(a.name)}')" class="px-2.5 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded text-[11px] font-semibold transition-colors">Delete</button>
         </td>
       </tr>
     `).join('');
@@ -615,46 +848,6 @@ async function saveAgentModal() {
   }
 }
 
-async function resetAgentPassword() {
-  const agentId = document.getElementById('am-agent-id').value;
-  const tempPassword = document.getElementById('am-temp-password').value.trim();
-  
-  if (!agentId || !tempPassword) {
-    showToast('Please enter a temporary password.', 'error');
-    return;
-  }
-  
-  const btn = document.getElementById('am-temp-password').nextElementSibling;
-  const oldText = btn.textContent;
-  btn.textContent = 'Saving...';
-  btn.disabled = true;
-
-  try {
-    const result = await callBackend('setAgentTempPassword', { agentId, tempPassword });
-    document.getElementById('temp-pass-value').textContent = result.tempPassword;
-    document.getElementById('temp-pass-result').classList.remove('hidden');
-    showToast('Password reset successfully!');
-    loadAgentList();
-  } catch (err) {
-    showToast(err.message, 'error');
-  } finally {
-    btn.textContent = oldText;
-    btn.disabled = false;
-  }
-}
-
-async function deleteAgentBtn(agentId, name) {
-  if (!confirm(`Are you sure you want to deactivate ${name}?`)) return;
-  
-  try {
-    await callBackend('deleteAgent', { agentId });
-    showToast('Agent deleted successfully.');
-    loadAgentList();
-  } catch (err) {
-    showToast(err.message, 'error');
-  }
-}
-
 // ── Admin Promised Payments & Follow-Ups ─────────────────────
 async function loadPromisedPayments() {
   const tbody = document.getElementById('rep-promised-body');
@@ -675,7 +868,7 @@ async function loadPromisedPayments() {
       if (formattedPhone && !formattedPhone.toString().startsWith('0')) {
         formattedPhone = '0' + formattedPhone;
       }
-      
+
       let timeStatus = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-white/10 text-gray-300 border border-white/20">Upcoming (in ${Math.abs(p.daysUntilDue)} days)</span>`;
       if (p.daysUntilDue === 0) timeStatus = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">Due Today</span>`;
       else if (p.daysUntilDue > 0) timeStatus = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/20 text-red-300 border border-red-500/30">Overdue by ${p.daysUntilDue} days</span>`;
@@ -740,7 +933,7 @@ function openAdminFollowUpModal(customerId, name, phone) {
   document.getElementById('afu-client-phone').textContent = phone || 'No Number';
   document.getElementById('afu-next-date').value = '';
   document.getElementById('afu-notes').value = '';
-  
+
   populateAgentDropdown('afu-agent-id');
   document.getElementById('afu-agent-id').value = '';
 
@@ -777,6 +970,12 @@ async function submitAdminFollowUp() {
     closeAdminFollowUpModal();
     loadCallbackReport(currentReportDate);
     loadPromisedPayments();
+    if (document.getElementById('view-grid') && !document.getElementById('view-grid').classList.contains('hidden')) {
+      loadMasterGrid();
+    }
+    if (currentViewingCustomerId) {
+      fetchCustomerDetailHistory(currentViewingCustomerId);
+    }
   } catch (err) {
     showToast(err.message, 'error');
   } finally {

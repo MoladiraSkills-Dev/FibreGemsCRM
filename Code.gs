@@ -40,7 +40,7 @@ function doPost(e) {
     // --- SMART CACHE IMPLEMENTATION ---
     const cacheableActions = [
       'getAgentWorklist', 'getAgentDailyQueue', 'getAgentActivityLog',
-      'getAdminDashboard', 'getAdminMasterGrid', 'getAdminCallbackReport', 
+      'getAdminDashboard', 'getAdminMasterGrid', 'getAdminCustomerDetail', 'getAdminCallbackReport', 
       'getAgentList', 'getAdminPromisedPayments', 'getSupportDashboard', 
       'getSupportCustomers', 'getSupportTickets'
     ];
@@ -109,6 +109,9 @@ function doPost(e) {
         break;
       case 'getAdminMasterGrid':
         result = getAdminMasterGrid(token, payload.offset, payload.limit);
+        break;
+      case 'getAdminCustomerDetail':
+        result = getAdminCustomerDetail(token, payload.customerId);
         break;
       case 'getAdminCallbackReport':
         result = getAdminCallbackReport(token, payload.targetDate);
@@ -1685,10 +1688,22 @@ function getAdminMasterGrid(token, offset, limit) {
 
     grid.push({
       id: custData[i][0],
+      recordStatus: custData[i][1] || 'Active',
       name: custData[i][5] || '',
       cellNumber: phone,
+      alternateCell: custData[i][7] ? String(custData[i][7]).trim() : '',
+      email: custData[i][8] || '',
+      address: custData[i][9] || '',
+      suburb: custData[i][10] || '',
+      package: custData[i][11] || '',
+      paymentType: custData[i][12] || '',
       agent: agentName,
-      status: custData[i][16],
+      agentId: agentId,
+      teamLeaderId: custData[i][15] || '',
+      status: custData[i][16] || '',
+      nextAction: custData[i][17] || '',
+      nextActionDate: formatDateSafe_(custData[i][18]),
+      lastContactDate: formatDateSafe_(custData[i][19]),
       orderNumber: custData[i][20] || '',
       easyPayNumber: custData[i][21] || '',
       easyPayCycle: custData[i][22] || '',
@@ -1696,13 +1711,131 @@ function getAdminMasterGrid(token, offset, limit) {
       referredByCode: custData[i][24] || '',
       easyPayExpiry: formatDateSafe_(custData[i][25]),
       activationDate: formatDateSafe_(custData[i][26]),
+      promisedPaymentDate: formatDateSafe_(custData[i][27]),
       orderDate: formatDateSafe_(custData[i][13]),
       createdDate: formatDateSafe_(custData[i][2]),
-      nextActionDate: formatDateSafe_(custData[i][18]),
+      lastUpdated: formatDateSafe_(custData[i][4]),
+      lastOutcome: custData[i][32] || custData[i][31] || '',
       payStatus: (payMap.get(custData[i][0]) || [])[2] || 'Pending'
     });
   }
   return { data: grid.reverse().slice(offset, offset + limit), total: grid.length };
+}
+
+/**
+ * Returns comprehensive details for a single customer from Team Leader perspective:
+ * Full profile, all activity logs / call history, payments, orders, and assigned agent.
+ */
+function getAdminCustomerDetail(token, customerId) {
+  requireAdmin_(token);
+  if (!customerId) throw new Error('Customer ID is required.');
+
+  const custSheet = ss.getSheetByName('CUSTOMERS');
+  const custData = custSheet.getDataRange().getValues();
+  const rowIndex = custData.findIndex(r => String(r[0]).trim() === String(customerId).trim());
+  if (rowIndex === -1) throw new Error('Customer not found: ' + customerId);
+
+  const row = custData[rowIndex];
+  const usersData = ss.getSheetByName('Users').getDataRange().getValues();
+  const agentMap = new Map();
+  for (let i = 1; i < usersData.length; i++) {
+    if (usersData[i][0]) agentMap.set(String(usersData[i][0]).trim(), String(usersData[i][1]).trim());
+  }
+
+  const payData = ss.getSheetByName('PAYMENTS').getDataRange().getValues();
+  const payMap = new Map(payData.slice(1).map(r => [r[1], r]));
+  const payments = [];
+  for (let i = 1; i < payData.length; i++) {
+    if (String(payData[i][1]).trim() === String(customerId).trim()) {
+      payments.push({
+        paymentId: payData[i][0],
+        status: payData[i][2] || 'Pending',
+        promisedDate: formatDateSafe_(payData[i][3]),
+        paidDate: formatDateSafe_(payData[i][4]),
+        amount: payData[i][5] || ''
+      });
+    }
+  }
+
+  const actData = ss.getSheetByName('ACTIVITY_LOG').getDataRange().getValues();
+  const activities = [];
+  for (let i = 1; i < actData.length; i++) {
+    const actRow = actData[i];
+    if (String(actRow[2]).trim() === String(customerId).trim()) {
+      let actDate = actRow[1];
+      if (actDate && actDate instanceof Date) {
+        actDate = Utilities.formatDate(actDate, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm');
+      }
+      const agentId = String(actRow[4] || '').trim();
+      activities.push({
+        activityId: String(actRow[0] || ''),
+        dateTime: actDate || '',
+        agentId: agentId,
+        agentName: agentMap.get(agentId) || agentId || 'System',
+        actionType: String(actRow[5] || ''),
+        contactMethod: String(actRow[6] || ''),
+        outcome: String(actRow[7] || ''),
+        statusAfter: String(actRow[8] || ''),
+        nextAction: String(actRow[10] || ''),
+        nextActionDate: formatDateSafe_(actRow[11]),
+        notes: String(actRow[15] || '')
+      });
+    }
+  }
+  activities.reverse();
+
+  const rawPhone = row[6];
+  let phone = "—";
+  if (rawPhone !== "" && rawPhone !== null && rawPhone !== undefined) {
+    let phoneStr = String(rawPhone).trim();
+    if (phoneStr !== "") {
+      phone = phoneStr.startsWith("0") ? phoneStr : "0" + phoneStr;
+    }
+  }
+
+  const agentId = String(row[14] || '').trim();
+  const agentName = agentMap.get(agentId) || (agentId ? 'Agent ' + agentId : 'Unassigned');
+
+  return {
+    customer: {
+      id: row[0],
+      recordStatus: row[1] || 'Active',
+      createdDate: formatDateSafe_(row[2]),
+      agentName: row[3] || agentName,
+      lastUpdated: formatDateSafe_(row[4]),
+      fullName: row[5] || '',
+      cellNumber: phone,
+      alternateCell: row[7] ? String(row[7]).trim() : '',
+      email: row[8] || '',
+      address: row[9] || '',
+      suburb: row[10] || '',
+      productPackage: row[11] || '',
+      paymentType: row[12] || '',
+      orderDate: formatDateSafe_(row[13]),
+      currentOwnerId: agentId,
+      currentOwnerName: agentName,
+      teamLeaderId: row[15] || '',
+      status: row[16] || '',
+      nextAction: row[17] || '',
+      nextActionDate: formatDateSafe_(row[18]),
+      lastContactDate: formatDateSafe_(row[19]),
+      orderNumber: row[20] || '',
+      easyPayNumber: row[21] || '',
+      easyPayCycle: row[22] || '',
+      referralCode: row[23] || '',
+      referredByCode: row[24] || '',
+      easyPayExpiry: formatDateSafe_(row[25]),
+      activationDate: formatDateSafe_(row[26]),
+      promisedPaymentDate: formatDateSafe_(row[27]),
+      escalated: row[28] || 'False',
+      escalationReason: row[29] || 'None',
+      lastContactOutcome: row[31] || row[32] || '',
+      nextActionTime: row[33] || '',
+      payStatus: (payMap.get(row[0]) || [])[2] || 'Pending'
+    },
+    activities: activities,
+    payments: payments
+  };
 }
 
 function runAgilitySync(token) {

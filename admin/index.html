@@ -32,22 +32,32 @@
     }
 
     @keyframes slide-in {
-      from { transform: translateX(100%); opacity: 0; }
-      to { transform: translateX(0); opacity: 1; }
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
     }
 
     ::-webkit-scrollbar {
       width: 6px;
       height: 6px;
     }
+
     ::-webkit-scrollbar-track {
       background: rgba(255, 255, 255, 0.02);
       border-radius: 8px;
     }
+
     ::-webkit-scrollbar-thumb {
       background: #E07C2A;
       border-radius: 8px;
     }
+
     ::-webkit-scrollbar-thumb:hover {
       background: #CE5926;
     }
@@ -75,7 +85,9 @@
     }
 
     @keyframes spin {
-      to { transform: rotate(360deg); }
+      to {
+        transform: rotate(360deg);
+      }
     }
 
     .sidebar-transition {
@@ -86,28 +98,35 @@
       width: 6px;
       height: 6px;
     }
+
     ::-webkit-scrollbar-track {
       background: rgba(255, 255, 255, 0.02);
       border-radius: 8px;
     }
+
     ::-webkit-scrollbar-thumb {
       background: #E07C2A;
       border-radius: 8px;
     }
+
     ::-webkit-scrollbar-thumb:hover {
       background: #CE5926;
     }
+
     .custom-scrollbar::-webkit-scrollbar {
       width: 4px;
     }
+
     .custom-scrollbar::-webkit-scrollbar-track {
       background: rgba(255, 255, 255, 0.02);
       border-radius: 8px;
     }
+
     .custom-scrollbar::-webkit-scrollbar-thumb {
       background: rgba(224, 124, 42, 0.4);
       border-radius: 10px;
     }
+
     .custom-scrollbar::-webkit-scrollbar-thumb:hover {
       background: rgba(224, 124, 42, 0.7);
     }
@@ -138,13 +157,22 @@
       -webkit-appearance: none;
       appearance: none;
     }
-    .input-field::placeholder { color: rgba(148, 163, 184, 0.5); }
-    .input-field:hover { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.18); }
-    .input-field:focus {
-      background: rgba(255,255,255,0.08);
-      border-color: rgba(224,124,42,0.6);
-      box-shadow: 0 0 0 3px rgba(224,124,42,0.15), 0 1px 3px rgba(0,0,0,0.3);
+
+    .input-field::placeholder {
+      color: rgba(148, 163, 184, 0.5);
     }
+
+    .input-field:hover {
+      background: rgba(255, 255, 255, 0.07);
+      border-color: rgba(255, 255, 255, 0.18);
+    }
+
+    .input-field:focus {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(224, 124, 42, 0.6);
+      box-shadow: 0 0 0 3px rgba(224, 124, 42, 0.15), 0 1px 3px rgba(0, 0, 0, 0.3);
+    }
+
     select.input-field {
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
       background-repeat: no-repeat;
@@ -152,7 +180,12 @@
       padding-right: 2.5rem;
       cursor: pointer;
     }
-    select.input-field option { background-color: #1e2330; color: #f1f5f9; }
+
+    select.input-field option {
+      background-color: #1e2330;
+      color: #f1f5f9;
+    }
+
     .field-label {
       display: block;
       font-size: 0.7rem;
@@ -162,7 +195,11 @@
       color: rgba(148, 163, 184, 0.8);
       margin-bottom: 0.4rem;
     }
-    .modal-overlay { background: rgba(14,34,64,0.7); backdrop-filter: blur(4px); }
+
+    .modal-overlay {
+      background: rgba(14, 34, 64, 0.7);
+      backdrop-filter: blur(4px);
+    }
   </style>
 </head>
 
@@ -172,7 +209,8 @@
   <div id="toast-container" class="fixed top-4 right-4 z-[9999] flex flex-col gap-3"></div>
 
   <!-- Global Loading Overlay -->
-  <div id="global-loader" class="hidden fixed inset-0 z-[80] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+  <div id="global-loader"
+    class="hidden fixed inset-0 z-[80] flex items-center justify-center bg-black/60 backdrop-blur-sm">
     <div class="flex flex-col items-center gap-3">
       <div class="w-10 h-10 rounded-full border-4 border-fiber-500/30 border-t-fiber-500 animate-spin"></div>
       <p class="text-xs text-gray-300 font-semibold tracking-wide">Processing...</p>
@@ -182,7 +220,8 @@
   <!-- ═══════════════════════════════════════════════════════════ -->
   <!-- Mobile Header                                              -->
   <!-- ═══════════════════════════════════════════════════════════ -->
-  <header class="lg:hidden fixed top-0 left-0 right-0 z-30 bg-navy-900/95 backdrop-blur-lg border-b border-white/5 px-4 py-3 flex items-center justify-between">
+  <header
+    class="lg:hidden fixed top-0 left-0 right-0 z-30 bg-navy-900/95 backdrop-blur-lg border-b border-white/5 px-4 py-3 flex items-center justify-between">
     <div class="flex items-center gap-3">
       <button onclick="toggleAdminSidebar()" class="p-2 rounded-lg hover:bg-white/5 transition-colors">
         <svg class="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -199,7 +238,8 @@
   <!-- ═══════════════════════════════════════════════════════════ -->
   <!-- Sidebar                                                     -->
   <!-- ═══════════════════════════════════════════════════════════ -->
-  <aside id="admin-sidebar" class="fixed top-0 left-0 bottom-0 w-64 bg-navy-800/80 backdrop-blur-xl border-r border-white/5 z-40 sidebar-transition -translate-x-full lg:translate-x-0">
+  <aside id="admin-sidebar"
+    class="fixed top-0 left-0 bottom-0 w-64 bg-navy-800/80 backdrop-blur-xl border-r border-white/5 z-40 sidebar-transition -translate-x-full lg:translate-x-0">
     <!-- Brand -->
     <div class="px-6 py-6 border-b border-white/5">
       <div class="flex flex-col gap-2">
@@ -213,7 +253,8 @@
     <!-- Admin Info -->
     <div class="px-6 py-4 border-b border-white/5">
       <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-fiber-500 to-fiber-700 flex items-center justify-center text-sm font-bold text-white shadow-md shadow-fiber-500/20">
+        <div
+          class="w-10 h-10 rounded-full bg-gradient-to-br from-fiber-500 to-fiber-700 flex items-center justify-center text-sm font-bold text-white shadow-md shadow-fiber-500/20">
           <span id="admin-avatar">A</span>
         </div>
         <div class="flex-1 min-w-0">
@@ -238,11 +279,13 @@
         class="w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 border-l-4 border-transparent text-gray-400 hover:text-white hover:bg-white/5">
         <div class="flex items-center gap-3">
           <svg class="w-5 h-5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
+            <path stroke-linecap="round" stroke-linejoin="round"
+              d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
           </svg>
           <span>Call Back Reports</span>
         </div>
-        <span id="nav-admin-missed-badge" class="hidden px-2 py-0.5 rounded-full text-xs font-bold bg-red-500 text-white animate-pulse">0</span>
+        <span id="nav-admin-missed-badge"
+          class="hidden px-2 py-0.5 rounded-full text-xs font-bold bg-red-500 text-white animate-pulse">0</span>
       </button>
 
       <button onclick="switchAdminView('grid')" data-admin-nav="grid"
@@ -275,7 +318,8 @@
 
     <!-- Lifecycle Engine Trigger in Footer -->
     <div class="px-4 py-3 border-t border-white/5 bg-white/[0.01]">
-      <button onclick="runLifecycleEngine()" id="lifecycle-btn" class="w-full py-2 px-3 rounded-lg text-[11px] font-bold bg-white/5 hover:bg-white/10 text-fiber-300 border border-white/10 transition-colors flex items-center justify-center gap-1.5">
+      <button onclick="runLifecycleEngine()" id="lifecycle-btn"
+        class="w-full py-2 px-3 rounded-lg text-[11px] font-bold bg-white/5 hover:bg-white/10 text-fiber-300 border border-white/10 transition-colors flex items-center justify-center gap-1.5">
         ⚙️ Run 42-Day & 7-Day Audit
       </button>
     </div>
@@ -294,7 +338,8 @@
   </aside>
 
   <!-- Sidebar overlay for mobile -->
-  <div id="admin-sidebar-overlay" onclick="toggleAdminSidebar()" class="hidden fixed inset-0 bg-black/50 z-30 lg:hidden"></div>
+  <div id="admin-sidebar-overlay" onclick="toggleAdminSidebar()"
+    class="hidden fixed inset-0 bg-black/50 z-30 lg:hidden"></div>
 
   <!-- ═══════════════════════════════════════════════════════════ -->
   <!-- Main Content                                                -->
@@ -304,16 +349,19 @@
     <!-- ─── DASHBOARD VIEW ─────────────────────────────────── -->
     <div id="view-dashboard">
       <!-- Header -->
-      <div class="px-6 lg:px-8 py-6 border-b border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div
+        class="px-6 lg:px-8 py-6 border-b border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 class="text-xl font-bold text-white">Command Centre</h2>
           <p class="text-sm text-gray-400 mt-0.5">Real-time overview of pipeline health and field execution</p>
         </div>
         <div class="flex items-center gap-3">
-          <button onclick="switchAdminView('callbacks')" class="px-4 py-2.5 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5">
+          <button onclick="switchAdminView('callbacks')"
+            class="px-4 py-2.5 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5">
             📞 View Call Back Performance
           </button>
-          <button onclick="loadDashboard()" class="p-2.5 bg-white/5 hover:bg-white/10 text-gray-300 rounded-xl transition-all border border-white/10 text-xs font-medium">
+          <button onclick="loadDashboard()"
+            class="p-2.5 bg-white/5 hover:bg-white/10 text-gray-300 rounded-xl transition-all border border-white/10 text-xs font-medium">
             ↻ Refresh
           </button>
         </div>
@@ -324,7 +372,8 @@
         <div class="stat-card rounded-2xl p-5">
           <div class="flex items-center gap-3 mb-3">
             <div class="w-10 h-10 rounded-xl bg-fiber-500/15 flex items-center justify-center">
-              <svg class="w-5 h-5 text-fiber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <svg class="w-5 h-5 text-fiber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                stroke-width="1.5">
                 <path stroke-linecap="round" stroke-linejoin="round"
                   d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
               </svg>
@@ -338,7 +387,8 @@
         <div class="stat-card rounded-2xl p-5">
           <div class="flex items-center gap-3 mb-3">
             <div class="w-10 h-10 rounded-xl bg-gem-500/15 flex items-center justify-center">
-              <svg class="w-5 h-5 text-gem-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <svg class="w-5 h-5 text-gem-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                stroke-width="1.5">
                 <path stroke-linecap="round" stroke-linejoin="round"
                   d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375" />
               </svg>
@@ -352,7 +402,8 @@
         <div class="stat-card rounded-2xl p-5">
           <div class="flex items-center gap-3 mb-3">
             <div class="w-10 h-10 rounded-xl bg-emerald-500/15 flex items-center justify-center">
-              <svg class="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <svg class="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                stroke-width="1.5">
                 <path stroke-linecap="round" stroke-linejoin="round"
                   d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
               </svg>
@@ -376,9 +427,12 @@
           <table class="w-full">
             <thead>
               <tr class="border-b border-white/10 bg-white/[0.01]">
-                <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Agent</th>
-                <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Touches</th>
-                <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Last Active</th>
+                <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Agent
+                </th>
+                <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Touches
+                </th>
+                <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Last
+                  Active</th>
               </tr>
             </thead>
             <tbody id="agent-activity-body"></tbody>
@@ -397,33 +451,43 @@
 
     <!-- ─── CALL BACKS & ESCALATIONS VIEW (ACCOUNTABILITY) ───── -->
     <div id="view-callbacks" class="hidden px-6 lg:px-8 py-6">
-      
+
       <!-- View Header & Date Control -->
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-white/10">
         <div>
           <div class="flex items-center gap-2">
             <h2 class="text-xl font-bold text-white">Call Back Accountability & Escalations</h2>
-            <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">Next-Day Audits</span>
+            <span
+              class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">Next-Day
+              Audits</span>
           </div>
-          <p class="text-xs text-gray-400 mt-0.5">System tracks completed vs missed callbacks and escalates stale leads after 7 days.</p>
+          <p class="text-xs text-gray-400 mt-0.5">System tracks completed vs missed callbacks and escalates stale leads
+            after 7 days.</p>
         </div>
 
         <!-- Date Switcher -->
         <div class="flex items-center gap-2">
-          <button onclick="setReportDateOffset(0)" id="btn-report-today" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-fiber-500 text-white transition-all">Today</button>
-          <button onclick="setReportDateOffset(-1)" id="btn-report-yesterday" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-white/5 text-gray-400 hover:text-white transition-all">Yesterday (Next-Day Review)</button>
-          <input type="date" id="admin-report-date-picker" onchange="loadCallbackReport(this.value)" class="input-field !py-1 !px-2 !text-xs !w-auto">
+          <button onclick="setReportDateOffset(0)" id="btn-report-today"
+            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-fiber-500 text-white transition-all">Today</button>
+          <button onclick="setReportDateOffset(-1)" id="btn-report-yesterday"
+            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-white/5 text-gray-400 hover:text-white transition-all">Yesterday
+            (Next-Day Review)</button>
+          <input type="date" id="admin-report-date-picker" onchange="loadCallbackReport(this.value)"
+            class="input-field !py-1 !px-2 !text-xs !w-auto">
         </div>
       </div>
 
       <!-- High Priority Missed Alert Banner (Shown if missed callbacks exist) -->
-      <div id="missed-alert-banner" class="hidden my-6 p-4 rounded-2xl bg-red-500/15 border border-red-500/30 flex items-start gap-3.5">
-        <div class="w-10 h-10 rounded-xl bg-red-500/20 text-red-400 flex items-center justify-center flex-shrink-0 text-xl font-bold">
+      <div id="missed-alert-banner"
+        class="hidden my-6 p-4 rounded-2xl bg-red-500/15 border border-red-500/30 flex items-start gap-3.5">
+        <div
+          class="w-10 h-10 rounded-xl bg-red-500/20 text-red-400 flex items-center justify-center flex-shrink-0 text-xl font-bold">
           ⚠️
         </div>
         <div class="flex-1">
           <h4 class="text-sm font-bold text-red-200">Missed Call Backs Detected</h4>
-          <p class="text-xs text-red-300/80 mt-0.5" id="missed-alert-text">Agents have missed scheduled follow-ups for this date. Immediate action required.</p>
+          <p class="text-xs text-red-300/80 mt-0.5" id="missed-alert-text">Agents have missed scheduled follow-ups for
+            this date. Immediate action required.</p>
         </div>
       </div>
 
@@ -452,7 +516,8 @@
         <div class="px-5 py-4 border-b border-white/5 flex items-center justify-between">
           <div>
             <h3 class="text-sm font-bold text-white">Agent Call Back Execution Breakdown</h3>
-            <p class="text-xs text-gray-400 mt-0.5">Performance tracking per agent for <span class="font-mono text-fiber-400" id="rep-current-date-label">Today</span></p>
+            <p class="text-xs text-gray-400 mt-0.5">Performance tracking per agent for <span
+                class="font-mono text-fiber-400" id="rep-current-date-label">Today</span></p>
           </div>
         </div>
 
@@ -469,7 +534,9 @@
               </tr>
             </thead>
             <tbody id="rep-agent-body">
-              <tr><td colspan="6" class="px-6 py-8 text-center text-gray-500 text-xs">Loading report...</td></tr>
+              <tr>
+                <td colspan="6" class="px-6 py-8 text-center text-gray-500 text-xs">Loading report...</td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -498,7 +565,9 @@
               </tr>
             </thead>
             <tbody id="rep-missed-body">
-              <tr><td colspan="7" class="px-6 py-8 text-center text-gray-500 text-xs">No missed callbacks.</td></tr>
+              <tr>
+                <td colspan="7" class="px-6 py-8 text-center text-gray-500 text-xs">No missed callbacks.</td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -511,7 +580,8 @@
             <span class="text-base">🚨</span>
             <div>
               <h3 class="text-sm font-bold text-amber-200">7+ Day Stale Lead Escalation Chain</h3>
-              <p class="text-xs text-amber-300/70">Leads with zero contact/feedback for 7+ days escalated to Supervisor / Operations</p>
+              <p class="text-xs text-amber-300/70">Leads with zero contact/feedback for 7+ days escalated to Supervisor
+                / Operations</p>
             </div>
           </div>
         </div>
@@ -529,7 +599,9 @@
               </tr>
             </thead>
             <tbody id="rep-escalated-body">
-              <tr><td colspan="6" class="px-6 py-8 text-center text-gray-500 text-xs">No escalated leads.</td></tr>
+              <tr>
+                <td colspan="6" class="px-6 py-8 text-center text-gray-500 text-xs">No escalated leads.</td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -542,10 +614,13 @@
             <span class="text-base">💳</span>
             <div>
               <h3 class="text-sm font-bold text-purple-200">Promised Payment Follow-Ups</h3>
-              <p class="text-xs text-purple-300/70">Clients who requested to be contacted on specific dates for payment.</p>
+              <p class="text-xs text-purple-300/70">Clients who requested to be contacted on specific dates for payment.
+              </p>
             </div>
           </div>
-          <button onclick="loadPromisedPayments()" class="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-xs text-gray-400 transition-colors">↻ Refresh</button>
+          <button onclick="loadPromisedPayments()"
+            class="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-xs text-gray-400 transition-colors">↻
+            Refresh</button>
         </div>
 
         <div class="overflow-x-auto">
@@ -556,14 +631,17 @@
                 <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Phone</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Assigned Agent</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-purple-300 uppercase">Promised Date</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-emerald-300 uppercase">EasyPay &amp; Expiry</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-emerald-300 uppercase">EasyPay &amp; Expiry
+                </th>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Time Status</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Lead Status</th>
                 <th class="px-4 py-3 text-right text-xs font-semibold text-gray-400 uppercase">Action</th>
               </tr>
             </thead>
             <tbody id="rep-promised-body">
-              <tr><td colspan="8" class="px-6 py-8 text-center text-gray-500 text-xs">Loading promised payments...</td></tr>
+              <tr>
+                <td colspan="8" class="px-6 py-8 text-center text-gray-500 text-xs">Loading promised payments...</td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -573,7 +651,8 @@
 
     <!-- ─── MASTER GRID VIEW ───────────────────────────────── -->
     <div id="view-grid" class="hidden">
-      <div class="px-6 lg:px-8 py-6 border-b border-white/5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div
+        class="px-6 lg:px-8 py-6 border-b border-white/5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 class="text-xl font-bold text-white">Master Lead & Order Grid</h2>
           <p class="text-sm text-gray-500 mt-0.5"><span id="grid-count">0 records</span></p>
@@ -591,9 +670,12 @@
               <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Customer</th>
               <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Phone</th>
               <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Agent</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Referral Code</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Order & Date</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">EasyPay (14d Expiry)</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Referral Code
+              </th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Order & Date
+              </th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">EasyPay (14d
+                Expiry)</th>
               <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
               <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Payment</th>
             </tr>
@@ -616,13 +698,16 @@
         <div class="bg-white/[0.03] border border-white/5 rounded-2xl p-6 mb-6">
           <div class="flex items-start gap-4">
             <div class="w-12 h-12 rounded-xl bg-fiber-500/15 flex items-center justify-center flex-shrink-0">
-              <svg class="w-6 h-6 text-fiber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+              <svg class="w-6 h-6 text-fiber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                  d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
               </svg>
             </div>
             <div>
               <h3 class="text-base font-semibold text-white mb-2">Automated Data Ingestion</h3>
-              <p class="text-sm text-gray-400">Processes unsynced Agility rows, extracts OVR/OVK strings, and creates records across CUSTOMERS, ORDERS, PAYMENTS, and ACTIVATIONS with automatic order date stamping.</p>
+              <p class="text-sm text-gray-400">Processes unsynced Agility rows, extracts OVR/OVK strings, and creates
+                records across CUSTOMERS, ORDERS, PAYMENTS, and ACTIVATIONS with automatic order date stamping.</p>
             </div>
           </div>
         </div>
@@ -638,7 +723,8 @@
 
     <!-- ─── AGENTS VIEW ───────────────────────────────────────── -->
     <div id="view-agents" class="hidden">
-      <div class="px-6 lg:px-8 py-6 border-b border-white/5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div
+        class="px-6 lg:px-8 py-6 border-b border-white/5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 class="text-xl font-bold text-white">Manage Agents</h2>
           <p class="text-sm text-gray-500 mt-0.5"><span id="agents-count">Loading...</span></p>
@@ -672,13 +758,15 @@
   <!-- ═══════════════════════════════════════════════════════════ -->
   <div id="modal-agent" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
     <div class="absolute inset-0 bg-navy-900/80 backdrop-blur-sm" onclick="closeAgentModal()"></div>
-    <div class="relative bg-navy-800 border border-white/10 rounded-2xl shadow-2xl w-full max-w-md z-10 max-h-[90vh] overflow-y-auto custom-scrollbar">
+    <div
+      class="relative bg-navy-800 border border-white/10 rounded-2xl shadow-2xl w-full max-w-md z-10 max-h-[90vh] overflow-y-auto custom-scrollbar">
       <div class="flex items-center justify-between px-6 py-5 border-b border-white/5">
         <div>
           <h3 class="text-base font-semibold text-white" id="agent-modal-title">Add Agent</h3>
           <p class="text-xs text-gray-500 mt-0.5" id="agent-modal-subtitle">Create a new portal account</p>
         </div>
-        <button onclick="closeAgentModal()" class="p-2 rounded-lg hover:bg-white/5 text-gray-500 hover:text-white transition-colors">
+        <button onclick="closeAgentModal()"
+          class="p-2 rounded-lg hover:bg-white/5 text-gray-500 hover:text-white transition-colors">
           <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>
@@ -725,9 +813,8 @@
         <div>
           <label class="field-label">New Temporary Password *</label>
           <input type="text" id="am-temp-password" placeholder="Enter password" class="input-field">
-          <button type="button" onclick="resetAgentPassword()" class="mt-3 w-full py-2 bg-fiber-500/20 text-fiber-300 rounded-lg text-sm font-bold hover:bg-fiber-500 hover:text-white transition-all">Set Temporary Password</button>
         </div>
-        <div id="temp-pass-result" class="hidden mt-4 bg-emerald-500/10 border border-emerald-500/25 rounded-xl p-4">
+        <div id="temp-pass-result" class="hidden bg-emerald-500/10 border border-emerald-500/25 rounded-xl p-4">
           <p class="text-xs text-emerald-400 font-semibold mb-1">Temporary password set:</p>
           <p class="text-base font-mono text-white tracking-widest" id="temp-pass-value"></p>
         </div>
@@ -738,8 +825,240 @@
           class="flex-1 py-2.5 bg-gradient-to-r from-fiber-500 to-fiber-600 text-white rounded-xl text-sm font-semibold hover:shadow-lg transition-all">
           Save
         </button>
-        <button onclick="closeAgentModal()" class="px-4 py-2.5 bg-white/5 text-gray-400 rounded-xl text-sm font-medium hover:bg-white/10 transition-colors">
+        <button onclick="closeAgentModal()"
+          class="px-4 py-2.5 bg-white/5 text-gray-400 rounded-xl text-sm font-medium hover:bg-white/10 transition-colors">
           Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- Team Leader Customer Detail Modal                          -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <div id="modal-customer-detail" class="hidden fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+    <div class="modal-overlay absolute inset-0 bg-black/75 backdrop-blur-sm" onclick="closeCustomerDetailModal()"></div>
+    
+    <div class="relative bg-navy-800 border border-white/10 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col z-10 animate-slide-in overflow-hidden">
+      <!-- Modal Header -->
+      <div class="px-6 py-5 border-b border-white/10 flex items-start justify-between bg-navy-900/60">
+        <div class="flex items-start gap-4">
+          <div class="w-12 h-12 rounded-xl bg-fiber-500/15 border border-fiber-500/25 flex items-center justify-center text-fiber-400 font-bold text-lg flex-shrink-0" id="cdm-avatar">
+            CD
+          </div>
+          <div>
+            <div class="flex items-center gap-2.5 flex-wrap">
+              <h3 class="text-xl font-bold text-white tracking-tight" id="cdm-name">Customer Details</h3>
+              <span id="cdm-status-badge"></span>
+              <span id="cdm-pay-status-badge"></span>
+            </div>
+            <div class="flex items-center gap-3 text-xs text-gray-400 mt-1 flex-wrap font-mono">
+              <span id="cdm-id">CUST-000000</span>
+              <span>•</span>
+              <span id="cdm-cell">000 000 0000</span>
+              <span>•</span>
+              <span class="text-gray-300">Agent: <strong class="text-fiber-300" id="cdm-agent">—</strong></span>
+            </div>
+          </div>
+        </div>
+        <button onclick="closeCustomerDetailModal()" class="p-2 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white transition-colors">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Quick Action Bar for Team Lead -->
+      <div class="px-6 py-3 bg-white/[0.02] border-b border-white/5 flex items-center justify-between flex-wrap gap-2 text-xs">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="text-gray-400 font-medium">Quick Contact:</span>
+          <a id="cdm-call-btn" href="#" class="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 font-medium inline-flex items-center gap-1.5 transition-colors">
+            📞 Call
+          </a>
+          <a id="cdm-wa-btn" href="#" target="_blank" class="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 font-medium inline-flex items-center gap-1.5 transition-colors">
+            💬 WhatsApp
+          </a>
+          <a id="cdm-email-btn" href="#" class="px-2.5 py-1 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 font-medium inline-flex items-center gap-1.5 transition-colors">
+            ✉️ Email
+          </a>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="openReassignModalFromDetail()" class="px-3 py-1.5 rounded-lg bg-amber-500/15 text-amber-300 border border-amber-500/30 hover:bg-amber-500/25 font-semibold transition-colors flex items-center gap-1.5">
+            <span>⇄</span> Reassign / Reschedule Follow-up
+          </button>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs inside Customer Modal -->
+      <div class="flex border-b border-white/10 px-6 bg-navy-900/40">
+        <button onclick="switchCustomerDetailTab('overview')" id="cdm-tab-overview" class="py-3 px-4 text-xs font-semibold border-b-2 border-fiber-500 text-fiber-400 transition-colors">
+          Overview & Profile
+        </button>
+        <button onclick="switchCustomerDetailTab('orders')" id="cdm-tab-orders" class="py-3 px-4 text-xs font-semibold border-b-2 border-transparent text-gray-400 hover:text-white transition-colors">
+          Orders & EasyPay
+        </button>
+        <button onclick="switchCustomerDetailTab('history')" id="cdm-tab-history" class="py-3 px-4 text-xs font-semibold border-b-2 border-transparent text-gray-400 hover:text-white transition-colors">
+          Call Logs & Activity (<span id="cdm-history-tab-count">0</span>)
+        </button>
+      </div>
+
+      <!-- Modal Body (Scrollable) -->
+      <div class="p-6 overflow-y-auto flex-1 space-y-6">
+        <!-- TAB 1: OVERVIEW -->
+        <div id="cdm-panel-overview" class="space-y-6">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Contact Card -->
+            <div class="bg-white/[0.03] border border-white/5 rounded-xl p-4 space-y-3">
+              <h4 class="text-xs font-semibold uppercase tracking-wider text-fiber-400 flex items-center gap-2">
+                <span>👤</span> Contact & Identification
+              </h4>
+              <div class="space-y-2.5 text-xs">
+                <div class="flex justify-between py-1 border-b border-white/5">
+                  <span class="text-gray-400">Full Name</span>
+                  <span class="text-white font-medium" id="cdm-d-name">—</span>
+                </div>
+                <div class="flex justify-between py-1 border-b border-white/5">
+                  <span class="text-gray-400">Primary Cell</span>
+                  <span class="text-white font-mono" id="cdm-d-cell">—</span>
+                </div>
+                <div class="flex justify-between py-1 border-b border-white/5">
+                  <span class="text-gray-400">Alternate Cell</span>
+                  <span class="text-white font-mono" id="cdm-d-altcell">—</span>
+                </div>
+                <div class="flex justify-between py-1 border-b border-white/5">
+                  <span class="text-gray-400">Email Address</span>
+                  <span class="text-white font-mono" id="cdm-d-email">—</span>
+                </div>
+                <div class="flex justify-between py-1 border-b border-white/5">
+                  <span class="text-gray-400">Area / Suburb</span>
+                  <span class="text-white font-medium" id="cdm-d-suburb">—</span>
+                </div>
+                <div class="flex justify-between py-1">
+                  <span class="text-gray-400">Physical Address</span>
+                  <span class="text-white text-right max-w-[220px] truncate" id="cdm-d-address" title="">—</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Ownership & Pipeline Status Card -->
+            <div class="bg-white/[0.03] border border-white/5 rounded-xl p-4 space-y-3">
+              <h4 class="text-xs font-semibold uppercase tracking-wider text-amber-400 flex items-center gap-2">
+                <span>🎯</span> Pipeline & Ownership (Team Lead)
+              </h4>
+              <div class="space-y-2.5 text-xs">
+                <div class="flex justify-between py-1 border-b border-white/5">
+                  <span class="text-gray-400">Assigned Agent</span>
+                  <span class="text-fiber-300 font-semibold" id="cdm-d-agent">—</span>
+                </div>
+                <div class="flex justify-between py-1 border-b border-white/5">
+                  <span class="text-gray-400">Lead Stage / Status</span>
+                  <span class="text-white font-medium" id="cdm-d-status">—</span>
+                </div>
+                <div class="flex justify-between py-1 border-b border-white/5">
+                  <span class="text-gray-400">Next Action</span>
+                  <span class="text-white font-medium" id="cdm-d-nextaction">—</span>
+                </div>
+                <div class="flex justify-between py-1 border-b border-white/5">
+                  <span class="text-gray-400">Next Action Date</span>
+                  <span class="text-white font-mono" id="cdm-d-nextdate">—</span>
+                </div>
+                <div class="flex justify-between py-1 border-b border-white/5">
+                  <span class="text-gray-400">Last Contact Date</span>
+                  <span class="text-gray-300 font-mono" id="cdm-d-lastcontact">—</span>
+                </div>
+                <div class="flex justify-between py-1">
+                  <span class="text-gray-400">Created Date</span>
+                  <span class="text-gray-400 font-mono" id="cdm-d-created">—</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 2: ORDERS & EASYPAY -->
+        <div id="cdm-panel-orders" class="hidden space-y-6">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="bg-white/[0.03] border border-white/5 rounded-xl p-4 space-y-3">
+              <h4 class="text-xs font-semibold uppercase tracking-wider text-fiber-400 flex items-center gap-2">
+                <span>📦</span> Order & Product Details
+              </h4>
+              <div class="space-y-2.5 text-xs">
+                <div class="flex justify-between py-1 border-b border-white/5">
+                  <span class="text-gray-400">Order Number</span>
+                  <span class="text-fiber-400 font-mono font-bold" id="cdm-d-ordernum">—</span>
+                </div>
+                <div class="flex justify-between py-1 border-b border-white/5">
+                  <span class="text-gray-400">Package / Product</span>
+                  <span class="text-white font-medium" id="cdm-d-package">—</span>
+                </div>
+                <div class="flex justify-between py-1 border-b border-white/5">
+                  <span class="text-gray-400">Payment Type</span>
+                  <span class="text-white font-medium" id="cdm-d-paytype">—</span>
+                </div>
+                <div class="flex justify-between py-1 border-b border-white/5">
+                  <span class="text-gray-400">Order Date</span>
+                  <span class="text-white font-mono" id="cdm-d-orderdate">—</span>
+                </div>
+                <div class="flex justify-between py-1 border-b border-white/5">
+                  <span class="text-gray-400">Activation Date</span>
+                  <span class="text-white font-mono" id="cdm-d-activation">—</span>
+                </div>
+                <div class="flex justify-between py-1">
+                  <span class="text-gray-400">Referral Code</span>
+                  <span class="text-amber-300 font-mono" id="cdm-d-refcode">—</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="bg-white/[0.03] border border-white/5 rounded-xl p-4 space-y-3">
+              <h4 class="text-xs font-semibold uppercase tracking-wider text-emerald-400 flex items-center gap-2">
+                <span>💳</span> EasyPay & Payment Cycle
+              </h4>
+              <div class="space-y-2.5 text-xs">
+                <div class="flex justify-between py-1 border-b border-white/5">
+                  <span class="text-gray-400">EasyPay Number</span>
+                  <span class="text-white font-mono font-bold text-sm tracking-wider" id="cdm-d-easypay">—</span>
+                </div>
+                <div class="flex justify-between py-1 border-b border-white/5">
+                  <span class="text-gray-400">Current Cycle</span>
+                  <span class="text-white font-medium" id="cdm-d-cycle">—</span>
+                </div>
+                <div class="flex justify-between py-1 border-b border-white/5">
+                  <span class="text-gray-400">Expiry Date (14 Days)</span>
+                  <span class="font-mono font-semibold" id="cdm-d-expiry">—</span>
+                </div>
+                <div class="flex justify-between py-1 border-b border-white/5">
+                  <span class="text-gray-400">Payment Status</span>
+                  <span class="text-white font-medium" id="cdm-d-paystatus">—</span>
+                </div>
+                <div class="flex justify-between py-1">
+                  <span class="text-gray-400">Promised Payment Date</span>
+                  <span class="text-amber-300 font-mono font-medium" id="cdm-d-promised">—</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 3: ACTIVITY LOGS & CALL HISTORY -->
+        <div id="cdm-panel-history" class="hidden space-y-4">
+          <div class="flex items-center justify-between">
+            <h4 class="text-xs font-semibold uppercase tracking-wider text-gray-400">
+              Interaction Timeline & Agent Discussion Notes
+            </h4>
+            <span id="cdm-history-count" class="text-xs text-gray-500 font-mono">0 events</span>
+          </div>
+          <div id="cdm-history-list" class="space-y-3 max-h-[380px] overflow-y-auto pr-1">
+            <p class="text-xs text-gray-500 py-6 text-center">Loading call logs...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="px-6 py-4 border-t border-white/10 bg-navy-900/60 flex items-center justify-between">
+        <span class="text-[11px] text-gray-500">Team Leader Management Hub</span>
+        <button onclick="closeCustomerDetailModal()" class="px-5 py-2 bg-white/10 text-white rounded-xl text-xs font-semibold hover:bg-white/15 transition-colors">
+          Close
         </button>
       </div>
     </div>
@@ -750,14 +1069,16 @@
   <!-- ═══════════════════════════════════════════════════════════ -->
   <div id="modal-admin-followup" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
     <div class="modal-overlay absolute inset-0" onclick="closeAdminFollowUpModal()"></div>
-    <div class="relative bg-navy-800 border border-amber-500/30 rounded-2xl shadow-2xl w-full max-w-md p-6 z-10 animate-slide-in">
+    <div
+      class="relative bg-navy-800 border border-amber-500/30 rounded-2xl shadow-2xl w-full max-w-md p-6 z-10 animate-slide-in">
       <div class="flex items-center justify-between pb-4 border-b border-white/10 mb-4">
         <div>
           <span class="text-xs font-semibold uppercase tracking-wider text-amber-400">Admin Action</span>
           <h3 class="text-lg font-bold text-white mt-0.5" id="afu-client-name">Client Name</h3>
           <p class="text-sm font-mono text-gray-400 mt-0.5" id="afu-client-phone">000 000 0000</p>
         </div>
-        <button onclick="closeAdminFollowUpModal()" class="p-2 rounded-lg hover:bg-white/5 text-gray-500 hover:text-white transition-colors">
+        <button onclick="closeAdminFollowUpModal()"
+          class="p-2 rounded-lg hover:bg-white/5 text-gray-500 hover:text-white transition-colors">
           <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>
@@ -772,7 +1093,7 @@
           <input type="date" id="afu-next-date" class="input-field">
           <p class="text-[10px] text-gray-400 mt-1">Note: Bypasses 8-day restriction.</p>
         </div>
-        
+
         <div>
           <label class="field-label">Reassign Agent (Optional)</label>
           <select id="afu-agent-id" class="input-field">
@@ -783,7 +1104,8 @@
 
         <div>
           <label class="field-label">Admin Notes</label>
-          <textarea id="afu-notes" rows="2" placeholder="e.g. Forced reschedule due to agent absence" class="input-field resize-none"></textarea>
+          <textarea id="afu-notes" rows="2" placeholder="e.g. Forced reschedule due to agent absence"
+            class="input-field resize-none"></textarea>
         </div>
       </div>
 
@@ -792,7 +1114,8 @@
           class="flex-1 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 text-navy-900 rounded-xl text-sm font-bold hover:shadow-lg transition-all">
           Force Reschedule
         </button>
-        <button onclick="closeAdminFollowUpModal()" class="px-4 py-2.5 bg-white/5 text-gray-400 rounded-xl text-sm font-medium hover:bg-white/10 transition-colors">
+        <button onclick="closeAdminFollowUpModal()"
+          class="px-4 py-2.5 bg-white/5 text-gray-400 rounded-xl text-sm font-medium hover:bg-white/10 transition-colors">
           Cancel
         </button>
       </div>
