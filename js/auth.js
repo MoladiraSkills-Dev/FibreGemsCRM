@@ -159,3 +159,13 @@ function showToast(message, type = 'info') {
     setTimeout(() => toast.remove(), 300);
   }, 9000);
 }
+
+// ── Presence Ping ───────────────────────────────────────────
+setInterval(() => {
+  if (typeof session !== 'undefined' && session && session.token) {
+    if (typeof callBackend === 'function') {
+      callBackend('pingSession', {}, { skipCache: true }).catch(() => {});
+    }
+  }
+}, 60000); // Ping every 60 seconds
+

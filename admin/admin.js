@@ -78,6 +78,13 @@ document.addEventListener('DOMContentLoaded', () => {
   
   loadDashboard();
   checkMissedCallbacksBadge();
+
+  // Poll for dashboard updates every 30 seconds if on dashboard view
+  setInterval(() => {
+    if (currentAdminView === 'dashboard') {
+      loadDashboard(true);
+    }
+  }, 30000);
 });
 
 // ── View Switching ───────────────────────────────────────────
@@ -128,18 +135,20 @@ async function checkMissedCallbacksBadge() {
 }
 
 // ── Dashboard ────────────────────────────────────────────────
-async function loadDashboard() {
+async function loadDashboard(silent = false) {
   const agentTableBody = document.getElementById('agent-activity-body');
   const statsContainer = document.getElementById('status-stats');
   
-  agentTableBody.innerHTML = `
-    <tr><td colspan="3" class="px-6 py-8 text-center">
-      <div class="spinner mx-auto mb-2"></div>
-      <p class="text-gray-500 text-sm">Loading dashboard...</p>
-    </td></tr>`;
+  if (!silent) {
+    agentTableBody.innerHTML = `
+      <tr><td colspan="3" class="px-6 py-8 text-center">
+        <div class="spinner mx-auto mb-2"></div>
+        <p class="text-gray-500 text-sm">Loading dashboard...</p>
+      </td></tr>`;
+  }
   
   try {
-    const data = await callBackend('getAdminDashboard');
+    const data = await callBackend('getAdminDashboard', {}, { skipCache: silent });
     
     document.getElementById('stat-active-agents').textContent = data.activeCount || 0;
     const totalCustomers = Object.values(data.statuses).reduce((a, b) => a + b, 0);
@@ -157,12 +166,13 @@ async function loadDashboard() {
         <tr class="border-b border-white/5 hover:bg-white/[0.03] transition-colors">
           <td class="px-4 py-3">
             <div class="flex items-center gap-3">
-              <div class="w-8 h-8 rounded-full bg-gradient-to-br from-fiber-500 to-fiber-700 flex items-center justify-center text-xs font-bold text-white">
+              <div class="w-8 h-8 rounded-full bg-gradient-to-br from-fiber-500 to-fiber-700 flex items-center justify-center text-xs font-bold text-white relative">
                 ${(agent.name || 'U').charAt(0)}
+                <span class="absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-[#1A1A1A] ${agent.isOnline ? 'bg-green-500' : 'bg-red-500'}"></span>
               </div>
               <div>
                 <p class="font-semibold text-white text-sm">${escHtml(agent.name)}</p>
-                <p class="text-xs text-gray-500">${escHtml(agent.role)}</p>
+                <p class="text-xs ${agent.isOnline ? 'text-green-400' : 'text-gray-500'}">${agent.isOnline ? 'Active' : 'Absent'} · ${escHtml(agent.role)}</p>
               </div>
             </div>
           </td>
@@ -193,10 +203,12 @@ async function loadDashboard() {
     }).join('');
     
   } catch (err) {
-    agentTableBody.innerHTML = `
-      <tr><td colspan="3" class="px-6 py-8 text-center text-red-400 text-sm">
-        Failed to load dashboard: ${escHtml(err.message)}
-      </td></tr>`;
+    if (!silent) {
+      agentTableBody.innerHTML = `
+        <tr><td colspan="3" class="px-6 py-8 text-center text-red-400 text-sm">
+          Failed to load dashboard: ${escHtml(err.message)}
+        </td></tr>`;
+    }
   }
 }
 
