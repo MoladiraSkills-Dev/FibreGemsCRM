@@ -759,7 +759,7 @@ async function loadWorklist() {
         </td>
         <td class="px-4 py-3.5 text-sm text-gray-400 truncate max-w-[160px]">${escHtml(c.lastOutcome || '—')}</td>
         <td class="px-4 py-3.5 text-right">
-          <button onclick="openCallOutcomeModal('${escHtml(c.customerId)}', '${escJs(c.name)}', '${escJs(c.cellNumber)}', '${escJs(c.package || '')}')"
+          <button onclick="openCallOutcomeModal('${escHtml(c.customerId)}', '${escJs(c.name)}', '${escJs("0" + c.cellNumber)}', '${escJs(c.package || '')}', false, false, '${escJs(c.paymentType || '')}', '${escJs(c.orderNumber || '')}', '${escJs(c.easyPayNumber || '')}', '${escJs(c.referralCode || '')}', '${escJs(c.easyPayExpiryDate || '')}', '${escJs(c.easyPayCycle || '')}')"
             class="px-3 py-1.5 bg-fiber-500/20 text-fiber-300 rounded-lg text-xs font-bold hover:bg-fiber-500 hover:text-white transition-all">
             Log Touch
           </button>

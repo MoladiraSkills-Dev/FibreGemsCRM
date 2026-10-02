@@ -517,6 +517,7 @@ async function loadAgentList() {
         <td class="px-4 py-3 font-mono text-gray-400">${escHtml(a.tempPass || '—')}</td>
         <td class="px-4 py-3">
           <button onclick="openEditAgent('${escHtml(a.agentId)}', '${escJs(a.name)}', '${escJs(a.email)}', '${escJs(a.status)}')" class="px-2.5 py-1 bg-white/5 hover:bg-white/10 text-gray-300 rounded text-[11px] font-semibold transition-colors mr-1">Edit</button>
+          <button onclick="deleteAgentBtn('${escHtml(a.agentId)}', '${escJs(a.name)}')" class="px-2.5 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded text-[11px] font-semibold transition-colors">Delete</button>
         </td>
       </tr>
     `).join('');
@@ -611,6 +612,46 @@ async function saveAgentModal() {
   } finally {
     saveBtn.disabled = false;
     saveBtn.textContent = 'Save';
+  }
+}
+
+async function resetAgentPassword() {
+  const agentId = document.getElementById('am-agent-id').value;
+  const tempPassword = document.getElementById('am-temp-password').value.trim();
+  
+  if (!agentId || !tempPassword) {
+    showToast('Please enter a temporary password.', 'error');
+    return;
+  }
+  
+  const btn = document.getElementById('am-temp-password').nextElementSibling;
+  const oldText = btn.textContent;
+  btn.textContent = 'Saving...';
+  btn.disabled = true;
+
+  try {
+    const result = await callBackend('setAgentTempPassword', { agentId, tempPassword });
+    document.getElementById('temp-pass-value').textContent = result.tempPassword;
+    document.getElementById('temp-pass-result').classList.remove('hidden');
+    showToast('Password reset successfully!');
+    loadAgentList();
+  } catch (err) {
+    showToast(err.message, 'error');
+  } finally {
+    btn.textContent = oldText;
+    btn.disabled = false;
+  }
+}
+
+async function deleteAgentBtn(agentId, name) {
+  if (!confirm(`Are you sure you want to deactivate ${name}?`)) return;
+  
+  try {
+    await callBackend('deleteAgent', { agentId });
+    showToast('Agent deleted successfully.');
+    loadAgentList();
+  } catch (err) {
+    showToast(err.message, 'error');
   }
 }
 
