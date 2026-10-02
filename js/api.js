@@ -37,7 +37,7 @@ function clearSession() {
 /** Actions whose responses can be safely cached. */
 const CACHEABLE_ACTIONS = new Set([
   'getAgentWorklist', 'getAgentDailyQueue', 'getAgentActivityLog',
-  'getAdminDashboard', 'getAdminMasterGrid', 'getAdminCallbackReport',
+  'getAdminDashboard', 'getAdminMasterGrid', 'getAdminCustomerDetail', 'getAdminCallbackReport',
   'getAgentList', 'getAdminPromisedPayments',
   'getSupportDashboard', 'getSupportCustomers', 'getSupportTickets'
 ]);
