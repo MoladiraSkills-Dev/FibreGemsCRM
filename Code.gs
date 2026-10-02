@@ -376,10 +376,10 @@ function handleAgentLeadUpdate(existingIdOverride, formData, token) {
 
   if (isActivated) {
     activationDate = todayStr;
-    nextAction = 'Activation Follow-Up (Check Connection)';
+    nextAction = 'After-Sales Call';
     nextActionDate = addDaysSafe_(todayStr, 7); // Exactly 1 week after activation
   } else if (isSaleWon && easyPayExpiry) {
-    nextAction = 'Follow Up Payment';
+    nextAction = 'Payment Follow-Up';
     nextActionDate = easyPayExpiry;
   }
 
@@ -840,29 +840,30 @@ function logCallOutcome(token, payload) {
   let computedNextActionDate = nextActionDate || '';
 
   if (isSaleWon) {
-    newStatus = 'Order Placed';          // allowed: Order Placed
+    newStatus = 'Order Placed';
     computedNextAction = 'Payment Follow-Up';
     computedNextActionDate = addDaysSafe_(todayStr, 14);
   } else if (isActivated) {
-    newStatus = 'Activated';             // allowed: Activated
+    newStatus = 'Activated';
     computedNextAction = 'After-Sales Call';
     computedNextActionDate = addDaysSafe_(todayStr, 7);
   } else if (outcome === 'Activation Follow-Up Completed') {
-    newStatus = 'After-Sales Completed'; // allowed: After-Sales Completed
+    newStatus = 'After-Sales Completed';
     computedNextAction = 'No Further Action';
     computedNextActionDate = '';
   } else if (isLost) {
-    newStatus = 'Not Interested';        // allowed: Not Interested
+    newStatus = 'Not Interested';
   } else if (outcome === 'Callback Rescheduled') {
-    newStatus = 'Contact Attempted';     // allowed: Contact Attempted
+    newStatus = 'Contact Attempted';
     computedNextAction = 'Customer Callback';
   } else if (outcome === 'No Answer / Voicemail') {
-    newStatus = 'Unable to Reach';       // allowed: Unable to Reach
+    newStatus = 'Unable to Reach';
     computedNextAction = 'Customer Callback';
   } else if (outcome === 'Payment Received') {
-    newStatus = 'Payment Received';      // allowed: Payment Received
+    newStatus = 'Payment Received';
   } else if (outcome === 'No Payment - Reschedule' || outcome === 'New Payment Date') {
-    newStatus = 'Payment Promised';      // allowed: Payment Promised
+    newStatus = 'Payment Promised';
+    computedNextAction = 'Payment Follow-Up';
   }
 
   // Update CUSTOMERS record
@@ -1162,7 +1163,13 @@ function getAgentWorklist(token, offset, limit) {
       nextActionDate: naDate || '',
       lastContactDate: lastContactDate,
       lastActionType: lastActionType,
-      lastOutcome: lastOutcome
+      lastOutcome: lastOutcome,
+      orderNumber: String(row[20] || ''),
+      easyPayNumber: String(row[21] || ''),
+      easyPayCycle: String(row[22] || ''),
+      referralCode: String(row[23] || ''),
+      easyPayExpiryDate: formatDateSafe_(row[25]),
+      paymentType: String(row[12] || '')
     });
   }
   worklist.reverse();
@@ -1564,7 +1571,7 @@ function adminUpdateFollowUp(token, payload) {
   const customerName = custRow[5] || '';
 
   // Update next action + date
-  custSheet.getRange(rowIndex, 18, 1, 2).setValues([['Call Back', newNextActionDate]]);
+  custSheet.getRange(rowIndex, 18, 1, 2).setValues([['Customer Callback', newNextActionDate]]);
   custSheet.getRange(rowIndex, 5).setValue(timestamp);
 
   // Optionally reassign agent
@@ -1832,6 +1839,7 @@ function getAgentList(token) {
   const agents = [];
   for (let i = 1; i < data.length; i++) {
     if (!data[i][0]) continue;
+    if (String(data[i][5]) !== 'Agent') continue; // Only show Agents
     agents.push({
       agentId: String(data[i][0]),
       name: String(data[i][1] || ''),
@@ -1846,7 +1854,7 @@ function getAgentList(token) {
 
 function createAgent(token, payload) {
   requireAdmin_(token);
-  const { name, email, password, role } = payload;
+  const { name, email, password } = payload; // removed role
   if (!name || !email || !password) throw new Error('Name, email and password are required.');
 
   const sheet = ss.getSheetByName('Users');
@@ -1863,24 +1871,26 @@ function createAgent(token, payload) {
   const hash = hashPassword(password, salt);
   const created = new Date().toISOString();
 
-  sheet.appendRow([agentId, name.trim(), email.trim().toLowerCase(), hash, salt, role || 'Agent', 'Verified', '', created]);
+  // Force role to 'Agent'
+  sheet.appendRow([agentId, name.trim(), email.trim().toLowerCase(), hash, salt, 'Agent', 'Verified', '', created]);
   return { success: true, agentId };
 }
 
 function updateAgent(token, payload) {
   requireAdmin_(token);
-  const { agentId, name, email, role, status } = payload;
+  const { agentId, name, email, status } = payload; // removed role
   if (!agentId) throw new Error('agentId is required.');
 
   const sheet = ss.getSheetByName('Users');
   const data = sheet.getDataRange().getValues();
   const rowIdx = data.findIndex(r => String(r[0]) === String(agentId));
   if (rowIdx < 1) throw new Error('Agent not found.');
+  if (String(data[rowIdx][5]) !== 'Agent') throw new Error('You can only modify Agent accounts.');
 
   const sheetRow = rowIdx + 1;
   if (name) sheet.getRange(sheetRow, 2).setValue(name.trim());
   if (email) sheet.getRange(sheetRow, 3).setValue(email.trim().toLowerCase());
-  if (role) sheet.getRange(sheetRow, 6).setValue(role);
+  // Removed role update to prevent privilege escalation
   if (status) sheet.getRange(sheetRow, 7).setValue(status);
 
   return { success: true };
@@ -1895,6 +1905,7 @@ function setAgentTempPassword(token, payload) {
   const data = sheet.getDataRange().getValues();
   const rowIdx = data.findIndex(r => String(r[0]) === String(agentId));
   if (rowIdx < 1) throw new Error('Agent not found.');
+  if (String(data[rowIdx][5]) !== 'Agent') throw new Error('You can only reset passwords for Agent accounts.');
 
   const sheetRow = rowIdx + 1;
   const salt = Utilities.getUuid();
@@ -1916,6 +1927,7 @@ function deleteAgent(token, agentId) {
   const data = sheet.getDataRange().getValues();
   const rowIdx = data.findIndex(r => String(r[0]) === String(agentId));
   if (rowIdx < 1) throw new Error('Agent not found.');
+  if (String(data[rowIdx][5]) !== 'Agent') throw new Error('You can only delete Agent accounts.');
 
   sheet.getRange(rowIdx + 1, 7).setValue('Inactive');
   return { success: true };

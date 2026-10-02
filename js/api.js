@@ -131,8 +131,8 @@ async function callBackend(action, payload = {}, opts = {}) {
     }
   }
 
-  // Show loader only for live (non-cached) fetches
-  if (loader) loader.classList.remove('hidden');
+  // Show loader only for live (non-cached), non-background fetches
+  if (loader && !opts.skipCache) loader.classList.remove('hidden');
 
   // --- CACHE BUST for mutations ---
   if (MUTATING_ACTIONS.has(action)) {

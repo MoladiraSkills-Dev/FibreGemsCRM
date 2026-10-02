@@ -502,7 +502,7 @@ async function loadAgentList() {
     countEl.textContent = `${agents.length} agent account${agents.length !== 1 ? 's' : ''}`;
 
     if (agents.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-8 text-center text-gray-500 text-xs">No agents created yet.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-8 text-center text-gray-500 text-xs">No agents created yet.</td></tr>`;
       return;
     }
 
@@ -513,16 +513,15 @@ async function loadAgentList() {
           <p class="text-[11px] text-gray-500 font-mono">${escHtml(a.agentId)}</p>
         </td>
         <td class="px-4 py-3 text-gray-300 font-mono">${escHtml(a.email)}</td>
-        <td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${a.role === 'Admin' ? 'bg-purple-500/20 text-purple-300' : 'bg-blue-500/20 text-blue-300'}">${escHtml(a.role)}</span></td>
         <td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${a.status === 'Verified' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-gray-500/20 text-gray-400'}">${escHtml(a.status)}</span></td>
         <td class="px-4 py-3 font-mono text-gray-400">${escHtml(a.tempPass || '—')}</td>
         <td class="px-4 py-3">
-          <button onclick="openEditAgent('${escHtml(a.agentId)}', '${escJs(a.name)}', '${escJs(a.email)}', '${escJs(a.role)}', '${escJs(a.status)}')" class="px-2.5 py-1 bg-white/5 hover:bg-white/10 text-gray-300 rounded text-[11px] font-semibold transition-colors mr-1">Edit</button>
+          <button onclick="openEditAgent('${escHtml(a.agentId)}', '${escJs(a.name)}', '${escJs(a.email)}', '${escJs(a.status)}')" class="px-2.5 py-1 bg-white/5 hover:bg-white/10 text-gray-300 rounded text-[11px] font-semibold transition-colors mr-1">Edit</button>
         </td>
       </tr>
     `).join('');
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-8 text-center text-red-400 text-xs">Failed to load agents: ${escHtml(err.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-8 text-center text-red-400 text-xs">Failed to load agents: ${escHtml(err.message)}</td></tr>`;
   }
 }
 
@@ -537,7 +536,6 @@ function openAgentModal(isEdit = false) {
     document.getElementById('am-agent-id').value = '';
     document.getElementById('am-name').value = '';
     document.getElementById('am-email').value = '';
-    document.getElementById('am-role').value = 'Agent';
     document.getElementById('am-status-row').classList.add('hidden');
     document.getElementById('am-password-row').classList.remove('hidden');
     document.getElementById('am-password').value = '';
@@ -545,14 +543,13 @@ function openAgentModal(isEdit = false) {
   }
 }
 
-function openEditAgent(agentId, name, email, role, status) {
+function openEditAgent(agentId, name, email, status) {
   openAgentModal(true);
   document.getElementById('agent-modal-title').textContent = 'Edit Agent';
   document.getElementById('agent-modal-subtitle').textContent = `Editing ${name}`;
   document.getElementById('am-agent-id').value = agentId;
   document.getElementById('am-name').value = name;
   document.getElementById('am-email').value = email;
-  document.getElementById('am-role').value = role;
   document.getElementById('am-status').value = status;
   document.getElementById('am-status-row').classList.remove('hidden');
   document.getElementById('am-password-row').classList.add('hidden');
@@ -595,7 +592,6 @@ async function saveAgentModal() {
       await callBackend('createAgent', {
         name: document.getElementById('am-name').value.trim(),
         email: document.getElementById('am-email').value.trim(),
-        role: document.getElementById('am-role').value,
         password: document.getElementById('am-password').value
       });
       showToast('Agent created successfully!');
@@ -604,7 +600,6 @@ async function saveAgentModal() {
         agentId: agentId,
         name: document.getElementById('am-name').value.trim(),
         email: document.getElementById('am-email').value.trim(),
-        role: document.getElementById('am-role').value,
         status: document.getElementById('am-status').value
       });
       showToast('Agent details updated!');
