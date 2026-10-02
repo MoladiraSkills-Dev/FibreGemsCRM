@@ -161,6 +161,9 @@ function doPost(e) {
       case 'uploadAgilityReport':
         result = uploadAgilityReport(token, payload);
         break;
+      case 'pingSession':
+        result = pingSession(token);
+        break;
       default:
         throw new Error("Invalid API action requested: " + action);
     }
@@ -226,6 +229,13 @@ function getSessionUser(token) {
     }
   }
   throw new Error('Session expired. Please log in again.');
+}
+
+function pingSession(token) {
+  const session = getSessionUser(token);
+  const cache = CacheService.getScriptCache();
+  cache.put('agent_last_seen_' + session.agentId, Date.now().toString(), 300); // 5 mins
+  return { success: true };
 }
 
 function requireAdmin_(token) {
@@ -1239,7 +1249,8 @@ function getAdminDashboard(token) {
   requireAdmin_(token);
   const todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
   const activityData = ss.getSheetByName('ACTIVITY_LOG').getDataRange().getValues().slice(1);
-  const userMap = new Map(ss.getSheetByName('Users').getDataRange().getValues().slice(1).map(u => [u[0], { name: u[1], role: u[5] }]));
+  const usersData = ss.getSheetByName('Users').getDataRange().getValues().slice(1);
+  const userMap = new Map(usersData.map(u => [u[0], { name: u[1], role: u[5] }]));
 
   const agentStats = {};
   activityData.forEach(row => {
@@ -1252,13 +1263,30 @@ function getAdminDashboard(token) {
     }
   });
 
-  const agents = Object.keys(agentStats).map(aid => ({
-    agentId: aid,
-    name: userMap.get(aid)?.name || 'Unknown',
-    role: userMap.get(aid)?.role || 'Agent',
-    touches: agentStats[aid].count,
-    lastActive: agentStats[aid].lastActivity
-  })).sort((a, b) => b.lastActive - a.lastActive);
+  const cache = CacheService.getScriptCache();
+  const now = Date.now();
+  let activeCount = 0;
+
+  const agents = usersData
+    .filter(u => u[5] !== 'Admin') // Exclude Admins from agent list
+    .map(u => {
+      const aid = u[0];
+      const role = u[5];
+      const name = u[1];
+      const lastSeenStr = cache.get('agent_last_seen_' + aid);
+      const isOnline = lastSeenStr ? (now - parseInt(lastSeenStr) < 300000) : false; // 5 mins
+      if (isOnline) activeCount++;
+      
+      return {
+        agentId: aid,
+        name: name,
+        role: role,
+        touches: agentStats[aid] ? agentStats[aid].count : 0,
+        lastActive: agentStats[aid] ? agentStats[aid].lastActivity : null,
+        isOnline: isOnline
+      };
+    })
+    .sort((a, b) => b.isOnline - a.isOnline || (b.lastActive || 0) - (a.lastActive || 0));
 
   const custData = ss.getSheetByName('CUSTOMERS').getDataRange().getValues().slice(1);
   const statuses = custData.reduce((acc, row) => {
@@ -1269,7 +1297,7 @@ function getAdminDashboard(token) {
     return acc;
   }, {});
 
-  return { activeCount: agents.length, agents, statuses };
+  return { activeCount: activeCount, agents, statuses };
 }
 
 /**
