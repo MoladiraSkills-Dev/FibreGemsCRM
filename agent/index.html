@@ -703,7 +703,15 @@
         <div>
           <span class="text-xs font-semibold uppercase tracking-wider text-fiber-400">Log Call Outcome</span>
           <h3 class="text-lg font-bold text-white mt-0.5" id="co-client-name">Client Name</h3>
-          <p class="text-sm font-mono text-emerald-400 mt-0.5" id="co-client-phone">000 000 0000</p>
+          <div class="flex items-center gap-3 mt-1 flex-wrap">
+            <p class="text-sm font-mono text-emerald-400" id="co-client-phone">000 000 0000</p>
+            <a id="co-call-btn" href="#" class="px-2.5 py-0.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 text-xs font-semibold inline-flex items-center gap-1 transition-colors">
+              📞 Call
+            </a>
+            <a id="co-wa-btn" href="#" target="_blank" class="px-2.5 py-0.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 text-xs font-semibold inline-flex items-center gap-1 transition-colors">
+              💬 WhatsApp
+            </a>
+          </div>
         </div>
         <button onclick="closeCallOutcomeModal()"
           class="p-2 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white transition-colors">

@@ -417,7 +417,7 @@ async function loadMasterGrid() {
       }
 
       return `
-      <tr class="border-b border-white/5 hover:bg-white/[0.04] transition-colors text-xs">
+      <tr class="border-b border-white/5 hover:bg-white/[0.06] transition-colors text-xs cursor-pointer group" onclick="openCustomerDetail('${escHtml(r.id)}')" title="Click to view full customer details & models">
         <td class="px-4 py-3 cursor-pointer group" onclick="openCustomerDetail('${escHtml(r.id)}')" title="Click to view full customer details from Team Lead perspective">
           <p class="font-semibold text-fiber-400 group-hover:text-fiber-300 group-hover:underline flex items-center gap-1.5 transition-colors">
             ${escHtml(r.name || 'Unnamed Customer')}
@@ -475,6 +475,11 @@ function openCustomerDetail(customerId) {
   // Badges
   document.getElementById('cdm-status-badge').innerHTML = statusBadge(c ? c.status : '');
   document.getElementById('cdm-pay-status-badge').innerHTML = `<span class="px-2.5 py-0.5 rounded text-[10px] font-semibold bg-white/5 text-gray-300 border border-white/10">${escHtml((c && c.payStatus) || 'Pending')}</span>`;
+  const recBadgeEl = document.getElementById('cdm-record-status-badge');
+  if (recBadgeEl) {
+    const rs = (c && c.recordStatus) || 'Active';
+    recBadgeEl.innerHTML = `<span class="px-2.5 py-0.5 rounded text-[10px] font-semibold bg-blue-500/10 text-blue-300 border border-blue-500/20">${escHtml(rs)}</span>`;
+  }
 
   // Quick Action Contact Buttons
   const phone = (c && c.cellNumber) ? c.cellNumber.replace(/\s+/g, '') : '';
@@ -511,13 +516,21 @@ function openCustomerDetail(customerId) {
   document.getElementById('cdm-d-suburb').textContent = (c && c.suburb) || '—';
   const addrEl = document.getElementById('cdm-d-address');
   addrEl.textContent = (c && c.address) || '—';
-  addrEl.title = (c && c.address) || '';
+
+  const recordStatusEl = document.getElementById('cdm-d-recordstatus');
+  if (recordStatusEl) recordStatusEl.textContent = (c && c.recordStatus) || 'Active';
 
   document.getElementById('cdm-d-agent').textContent = (c && c.agent) || 'Unassigned';
   document.getElementById('cdm-d-status').textContent = (c && c.status) || '—';
   document.getElementById('cdm-d-nextaction').textContent = (c && c.nextAction) || '—';
   document.getElementById('cdm-d-nextdate').textContent = (c && c.nextActionDate) || '—';
+  const nextTimeEl = document.getElementById('cdm-d-nexttime');
+  if (nextTimeEl) nextTimeEl.textContent = (c && c.nextActionTime) ? `at ${c.nextActionTime}` : '';
+
   document.getElementById('cdm-d-lastcontact').textContent = (c && c.lastContactDate) || '—';
+  const lastOutcomeEl = document.getElementById('cdm-d-lastoutcome');
+  if (lastOutcomeEl) lastOutcomeEl.textContent = (c && (c.lastContactOutcome || c.lastOutcome)) || '—';
+
   document.getElementById('cdm-d-created').textContent = (c && (c.createdDate || c.orderDate)) || '—';
 
   // Populate Orders & EasyPay Tab Fields
@@ -527,6 +540,8 @@ function openCustomerDetail(customerId) {
   document.getElementById('cdm-d-orderdate').textContent = (c && c.orderDate) || '—';
   document.getElementById('cdm-d-activation').textContent = (c && c.activationDate) || '—';
   document.getElementById('cdm-d-refcode').textContent = (c && c.referralCode) || '—';
+  const refByCodeEl = document.getElementById('cdm-d-refbycode');
+  if (refByCodeEl) refByCodeEl.textContent = (c && c.referredByCode) || '—';
 
   document.getElementById('cdm-d-easypay').textContent = (c && c.easyPayNumber) || '—';
   document.getElementById('cdm-d-cycle').textContent = (c && c.easyPayCycle) || 'Cycle 1 of 3';
@@ -547,7 +562,12 @@ function openCustomerDetail(customerId) {
   // Switch to Overview Tab by default
   switchCustomerDetailTab('overview');
 
-  // Reset History tab
+  // Reset Payment History tab & History tab
+  const pmtTabCount = document.getElementById('cdm-payments-tab-count');
+  if (pmtTabCount) pmtTabCount.textContent = '...';
+  const pmtsListEl = document.getElementById('cdm-payments-list');
+  if (pmtsListEl) pmtsListEl.innerHTML = `<div class="py-6 text-center text-xs text-gray-400"><div class="spinner mx-auto mb-2"></div>Loading payments...</div>`;
+
   document.getElementById('cdm-history-count').textContent = 'Loading...';
   document.getElementById('cdm-history-tab-count').textContent = '...';
   document.getElementById('cdm-history-list').innerHTML = `
@@ -567,7 +587,7 @@ function closeCustomerDetailModal() {
 }
 
 function switchCustomerDetailTab(tab) {
-  ['overview', 'orders', 'history'].forEach(t => {
+  ['overview', 'orders', 'payments', 'history'].forEach(t => {
     const btn = document.getElementById(`cdm-tab-${t}`);
     const panel = document.getElementById(`cdm-panel-${t}`);
     if (btn && panel) {
@@ -607,10 +627,71 @@ async function fetchCustomerDetailHistory(customerId) {
     document.getElementById('cdm-d-status').textContent = c.status || '—';
     document.getElementById('cdm-d-nextaction').textContent = c.nextAction || '—';
     document.getElementById('cdm-d-nextdate').textContent = c.nextActionDate || '—';
+    const nextTimeEl = document.getElementById('cdm-d-nexttime');
+    if (nextTimeEl) nextTimeEl.textContent = c.nextActionTime ? `at ${c.nextActionTime}` : '';
+
     document.getElementById('cdm-d-lastcontact').textContent = c.lastContactDate || '—';
+    const lastOutcomeEl = document.getElementById('cdm-d-lastoutcome');
+    if (lastOutcomeEl) lastOutcomeEl.textContent = c.lastContactOutcome || c.lastOutcome || '—';
+
     document.getElementById('cdm-d-ordernum').textContent = c.orderNumber || '—';
     document.getElementById('cdm-d-easypay').textContent = c.easyPayNumber || '—';
     document.getElementById('cdm-d-cycle').textContent = c.easyPayCycle || '—';
+
+    // Escalation Alert Banner
+    const escBanner = document.getElementById('cdm-escalation-banner');
+    if (escBanner) {
+      if (c.escalated === 'True' || c.escalated === true) {
+        escBanner.classList.remove('hidden');
+        const reasonEl = document.getElementById('cdm-escalation-reason');
+        if (reasonEl) reasonEl.textContent = c.escalationReason || 'No contact/feedback recorded for >= 7 days.';
+      } else {
+        escBanner.classList.add('hidden');
+      }
+    }
+
+    // Render Payments List
+    const pmts = res.payments || [];
+    const pmtTabCount = document.getElementById('cdm-payments-tab-count');
+    if (pmtTabCount) pmtTabCount.textContent = pmts.length;
+
+    const pmtsListEl = document.getElementById('cdm-payments-list');
+    if (pmtsListEl) {
+      if (pmts.length === 0) {
+        pmtsListEl.innerHTML = `
+          <div class="py-8 text-center text-gray-500 text-xs bg-white/[0.01] rounded-xl border border-white/5">
+            No specific payment transactions recorded yet for this customer.
+          </div>
+        `;
+      } else {
+        pmtsListEl.innerHTML = `
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs">
+              <thead>
+                <tr class="border-b border-white/10 text-gray-400 uppercase font-semibold text-[10px]">
+                  <th class="py-2.5 px-3 text-left">Payment ID</th>
+                  <th class="py-2.5 px-3 text-left">Status</th>
+                  <th class="py-2.5 px-3 text-left">Promised Date</th>
+                  <th class="py-2.5 px-3 text-left">Paid Date</th>
+                  <th class="py-2.5 px-3 text-right">Amount</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-white/5">
+                ${pmts.map(p => `
+                  <tr>
+                    <td class="py-2.5 px-3 font-mono text-fiber-400 font-semibold">${escHtml(p.paymentId || '—')}</td>
+                    <td class="py-2.5 px-3"><span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-white/5 text-gray-300 border border-white/10">${escHtml(p.status || 'Pending')}</span></td>
+                    <td class="py-2.5 px-3 font-mono text-amber-300">${escHtml(p.promisedDate || '—')}</td>
+                    <td class="py-2.5 px-3 font-mono text-emerald-400">${escHtml(p.paidDate || '—')}</td>
+                    <td class="py-2.5 px-3 text-right font-mono font-bold text-white">${p.amount ? 'R' + escHtml(p.amount) : '—'}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+    }
 
     // Render activity list
     const acts = res.activities || [];

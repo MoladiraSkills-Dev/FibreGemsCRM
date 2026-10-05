@@ -1336,9 +1336,11 @@ function getAdminCallbackReport(token, targetDate) {
   const usersData = ss.getSheetByName('Users').getDataRange().getValues();
   const userMap = new Map(usersData.slice(1).map(u => [String(u[0]).trim(), { name: u[1], role: u[5] }]));
 
-  // Build agent map
+  // Build agent map — only include frontline agents (role === 'Agent').
+  // Admins are team leaders/managers and should not appear in the execution breakdown.
   const agentReport = {};
   userMap.forEach((user, id) => {
+    if (user.role !== 'Agent') return; // skip Admins, Support, etc.
     agentReport[id] = {
       agentId: id,
       name: user.name,
