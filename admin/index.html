@@ -839,7 +839,7 @@
   <div id="modal-customer-detail" class="hidden fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
     <div class="modal-overlay absolute inset-0 bg-black/75 backdrop-blur-sm" onclick="closeCustomerDetailModal()"></div>
     
-    <div class="relative bg-navy-800 border border-white/10 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col z-10 animate-slide-in overflow-hidden">
+    <div class="relative bg-navy-800 border border-white/10 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[92vh] flex flex-col z-10 animate-slide-in overflow-hidden">
       <!-- Modal Header -->
       <div class="px-6 py-5 border-b border-white/10 flex items-start justify-between bg-navy-900/60">
         <div class="flex items-start gap-4">
@@ -851,6 +851,7 @@
               <h3 class="text-xl font-bold text-white tracking-tight" id="cdm-name">Customer Details</h3>
               <span id="cdm-status-badge"></span>
               <span id="cdm-pay-status-badge"></span>
+              <span id="cdm-record-status-badge"></span>
             </div>
             <div class="flex items-center gap-3 text-xs text-gray-400 mt-1 flex-wrap font-mono">
               <span id="cdm-id">CUST-000000</span>
@@ -890,20 +891,32 @@
       </div>
 
       <!-- Navigation Tabs inside Customer Modal -->
-      <div class="flex border-b border-white/10 px-6 bg-navy-900/40">
-        <button onclick="switchCustomerDetailTab('overview')" id="cdm-tab-overview" class="py-3 px-4 text-xs font-semibold border-b-2 border-fiber-500 text-fiber-400 transition-colors">
+      <div class="flex border-b border-white/10 px-6 bg-navy-900/40 overflow-x-auto">
+        <button onclick="switchCustomerDetailTab('overview')" id="cdm-tab-overview" class="py-3 px-4 text-xs font-semibold border-b-2 border-fiber-500 text-fiber-400 transition-colors whitespace-nowrap">
           Overview & Profile
         </button>
-        <button onclick="switchCustomerDetailTab('orders')" id="cdm-tab-orders" class="py-3 px-4 text-xs font-semibold border-b-2 border-transparent text-gray-400 hover:text-white transition-colors">
+        <button onclick="switchCustomerDetailTab('orders')" id="cdm-tab-orders" class="py-3 px-4 text-xs font-semibold border-b-2 border-transparent text-gray-400 hover:text-white transition-colors whitespace-nowrap">
           Orders & EasyPay
         </button>
-        <button onclick="switchCustomerDetailTab('history')" id="cdm-tab-history" class="py-3 px-4 text-xs font-semibold border-b-2 border-transparent text-gray-400 hover:text-white transition-colors">
+        <button onclick="switchCustomerDetailTab('payments')" id="cdm-tab-payments" class="py-3 px-4 text-xs font-semibold border-b-2 border-transparent text-gray-400 hover:text-white transition-colors whitespace-nowrap">
+          Payment History (<span id="cdm-payments-tab-count">0</span>)
+        </button>
+        <button onclick="switchCustomerDetailTab('history')" id="cdm-tab-history" class="py-3 px-4 text-xs font-semibold border-b-2 border-transparent text-gray-400 hover:text-white transition-colors whitespace-nowrap">
           Call Logs & Activity (<span id="cdm-history-tab-count">0</span>)
         </button>
       </div>
 
       <!-- Modal Body (Scrollable) -->
       <div class="p-6 overflow-y-auto flex-1 space-y-6">
+        <!-- Escalation Banner if Lead Escalated -->
+        <div id="cdm-escalation-banner" class="hidden p-4 rounded-xl bg-red-500/10 border border-red-500/30 flex items-start gap-3">
+          <span class="text-xl">⚠️</span>
+          <div>
+            <h4 class="text-xs font-bold uppercase tracking-wider text-red-400">Escalated Lead Alert</h4>
+            <p class="text-xs text-gray-300 mt-0.5" id="cdm-escalation-reason">No feedback/touch for >= 7 days. Requires team leader intervention.</p>
+          </div>
+        </div>
+
         <!-- TAB 1: OVERVIEW -->
         <div id="cdm-panel-overview" class="space-y-6">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -933,9 +946,13 @@
                   <span class="text-gray-400">Area / Suburb</span>
                   <span class="text-white font-medium" id="cdm-d-suburb">—</span>
                 </div>
-                <div class="flex justify-between py-1">
+                <div class="flex justify-between py-1 border-b border-white/5">
                   <span class="text-gray-400">Physical Address</span>
-                  <span class="text-white text-right max-w-[220px] truncate" id="cdm-d-address" title="">—</span>
+                  <span class="text-white text-right max-w-[280px] break-words font-medium" id="cdm-d-address">—</span>
+                </div>
+                <div class="flex justify-between py-1">
+                  <span class="text-gray-400">Record Status</span>
+                  <span class="text-gray-300 font-medium" id="cdm-d-recordstatus">Active</span>
                 </div>
               </div>
             </div>
@@ -959,12 +976,16 @@
                   <span class="text-white font-medium" id="cdm-d-nextaction">—</span>
                 </div>
                 <div class="flex justify-between py-1 border-b border-white/5">
-                  <span class="text-gray-400">Next Action Date</span>
-                  <span class="text-white font-mono" id="cdm-d-nextdate">—</span>
+                  <span class="text-gray-400">Next Action Date & Time</span>
+                  <span class="text-white font-mono"><span id="cdm-d-nextdate">—</span> <span id="cdm-d-nexttime" class="text-amber-300 font-semibold"></span></span>
                 </div>
                 <div class="flex justify-between py-1 border-b border-white/5">
                   <span class="text-gray-400">Last Contact Date</span>
                   <span class="text-gray-300 font-mono" id="cdm-d-lastcontact">—</span>
+                </div>
+                <div class="flex justify-between py-1 border-b border-white/5">
+                  <span class="text-gray-400">Last Call Outcome</span>
+                  <span class="text-emerald-400 font-medium" id="cdm-d-lastoutcome">—</span>
                 </div>
                 <div class="flex justify-between py-1">
                   <span class="text-gray-400">Created Date</span>
@@ -1003,9 +1024,13 @@
                   <span class="text-gray-400">Activation Date</span>
                   <span class="text-white font-mono" id="cdm-d-activation">—</span>
                 </div>
-                <div class="flex justify-between py-1">
+                <div class="flex justify-between py-1 border-b border-white/5">
                   <span class="text-gray-400">Referral Code</span>
                   <span class="text-amber-300 font-mono" id="cdm-d-refcode">—</span>
+                </div>
+                <div class="flex justify-between py-1">
+                  <span class="text-gray-400">Referred By Code</span>
+                  <span class="text-gray-300 font-mono" id="cdm-d-refbycode">—</span>
                 </div>
               </div>
             </div>
@@ -1040,7 +1065,19 @@
           </div>
         </div>
 
-        <!-- TAB 3: ACTIVITY LOGS & CALL HISTORY -->
+        <!-- TAB 3: PAYMENT HISTORY -->
+        <div id="cdm-panel-payments" class="hidden space-y-4">
+          <div class="flex items-center justify-between">
+            <h4 class="text-xs font-semibold uppercase tracking-wider text-gray-400">
+              Recorded Payment Records & Transactions
+            </h4>
+          </div>
+          <div id="cdm-payments-list" class="space-y-3">
+            <p class="text-xs text-gray-500 py-6 text-center">Loading payment history...</p>
+          </div>
+        </div>
+
+        <!-- TAB 4: ACTIVITY LOGS & CALL HISTORY -->
         <div id="cdm-panel-history" class="hidden space-y-4">
           <div class="flex items-center justify-between">
             <h4 class="text-xs font-semibold uppercase tracking-wider text-gray-400">
