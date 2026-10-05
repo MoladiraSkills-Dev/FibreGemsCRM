@@ -622,17 +622,25 @@ function getAgentDailyQueue(token) {
   const custData = ss.getSheetByName('CUSTOMERS').getDataRange().getValues();
   const actData = ss.getSheetByName('ACTIVITY_LOG').getDataRange().getValues();
 
-  // Map latest activity for each customer by this agent
+  // Map latest activity for each customer by this agent.
+  // Also track customers where a genuine call outcome was logged today
+  // (action = 'Call Logged'), distinct from mere lead creation.
   const agentActivityMap = {};
+  const calledTodaySet = new Set(); // customers with a logged call outcome today
   let todayTouchCount = 0;
   for (let i = 1; i < actData.length; i++) {
     const row = actData[i];
     const rowAgentId = String(row[4] || '').trim();
     const customerId = String(row[2] || '').trim();
     const actDateStr = formatDateSafe_(row[1]);
+    const actAction = String(row[5] || '').trim();
 
     if (rowAgentId === session.agentId) {
-      if (actDateStr === todayStr) todayTouchCount++;
+      if (actDateStr === todayStr) {
+        todayTouchCount++;
+        // Only 'Call Logged' means an outcome was genuinely recorded today
+        if (actAction === 'Call Logged' && customerId) calledTodaySet.add(customerId);
+      }
       if (customerId) agentActivityMap[customerId] = row;
     }
   }
@@ -684,17 +692,19 @@ function getAgentDailyQueue(token) {
       const scheduledDate = new Date(nextActionDate + 'T00:00:00');
       const diffDays = Math.round((todayDate - scheduledDate) / (1000 * 60 * 60 * 24));
       
-      const wasCreatedToday = (createdStr === todayStr);
-      const wasCompletedToday = (lastContactDate === todayStr && !wasCreatedToday);
+      // A callback is considered "worked today" if the agent logged a genuine call outcome
+      // (Call Logged action in ACTIVITY_LOG). This is more accurate than checking
+      // lastContactDate === today because lastContactDate is also set on lead creation.
+      const wasCalledToday = calledTodaySet.has(custId);
 
-      // Future callbacks (diffDays < 0): HIDE! They should ONLY show on the scheduled day, 
-      // UNLESS the agent actually completed it today (meaning they pushed it to the future today).
-      if (diffDays < 0 && !wasCompletedToday) {
+      // Future callbacks (diffDays < 0): HIDE! They should ONLY show on the scheduled day,
+      // UNLESS the agent actually logged a call outcome today (meaning they rescheduled it).
+      if (diffDays < 0 && !wasCalledToday) {
         continue;
       }
-      
+
       // If it's today and a time is set, hide until 5 mins before (UNLESS already completed)
-      if (diffDays === 0 && nextActionTime && !wasCompletedToday) {
+      if (diffDays === 0 && nextActionTime && !wasCalledToday) {
         const now = new Date();
         const currentMins = now.getHours() * 60 + now.getMinutes();
         const [hours, mins] = nextActionTime.split(':').map(Number);
@@ -705,7 +715,8 @@ function getAgentDailyQueue(token) {
       }
 
       totalScheduledToday++;
-      const isCompleted = (lastContactDate === todayStr);
+      // A callback counts as completed today if a call outcome was logged today
+      const isCompleted = wasCalledToday;
       if (isCompleted) callbacksCompletedToday++;
 
       todayCallbacks.push({
@@ -732,7 +743,7 @@ function getAgentDailyQueue(token) {
         isActivationFollowUp: isActivationFollowUp,
         isOverdue: diffDays > 0,
         daysOverdue: Math.max(0, diffDays),
-        isCompletedToday: isCompleted,
+        isCompletedToday: wasCalledToday,
         isPromisedPayment: false,
         lastOutcome: String(row[31] || (agentActivityMap[custId] ? agentActivityMap[custId][7] : ''))
       });
@@ -742,7 +753,7 @@ function getAgentDailyQueue(token) {
       const payDiffDays = Math.round((todayDate - payDate) / (1000 * 60 * 60 * 24));
       if (payDiffDays >= 0) {
         totalScheduledToday++;
-        const isCompleted = (lastContactDate === todayStr);
+        const isCompleted = calledTodaySet.has(custId);
         if (isCompleted) callbacksCompletedToday++;
         todayCallbacks.push({
           customerId: custId,
@@ -1339,6 +1350,20 @@ function getAdminCallbackReport(token, targetDate) {
     };
   });
 
+  // Build a precise set of customers where a call outcome was logged on the report date.
+  // Using the ACTIVITY_LOG directly avoids the false-negative caused by lastContactDate
+  // also being set on lead creation (making newly-created-and-worked leads appear uncompleted).
+  const calledOnReportDate = new Set(); // Set<customerId>
+  for (let i = 1; i < actData.length; i++) {
+    const actRow = actData[i];
+    const actDateStr = formatDateSafe_(actRow[1]);
+    const actAction = String(actRow[5] || '').trim();
+    const actCustId = String(actRow[2] || '').trim();
+    if (actDateStr === reportDateStr && actAction === 'Call Logged' && actCustId) {
+      calledOnReportDate.add(actCustId);
+    }
+  }
+
   const missedCallbacks = [];
   const escalatedLeads = [];
 
@@ -1363,15 +1388,14 @@ function getAdminCallbackReport(token, targetDate) {
       const scheduledDate = new Date(nextActionDate + 'T00:00:00');
       const isDueOnReportDate = (nextActionDate === reportDateStr);
       const isOverdue = (scheduledDate < reportDate);
-      
-      const createdDateStr = formatDateSafe_(row[2]);
-      const wasCreatedToday = (createdDateStr === reportDateStr);
-      const wasCompletedToday = (lastContactDate === reportDateStr && !wasCreatedToday);
+      // A callback is definitively completed if a 'Call Logged' entry exists in ACTIVITY_LOG
+      // for this customer on the report date — this is immune to the wasCreatedToday false-exclusion.
+      const wasCalledOnReportDate = calledOnReportDate.has(custId);
 
-      if (agentReport[assignedAgentId] && (isDueOnReportDate || isOverdue || wasCompletedToday)) {
+      if (agentReport[assignedAgentId] && (isDueOnReportDate || isOverdue || wasCalledOnReportDate)) {
         agentReport[assignedAgentId].scheduled++;
-        
-        if (wasCompletedToday || lastContactDate >= nextActionDate) {
+
+        if (wasCalledOnReportDate) {
           agentReport[assignedAgentId].completed++;
         } else {
           agentReport[assignedAgentId].missed++;
