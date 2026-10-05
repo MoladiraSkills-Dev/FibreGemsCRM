@@ -196,7 +196,11 @@ function applyFilters_customers() {
     const matchSearch = !search ||
       (c.customer || '').toLowerCase().includes(search) ||
       (c.orderNumber || '').toLowerCase().includes(search) ||
-      (c.phone || '').toLowerCase().includes(search);
+      (c.phone || '').toLowerCase().includes(search) ||
+      (c.product || '').toLowerCase().includes(search) ||
+      (c.region || '').toLowerCase().includes(search) ||
+      (c.status || '').toLowerCase().includes(search) ||
+      (c.provider || '').toLowerCase().includes(search);
       
     // Match date if selected (checks created_da/completedDate matching YYYY-MM-DD)
     let matchDate = true;
@@ -388,6 +392,12 @@ async function loadTickets() {
   }
 }
 
+function refreshSupportTickets() {
+  allTickets = [];
+  loadTickets();
+  showToast('Refreshing support tickets...', 'info');
+}
+
 function applyFilters_tickets() {
   const search = (document.getElementById('ticket-search')?.value || '').toLowerCase();
   const dateFilter = document.getElementById('ticket-date-filter')?.value; // YYYY-MM-DD
@@ -397,7 +407,14 @@ function applyFilters_tickets() {
     const matchSearch = !search ||
       (t.customer || '').toLowerCase().includes(search) ||
       (t.ticketNumber || '').toLowerCase().includes(search) ||
-      (t.description || '').toLowerCase().includes(search);
+      (t.ticket2 || '').toLowerCase().includes(search) ||
+      (t.orderNumber || '').toLowerCase().includes(search) ||
+      (t.description || '').toLowerCase().includes(search) ||
+      (t.channelPartner || '').toLowerCase().includes(search) ||
+      (t.product || '').toLowerCase().includes(search) ||
+      (t.status || '').toLowerCase().includes(search) ||
+      (t.paymentRec || '').toLowerCase().includes(search) ||
+      (t.updates && t.updates.join(' ').toLowerCase().includes(search));
       
     let matchDate = true;
     if (dateFilter) {
@@ -463,8 +480,14 @@ function renderTicketTable() {
       <td><span class="${getStatusBadgeClass(t.status)} text-[11px] px-2 py-0.5 rounded-full font-semibold">${escHtml(t.status || 'Unknown')}</span></td>
       <td class="text-xs text-gray-400 max-w-xs truncate">${escHtml(t.description || '—')}</td>
       <td class="text-xs text-gray-500">${escHtml(t.channelPartner || '—')}</td>
-      <td>
-        <button class="text-xs text-fiber-400 font-semibold pointer-events-none">View →</button>
+      <td onclick="event.stopPropagation()">
+        <button onclick="openTicketDetail(${globalIdx})"
+          class="px-2.5 py-1 text-xs bg-fiber-600/20 hover:bg-fiber-600/30 text-fiber-300 hover:text-white font-semibold rounded-lg border border-fiber-500/20 transition-all inline-flex items-center gap-1">
+          <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+          </svg>
+          Update Ticket
+        </button>
       </td>
     </tr>
   `;
@@ -648,33 +671,139 @@ async function loadSyncHistory() {
   }
 }
 
+async function convertFileToCsvBase64_(file, provider) {
+  const ext = file.name.split('.').pop().toLowerCase();
+
+  if (ext === 'csv') {
+    return await readFileAsBase64_(file);
+  }
+
+  if (ext === 'xlsx' || ext === 'xls') {
+    if (typeof XLSX === 'undefined') {
+      throw new Error('Excel parser library is initializing. Please refresh the page and try again.');
+    }
+    const arrayBuffer = await file.arrayBuffer();
+    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+
+    if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+      throw new Error('The uploaded Excel file contains no worksheets.');
+    }
+
+    // Smart sheet matching based on provider or fallback to first sheet
+    let targetSheetName = workbook.SheetNames[0];
+    const provUpper = (provider || '').toUpperCase();
+
+    for (const sheetName of workbook.SheetNames) {
+      const clean = sheetName.trim().toUpperCase();
+      if (provUpper === 'SADV' && (clean === 'AUGSEP' || clean.includes('SADV') || clean.includes('AUGSEP'))) {
+        targetSheetName = sheetName;
+        break;
+      }
+      if (provUpper === 'INFINIFI' && (clean.includes('INFINIFI') || clean.includes('CUSTOMER'))) {
+        targetSheetName = sheetName;
+        break;
+      }
+    }
+
+    const worksheet = workbook.Sheets[targetSheetName];
+    if (!worksheet) {
+      throw new Error(`Sheet "${targetSheetName}" could not be parsed.`);
+    }
+
+    const csvString = XLSX.utils.sheet_to_csv(worksheet);
+    if (!csvString || !csvString.trim()) {
+      throw new Error(`Sheet "${targetSheetName}" in workbook is empty.`);
+    }
+
+    const encoder = new TextEncoder();
+    const bytes = encoder.encode(csvString);
+    let binary = '';
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+  }
+
+  throw new Error('Unsupported file format. Please upload an Excel (.xlsx, .xls) or CSV (.csv) file.');
+}
+
 async function uploadAgilityReport() {
   const provider = document.getElementById('agility-provider').value;
   const fileInput = document.getElementById('agility-file');
   const file = fileInput.files[0];
+  const btn = document.getElementById('agility-upload-btn');
+  const resultEl = document.getElementById('agility-upload-result');
 
   if (!file) {
     showToast('Please select a file to upload.', 'error');
     return;
   }
 
-  showToast(`Uploading ${provider} agility report...`, 'info');
+  const validExts = ['xlsx', 'xls', 'csv'];
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (!validExts.includes(ext)) {
+    showToast('Please upload an Excel (.xlsx, .xls) or CSV (.csv) file.', 'error');
+    return;
+  }
+
+  if (btn) { btn.disabled = true; btn.innerHTML = '<div class="spinner-sm inline-block mr-2"></div> Uploading &amp; Parsing...'; }
+  if (resultEl) resultEl.classList.add('hidden');
+  showToast(`Parsing ${file.name}...`, 'info');
 
   try {
-    // Read file as base64 to send via Apps Script backend
-    const base64 = await readFileAsBase64_(file);
-    await callBackend('uploadAgilityReport', {
+    const base64 = await convertFileToCsvBase64_(file, provider);
+    const result = await callBackend('uploadAgilityReport', {
       provider,
       fileName: file.name,
       fileContent: base64,
     });
-    showToast(`${provider} Agility report synced successfully!`, 'success');
+
+    // Show rich result card
+    if (resultEl) {
+      resultEl.classList.remove('hidden');
+      resultEl.innerHTML = `
+        <div class="flex items-center gap-2 text-emerald-400 font-bold text-sm mb-3">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          ${escHtml(provider)} Agility Report Synced
+        </div>
+        <div class="grid grid-cols-3 gap-3 mb-3">
+          <div class="text-center p-3 rounded-xl bg-white/5">
+            <p class="text-xl font-bold text-white">${result.rowsProcessed}</p>
+            <p class="text-[10px] text-gray-500 mt-0.5">Rows Processed</p>
+          </div>
+          <div class="text-center p-3 rounded-xl bg-emerald-500/10">
+            <p class="text-xl font-bold text-emerald-400">${result.rowsNew}</p>
+            <p class="text-[10px] text-gray-500 mt-0.5">New Records</p>
+          </div>
+          <div class="text-center p-3 rounded-xl bg-blue-500/10">
+            <p class="text-xl font-bold text-blue-400">${result.rowsUpdated}</p>
+            <p class="text-[10px] text-gray-500 mt-0.5">Updated</p>
+          </div>
+        </div>
+        <p class="text-[11px] text-gray-500">Sync ID: <span class="font-mono text-gray-400">${escHtml(result.syncId)}</span> &bull; ${escHtml(file.name)}</p>
+      `;
+    }
+
+    showToast(`${provider} synced — ${result.rowsNew} new, ${result.rowsUpdated} updated`, 'success');
     fileInput.value = '';
     loadSyncHistory();
-    // Refresh dashboard stats
     loadDashboard();
+
+    // Auto-refresh support tickets and customer tables with new Agility data
+    allTickets = [];
+    allCustomers = [];
+    loadTickets();
+    if (typeof loadCustomers === 'function') loadCustomers();
   } catch (err) {
+    if (resultEl) {
+      resultEl.classList.remove('hidden');
+      resultEl.innerHTML = `<div class="text-red-400 font-semibold text-sm mb-1">Upload Failed</div><p class="text-xs text-gray-400">${escHtml(err.message)}</p>`;
+    }
     showToast('Upload failed: ' + err.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = 'Upload &amp; Parse'; }
   }
 }
 

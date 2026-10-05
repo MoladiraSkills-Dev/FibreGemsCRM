@@ -40,7 +40,7 @@ function doPost(e) {
     // --- SMART CACHE IMPLEMENTATION ---
     const cacheableActions = [
       'getAgentWorklist', 'getAgentDailyQueue', 'getAgentActivityLog',
-      'getAdminDashboard', 'getAdminMasterGrid', 'getAdminCustomerDetail', 'getAdminCallbackReport', 
+      'getAdminMasterGrid', 'getAdminCustomerDetail', 
       'getAgentList', 'getAdminPromisedPayments', 'getSupportDashboard', 
       'getSupportCustomers', 'getSupportTickets'
     ];
@@ -1289,7 +1289,7 @@ function getAdminDashboard(token) {
   let activeCount = 0;
 
   const agents = usersData
-    .filter(u => u[5] !== 'Admin') // Exclude Admins from agent list
+    .filter(u => String(u[5] || '').trim().toLowerCase() === 'agent') // Only show frontline Agents — exclude Admins, Support, Team Leaders
     .map(u => {
       const aid = u[0];
       const role = u[5];
@@ -1297,7 +1297,6 @@ function getAdminDashboard(token) {
       const lastSeenStr = cache.get('agent_last_seen_' + aid);
       const isOnline = lastSeenStr ? (now - parseInt(lastSeenStr) < 300000) : false; // 5 mins
       if (isOnline) activeCount++;
-      
       return {
         agentId: aid,
         name: name,
@@ -1340,7 +1339,7 @@ function getAdminCallbackReport(token, targetDate) {
   // Admins are team leaders/managers and should not appear in the execution breakdown.
   const agentReport = {};
   userMap.forEach((user, id) => {
-    if (user.role !== 'Agent') return; // skip Admins, Support, etc.
+    if (String(user.role || '').trim().toLowerCase() !== 'agent') return; // skip Admins, Support, Team Leaders
     agentReport[id] = {
       agentId: id,
       name: user.name,
@@ -2499,14 +2498,254 @@ function updateSupportTicket(token, payload) {
   return true;
 }
 
+// ── Agility Sync Log Sheet helper ────────────────────────────
+function getOrCreateAgilityLog_() {
+  let sheet = ss.getSheetByName('AGILITY_LOG');
+  if (!sheet) {
+    sheet = ss.insertSheet('AGILITY_LOG');
+    sheet.appendRow([
+      'Sync_ID', 'Synced_At', 'Provider', 'Rows_Processed', 'Rows_New',
+      'Rows_Updated', 'Synced_By', 'File_Name'
+    ]);
+  }
+  return sheet;
+}
+
+function getOrCreateAgilityData_() {
+  let sheet = ss.getSheetByName('AGILITY_DATA');
+  if (!sheet) {
+    sheet = ss.insertSheet('AGILITY_DATA');
+    sheet.appendRow([
+      'Ticket_Number', 'Created_Date', 'Completed_Date', 'Agent_Name',
+      'Status', 'Payment_Ref', 'Product_Name', 'Description',
+      'Customer_Name', 'Update_1', 'Update_2', 'Update_3', 'Update_4',
+      'Update_5', 'Ticket_2', 'Order_Number', 'Provider', 'Synced_At'
+    ]);
+  }
+  return sheet;
+}
+
 function getAgilitySyncHistory(token) {
   requireSupport_(token);
-  return { history: [] };
+  const logSheet = getOrCreateAgilityLog_();
+  const rows = logSheet.getDataRange().getValues();
+  if (rows.length <= 1) return { history: [] };
+  const history = rows.slice(1).reverse().slice(0, 20).map(r => ({
+    syncId:        String(r[0] || ''),
+    syncedAt:      r[1] ? Utilities.formatDate(new Date(r[1]), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm") : '',
+    provider:      String(r[2] || ''),
+    rowsProcessed: Number(r[3] || 0),
+    rowsNew:       Number(r[4] || 0),
+    rowsUpdated:   Number(r[5] || 0),
+    syncedBy:      String(r[6] || ''),
+    fileName:      String(r[7] || '')
+  }));
+  return { history };
 }
 
+/**
+ * uploadAgilityReport — Parses an AUGSEP-format agility export uploaded as CSV.
+ *
+ * The AUGSEP columns (0-indexed) are:
+ *   0: created_da   1: completed_   2: channel_partner_user_name   3: status
+ *   4: paymentrec   5: contractproductname   6: description   7: customer
+ *   8-16: Update 1-9   17: Ticket number   18: Ticket 2   19: Order Number
+ *
+ * Strategy:
+ *  - Rows are identified by Ticket_Number (col 17). Blank ticket rows are skipped.
+ *  - If a row with that ticket number already exists in AGILITY_DATA → update it.
+ *  - If it is new → insert it.
+ *  - Old rows are never deleted, preserving history.
+ *
+ * Payload: { provider, fileName, fileContent (base64 CSV) }
+ */
 function uploadAgilityReport(token, payload) {
-  requireSupport_(token);
-  throw new Error("Agility parsing logic not yet implemented.");
+  const sess = requireSupport_(token);
+
+  const { provider, fileName, fileContent } = payload || {};
+  if (!fileContent) throw new Error('No file content received.');
+  if (!provider) throw new Error('Provider is required.');
+
+  // Decode base64 → CSV string
+  const csvBytes = Utilities.base64Decode(fileContent);
+  const csvString = Utilities.newBlob(csvBytes).getDataAsString('UTF-8');
+
+  // Parse CSV
+  let rows;
+  try {
+    rows = Utilities.parseCsv(csvString);
+  } catch (e) {
+    throw new Error('Could not parse file as CSV. Please export the agility report as CSV format. Error: ' + e.message);
+  }
+
+  if (!rows || rows.length < 2) throw new Error('File appears empty or has no data rows.');
+
+  // Map header row to column indices dynamically (case-insensitive, trim)
+  const headers = rows[0].map(h => String(h).toLowerCase().trim().replace(/[^a-z0-9_]/g, '_'));
+  const col = (name) => headers.indexOf(name);
+
+  // Known column names in AUGSEP format
+  const IDX = {
+    created:    Math.max(col('created_da'), col('created_date'), 0),
+    completed:  Math.max(col('completed_'), col('completed_date'), 1),
+    agent:      Math.max(col('channel_partner_user_name'), 2),
+    status:     Math.max(col('status'), 3),
+    payment:    Math.max(col('paymentrec'), col('payment_rec'), 4),
+    product:    Math.max(col('contractproductname'), col('contract_product_name'), 5),
+    desc:       Math.max(col('description'), 6),
+    customer:   Math.max(col('customer'), 7),
+    update1:    Math.max(col('update_1'), 8),
+    update2:    Math.max(col('update_2'), 9),
+    update3:    Math.max(col('update_3'), 10),
+    update4:    Math.max(col('update_4'), 11),
+    update5:    Math.max(col('update_5'), 12),
+    ticket:     Math.max(col('ticket_number'), col('ticketnumber'), 17),
+    ticket2:    Math.max(col('ticket_2'), col('ticket2'), 18),
+    order:      Math.max(col('order_number'), col('ordernumber'), 19)
+  };
+
+  // Load existing AGILITY_DATA sheet
+  const dataSheet = getOrCreateAgilityData_();
+  const existing = dataSheet.getDataRange().getValues();
+  const existingMap = {};
+  for (let i = 1; i < existing.length; i++) {
+    const t = String(existing[i][0] || '').trim();
+    const o = String(existing[i][15] || '').trim();
+    const c = String(existing[i][8] || '').trim().toLowerCase();
+    if (t) existingMap['T:' + t] = i + 1;
+    if (o) existingMap['O:' + o] = i + 1;
+    if (c) existingMap['C:' + c] = i + 1;
+  }
+
+  // Load AUGSEP sheet (SADV) or Infinifi customers (Infinifi) from support db or active ss
+  let supportSheet = null;
+  let supportMap = {};
+  try {
+    const sDb = getSupportDb_();
+    supportSheet = sDb.getSheetByName(provider === 'Infinifi' ? 'Infinifi customers' : 'AUGSEP');
+  } catch(e) {}
+  if (!supportSheet) {
+    supportSheet = ss.getSheetByName(provider === 'Infinifi' ? 'Infinifi customers' : 'AUGSEP');
+  }
+
+  if (supportSheet) {
+    const sRows = supportSheet.getDataRange().getValues();
+    for (let i = 1; i < sRows.length; i++) {
+      if (provider === 'SADV') {
+        const t = String(sRows[i][17] || '').trim();
+        const o = String(sRows[i][19] || '').trim();
+        const c = String(sRows[i][7] || '').trim().toLowerCase();
+        if (t) supportMap['T:' + t] = i + 1;
+        if (o) supportMap['O:' + o] = i + 1;
+        if (c) supportMap['C:' + c] = i + 1;
+      } else {
+        const c = String(sRows[i][2] || '').trim().toLowerCase();
+        const o = String(sRows[i][5] || '').trim();
+        if (o) supportMap['O:' + o] = i + 1;
+        if (c) supportMap['C:' + c] = i + 1;
+      }
+    }
+  }
+
+  const now = new Date();
+  const nowStr = Utilities.formatDate(now, Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
+  let rowsNew = 0, rowsUpdated = 0, rowsProcessed = 0;
+
+  const dataRows = rows.slice(1);
+  for (const row of dataRows) {
+    const ticketNum = String(row[IDX.ticket] || '').trim();
+    const orderNum = String(row[IDX.order] || '').trim();
+    const customerName = String(row[IDX.customer] || '').trim();
+
+    if (!ticketNum && !orderNum && !customerName) continue; // skip completely empty rows
+    rowsProcessed++;
+
+    const rowKey = ticketNum || orderNum;
+
+    const newRow = [
+      rowKey || customerName,
+      String(row[IDX.created]   || '').trim(),
+      String(row[IDX.completed] || '').trim(),
+      String(row[IDX.agent]     || '').trim(),
+      String(row[IDX.status]    || '').trim(),
+      String(row[IDX.payment]   || '').trim(),
+      String(row[IDX.product]   || '').trim(),
+      String(row[IDX.desc]      || '').trim(),
+      customerName,
+      String(row[IDX.update1]   || '').trim(),
+      String(row[IDX.update2]   || '').trim(),
+      String(row[IDX.update3]   || '').trim(),
+      String(row[IDX.update4]   || '').trim(),
+      String(row[IDX.update5]   || '').trim(),
+      String(row[IDX.ticket2]   || '').trim(),
+      orderNum,
+      provider,
+      nowStr
+    ];
+
+    // Find row index in AGILITY_DATA
+    const targetRowIdx = existingMap['T:' + ticketNum] || existingMap['O:' + orderNum] || existingMap['C:' + customerName.toLowerCase()];
+    if (targetRowIdx) {
+      dataSheet.getRange(targetRowIdx, 2, 1, newRow.length - 1).setValues([newRow.slice(1)]);
+      rowsUpdated++;
+    } else {
+      dataSheet.appendRow(newRow);
+      const newIdx = existing.length + rowsNew + 1;
+      if (ticketNum) existingMap['T:' + ticketNum] = newIdx;
+      if (orderNum) existingMap['O:' + orderNum] = newIdx;
+      if (customerName) existingMap['C:' + customerName.toLowerCase()] = newIdx;
+      rowsNew++;
+    }
+
+    // Upsert into AUGSEP sheet for SADV so main support tickets log updates directly
+    if (supportSheet && provider === 'SADV') {
+      const sRowIdx = supportMap['T:' + ticketNum] || supportMap['O:' + orderNum] || supportMap['C:' + customerName.toLowerCase()];
+      const augRow = Array(20).fill('');
+      augRow[0]  = row[IDX.created]   || '';
+      augRow[1]  = row[IDX.completed] || '';
+      augRow[2]  = row[IDX.agent]     || '';
+      augRow[3]  = row[IDX.status]    || '';
+      augRow[4]  = row[IDX.payment]   || '';
+      augRow[5]  = row[IDX.product]   || '';
+      augRow[6]  = row[IDX.desc]      || '';
+      augRow[7]  = customerName;
+      augRow[8]  = row[IDX.update1]   || '';
+      augRow[9]  = row[IDX.update2]   || '';
+      augRow[10] = row[IDX.update3]   || '';
+      augRow[11] = row[IDX.update4]   || '';
+      augRow[12] = row[IDX.update5]   || '';
+      augRow[17] = ticketNum;
+      augRow[18] = row[IDX.ticket2]   || '';
+      augRow[19] = orderNum;
+
+      if (sRowIdx) {
+        // Update existing row in AUGSEP
+        supportSheet.getRange(sRowIdx, 1, 1, 20).setValues([augRow]);
+      } else {
+        // Append new row to AUGSEP
+        supportSheet.appendRow(augRow);
+        const newSIdx = sRows.length + 1;
+        if (ticketNum) supportMap['T:' + ticketNum] = newSIdx;
+        if (orderNum) supportMap['O:' + orderNum] = newSIdx;
+        if (customerName) supportMap['C:' + customerName.toLowerCase()] = newSIdx;
+      }
+    }
+  }
+
+  // Bust Apps Script cache to return fresh data
+  incrementCacheVersion_();
+
+  // Record sync log entry
+  const logSheet = getOrCreateAgilityLog_();
+  const syncId = 'SYN-' + Utilities.getUuid().substring(0, 8).toUpperCase();
+  logSheet.appendRow([syncId, now, provider, rowsProcessed, rowsNew, rowsUpdated, sess.name || sess.agentId, fileName || '']);
+
+  return {
+    success: true,
+    provider,
+    rowsProcessed,
+    rowsNew,
+    rowsUpdated,
+    syncId
+  };
 }
-
-
