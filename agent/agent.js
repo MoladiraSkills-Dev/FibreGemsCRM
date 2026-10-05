@@ -703,10 +703,9 @@ async function submitLead(overrideId = null) {
       return;
     }
 
-    showToast("Lead successfully captured!");
+    showToast("Lead successfully captured! Form cleared — ready for next lead.");
     document.getElementById('lead-form').reset();
     setupDatepickerLimits();
-    switchView('callbacks');
   } catch (err) {
     showToast(err.message, "error");
   } finally {
