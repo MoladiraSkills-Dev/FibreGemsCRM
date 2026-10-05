@@ -150,19 +150,22 @@ async function loadDashboard(silent = false) {
   try {
     const data = await callBackend('getAdminDashboard', {}, { skipCache: silent });
 
-    document.getElementById('stat-active-agents').textContent = data.activeCount || 0;
-    const totalCustomers = Object.values(data.statuses).reduce((a, b) => a + b, 0);
+    const frontlineAgents = (data.agents || []).filter(ag => String(ag.role || '').trim().toLowerCase() === 'agent');
+
+    const activeCount = frontlineAgents.filter(ag => ag.isOnline).length;
+    document.getElementById('stat-active-agents').textContent = activeCount;
+    const totalCustomers = Object.values(data.statuses || {}).reduce((a, b) => a + b, 0);
     document.getElementById('stat-total-customers').textContent = totalCustomers;
-    const todayTouches = data.agents.reduce((a, ag) => a + ag.touches, 0);
+    const todayTouches = frontlineAgents.reduce((a, ag) => a + ag.touches, 0);
     document.getElementById('stat-today-touches').textContent = todayTouches;
 
-    if (data.agents.length === 0) {
+    if (frontlineAgents.length === 0) {
       agentTableBody.innerHTML = `
         <tr><td colspan="3" class="px-6 py-8 text-center text-gray-500 text-sm">
           No agent activity recorded yet today
         </td></tr>`;
     } else {
-      agentTableBody.innerHTML = data.agents.map(agent => `
+      agentTableBody.innerHTML = frontlineAgents.map(agent => `
         <tr class="border-b border-white/5 hover:bg-white/[0.03] transition-colors">
           <td class="px-4 py-3">
             <div class="flex items-center gap-3">
