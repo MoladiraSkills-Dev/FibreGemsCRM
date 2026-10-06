@@ -28,6 +28,9 @@ let _activeDetailTicket = null; // Stores currently viewed ticket
 // INIT
 // ─────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
+  // Clear any stale local browser cache for support
+  if (typeof clearAllCache_ === 'function') clearAllCache_();
+
   // Auth guard — Support or Admin only
   if (!requireAuth()) return;
 
@@ -192,7 +195,7 @@ function applyFilters_customers() {
     const matchProvider = activeProviderFilter === 'all' || c.provider === activeProviderFilter;
     const matchStatus = activeStatusFilter === 'all' ||
       (activeStatusFilter === 'active' && isActive_(c.status)) ||
-      (activeStatusFilter === 'inactive' && !isActive_(c.status));
+      (activeStatusFilter === 'inactive' && isInactive_(c.status));
     const matchSearch = !search ||
       (c.customer || '').toLowerCase().includes(search) ||
       (c.orderNumber || '').toLowerCase().includes(search) ||
@@ -301,10 +304,12 @@ function renderCustomerTable() {
   }
 
   tbody.innerHTML = slice.map(c => {
-    const rowClass = isActive_(c.status) ? 'row-active' : isPending_(c.status) ? 'row-pending' : 'row-inactive';
-    const statusBadge = isActive_(c.status)
+    const isAct = isActive_(c.status);
+    const isPend = isPending_(c.status);
+    const rowClass = isAct ? 'row-active' : isPend ? 'row-pending' : 'row-inactive';
+    const statusBadge = isAct
       ? `<span class="badge-active text-xs px-2 py-0.5 rounded-full font-semibold">Active</span>`
-      : isPending_(c.status)
+      : isPend
       ? `<span class="badge-pending text-xs px-2 py-0.5 rounded-full font-semibold">Pending</span>`
       : `<span class="badge-inactive text-xs px-2 py-0.5 rounded-full font-semibold">Inactive</span>`;
 
@@ -618,11 +623,14 @@ async function submitTicketUpdate(e) {
 
   try {
     const payload = {
-      ticketId: _activeDetailTicket.createdDate, // Use createdDate as unique identifier
-      provider: _activeDetailTicket.provider,
+      ticketId: _activeDetailTicket.createdDate, // Created date reference
+      ticketNumber: _activeDetailTicket.ticketNumber || '',
+      orderNumber: _activeDetailTicket.orderNumber || '',
+      customer: _activeDetailTicket.customer || '',
+      provider: _activeDetailTicket.provider || 'SADV',
       newStatus: statusVal,
       newNote: noteVal,
-      agentName: 'Support Agent' // TODO: Get from auth context
+      agentName: (typeof session !== 'undefined' && session?.name) ? session.name : 'Support Agent'
     };
 
     const res = await callBackend('updateSupportTicket', payload);
@@ -660,7 +668,7 @@ async function loadSyncHistory() {
     el.innerHTML = history.map(h => `
       <div class="flex items-center justify-between py-2.5 border-b border-white/5 last:border-0">
         <div>
-          <p class="text-xs font-semibold text-white">${escHtml(h.provider)} — ${formatDate_(h.syncedAt)}</p>
+          <p class="text-xs font-semibold text-white">${escHtml(h.provider)} — ${formatDateTime_(h.syncedAt)}</p>
           <p class="text-[11px] text-gray-500">${escHtml(h.rowsProcessed)} rows processed</p>
         </div>
         <span class="badge-active text-[10px] px-2 py-0.5 rounded-full font-semibold">✓ Done</span>
@@ -783,6 +791,7 @@ async function uploadAgilityReport() {
           </div>
         </div>
         <p class="text-[11px] text-gray-500">Sync ID: <span class="font-mono text-gray-400">${escHtml(result.syncId)}</span> &bull; ${escHtml(file.name)}</p>
+        <p class="text-[11px] text-gray-500 mt-1">⏱ Synced at: <span class="text-gray-300 font-semibold">${formatDateTime_(result.syncedAt)}</span></p>
       `;
     }
 
@@ -936,13 +945,19 @@ function closeSopModal() {
 function isActive_(status) {
   if (!status) return false;
   const s = status.toString().toLowerCase().trim();
-  return s === 'active' || s === 'completed' || s === 'activated';
+  return s === 'active' || s.includes('complete') || s.includes('activated') || s === 'resolved';
 }
 
 function isPending_(status) {
+  if (!status) return true;
+  const s = status.toString().toLowerCase().trim();
+  return s === 'pending' || s === 'scheduled' || s.includes('progress') || s === 'open' || s === 'new' || s.includes('book') || s.includes('order') || s.includes('escalat');
+}
+
+function isInactive_(status) {
   if (!status) return false;
   const s = status.toString().toLowerCase().trim();
-  return s === 'pending' || s === 'scheduled' || s === 'in progress' || s === 'open';
+  return s === 'inactive' || s.includes('cancel') || s.includes('expired') || s.includes('declined') || s === 'closed';
 }
 
 function getProviderBadgeClass(provider) {
@@ -952,10 +967,9 @@ function getProviderBadgeClass(provider) {
 
 function getStatusBadgeClass(status) {
   if (!status) return 'badge-pending';
-  const s = status.toLowerCase();
+  const s = status.toString().toLowerCase().trim();
   if (isActive_(s)) return 'badge-active';
-  if (s === 'resolved') return 'badge-active';
-  if (s === 'escalated' || s === 'closed') return 'badge-inactive';
+  if (isInactive_(s)) return 'badge-inactive';
   return 'badge-pending';
 }
 
@@ -977,6 +991,38 @@ function formatDate_(val) {
     if (isNaN(d.getTime())) return str.slice(0, 10);
     return d.toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' });
   } catch { return String(val).slice(0, 10); }
+}
+
+/**
+ * formatDateTime_ — Formats a value as date + time, e.g. "06 Oct 2026 • 12:45:30".
+ * Accepts: yyyy-MM-dd HH:mm:ss, ISO 8601, DD/MM/YYYY HH:mm:ss, or a Date object.
+ */
+function formatDateTime_(val) {
+  if (!val) return '—';
+  try {
+    let d;
+    const str = String(val).trim();
+
+    // yyyy-MM-dd HH:mm:ss (Apps Script / backend format)
+    const ymd = str.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/);
+    if (ymd) {
+      d = new Date(`${ymd[1]}-${ymd[2]}-${ymd[3]}T${ymd[4]}:${ymd[5]}:${ymd[6]}`);
+    } else {
+      // Detect DD/MM/YYYY HH:mm:ss (Google Sheets South African format)
+      const ddmm = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?/);
+      if (ddmm) {
+        const timePart = ddmm[4] ? `T${ddmm[4]}:${ddmm[5]}:${ddmm[6] || '00'}` : 'T00:00:00';
+        d = new Date(`${ddmm[3]}-${ddmm[2].padStart(2,'0')}-${ddmm[1].padStart(2,'0')}${timePart}`);
+      } else {
+        d = new Date(str);
+      }
+    }
+
+    if (isNaN(d.getTime())) return str;
+    const datePart = d.toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' });
+    const timePart = d.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+    return `${datePart} • ${timePart}`;
+  } catch { return String(val); }
 }
 
 

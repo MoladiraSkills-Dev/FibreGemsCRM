@@ -41,8 +41,7 @@ function doPost(e) {
     const cacheableActions = [
       'getAgentWorklist', 'getAgentDailyQueue', 'getAgentActivityLog',
       'getAdminMasterGrid', 'getAdminCustomerDetail', 
-      'getAgentList', 'getAdminPromisedPayments', 'getSupportDashboard', 
-      'getSupportCustomers', 'getSupportTickets'
+      'getAgentList', 'getAdminPromisedPayments'
     ];
     
     const mutatingActions = [
@@ -2153,45 +2152,194 @@ function extendDatabaseHeaders() {
  * 19 Order Number
  */
 
+// ─────────────────────────────────────────────
+// SUPPORT PORTAL HELPERS & HANDLERS
+// ─────────────────────────────────────────────
+
+function getSadvSupportSheet_(supportDb) {
+  if (!supportDb) return null;
+  const sheets = supportDb.getSheets();
+  // 1. Highest priority: exact match on 'AUGSEP' or 'AUG_SEP'
+  for (const s of sheets) {
+    const norm = s.getName().trim().toUpperCase().replace(/\s+/g, ' ');
+    if (norm === 'AUGSEP' || norm === 'AUG_SEP') {
+      return s;
+    }
+  }
+  // 2. Second priority: 'AUG TO DATE 2026' or variations containing both AUG and DATE
+  for (const s of sheets) {
+    const norm = s.getName().trim().toUpperCase().replace(/\s+/g, ' ');
+    if (norm === 'AUG TO DATE 2026' || norm === 'AUG_TO_DATE_2026' || (norm.includes('AUG') && norm.includes('DATE'))) {
+      return s;
+    }
+  }
+  // 3. Fallback: sheet starting with 'AUG'
+  for (const s of sheets) {
+    const norm = s.getName().trim().toUpperCase().replace(/\s+/g, ' ');
+    if (norm.startsWith('AUG')) {
+      return s;
+    }
+  }
+  return sheets[0];
+}
+
+function getHeaderIndices_(headers) {
+  const norm = (h) => String(h || '').toLowerCase().trim().replace(/[^a-z0-9_]/g, '_');
+  const hList = headers.map(norm);
+  const find = (names, fallback) => {
+    for (const n of names) {
+      const idx = hList.indexOf(n);
+      if (idx !== -1) return idx;
+    }
+    return fallback;
+  };
+
+  return {
+    created:   find(['created_da', 'created_date', 'created_at', 'date'], 0),
+    completed: find(['completed_', 'completed_date', 'completed_at'], 1),
+    agent:     find(['channel_partner_user_name', 'agent_name', 'agent', 'channel_partner'], 2),
+    status:    find(['status', 'internal_status'], 3),
+    payment:   find(['paymentrec', 'payment_rec', 'payment_received_date'], 4),
+    product:   find(['contractproductname', 'contract_product_name', 'product_name', 'product'], 5),
+    desc:      find(['description', 'desc'], 6),
+    customer:  find(['customer', 'customer_name', 'name'], 7),
+    ticket:    find(['ticket_number', 'ticketnumber', 'ticket_no'], 15),
+    ticket2:   find(['ticket_2', 'ticket2'], 16),
+    order:     find(['order_number', 'ordernumber', 'order_no'], 17)
+  };
+}
+
+function isValidAugSepRow_(row, idx) {
+  if (!row || !Array.isArray(row) || row.length < 7) return false;
+
+  const getCol = (key, fallback) => {
+    if (idx && typeof idx[key] === 'number' && idx[key] >= 0 && idx[key] < row.length) {
+      return row[idx[key]];
+    }
+    return row[fallback];
+  };
+
+  // 1. Column 1 (completed_) in secondary leads table is "Yes" / "No" -> REJECT
+  const col1 = String(row[1] || '').trim().toLowerCase();
+  if (col1 === 'yes' || col1 === 'no' || col1.includes('interested')) return false;
+
+  // 2. Created date (col 0) MUST be a valid date or timestamp (never an order number or empty)
+  const dateVal = getCol('created', 0);
+  if (!dateVal) return false;
+  if (dateVal instanceof Date) {
+    if (isNaN(dateVal.getTime())) return false;
+  } else {
+    const s = String(dateVal).trim();
+    if (!s) return false;
+    if (/^(ov|if|sa|ticket|order|would|name|email|phone|date|created)/i.test(s)) return false;
+    if (!/^\d{1,4}[/.-]\d{1,2}[/.-]\d{2,4}/.test(s) && isNaN(Date.parse(s))) return false;
+  }
+
+  // 2b. Agent name (col 2) in genuine ticket rows is always a full name with a space (e.g. "Oscar Tema").
+  //     Lead tables put FIRST NAME only in col 2 and LAST NAME in col 3.
+  //     If col2 is a single word AND col3 is also a single short word -> lead row -> REJECT.
+  const agentVal = String(getCol('agent', 2) || '').trim();
+  const col3Val  = String(row[3] || '').trim();
+  if (agentVal && !agentVal.includes(' ') && col3Val && !col3Val.includes(' ') && col3Val.length < 20) {
+    return false;
+  }
+
+  // 3. Product (col 5) and Description (col 6) verification
+  const prodVal = String(getCol('product', 5) || '').trim().toLowerCase();
+  const descVal = String(getCol('desc', 6) || '').trim().toLowerCase();
+  
+  // Reject if product is a phone number or numeric
+  if (/^[0-9+\s()-]{7,20}$/.test(prodVal) || prodVal === 'phone number') return false;
+
+  // A genuine SADV operational row MUST have fibre keywords in product or description
+  const combined = prodVal + ' ' + descVal;
+  const isFibreRelated = /(vuma|reach|key|fttr|fttk|fibre|fiber|ov[a-z]-|if\d+)/i.test(combined);
+  if (!isFibreRelated) return false;
+
+  // 4. Customer Name (col 7) must not be a street address or table header
+  const custVal = String(getCol('customer', 7) || '').trim();
+  if (!custVal) return false;
+  const lowerCust = custVal.toLowerCase();
+  if (lowerCust === 'physical address' || lowerCust === 'customer' || lowerCust === 'customer name' || lowerCust === 'name') return false;
+  if (/^\d+\s*[a-z0-9\s/]*(street|st|drive|dr|road|rd|avenue|ave|lane|ln|way|close|cl|ext|zone)\b/i.test(custVal)) {
+    return false;
+  }
+  // Reject if customer value looks like a standalone phone number
+  if (/^[0-9+\s()-]{7,15}$/.test(custVal)) return false;
+
+  return true;
+}
+
 function getSupportDashboard(token) {
   requireSupport_(token);
   const supportDb = getSupportDb_();
-  const ticketsSheet = supportDb.getSheetByName('AUGSEP');
-  if (!ticketsSheet) throw new Error("Could not find 'AUGSEP' sheet.");
+  const ticketsSheet = getSadvSupportSheet_(supportDb);
+  if (!ticketsSheet) throw new Error("Could not find 'AUG TO DATE 2026' or 'AUGSEP' sheet in Support Database.");
 
   const rows = ticketsSheet.getDataRange().getValues();
+  if (rows.length === 0) return { activeCount: 0, inactiveCount: 0, openTickets: 0, lastSync: 'Live from Support DB', sadvStats: {}, infinifiStats: {}, recentTickets: [] };
+
+  const idx = getHeaderIndices_(rows[0]);
   let sadvActive = 0, sadvInactive = 0, sadvPending = 0, sadvOpen = 0;
 
   for (let i = 1; i < rows.length; i++) {
-    const status = (rows[i][3] || '').toString().trim().toLowerCase();
-    if (status === 'active' || status.includes('complete')) sadvActive++;
-    else if (status === 'expired' || status === 'inactive' || status.includes('cancel')) sadvInactive++;
-    else if (status === 'pending' || status === 'scheduled' || status.includes('progress')) sadvPending++;
-    if (!status || status === 'new' || status === 'open') sadvOpen++;
+    const row = rows[i];
+    if (!isValidAugSepRow_(row, idx)) continue;
+
+    const rawStatus = String(row[idx.status] || row[3] || '').trim().toLowerCase();
+    const completed = row[idx.completed] || row[1];
+    if (completed || rawStatus === 'active' || rawStatus.includes('complete') || rawStatus.includes('activated')) {
+      sadvActive++;
+    } else if (rawStatus === 'expired' || rawStatus === 'inactive' || rawStatus.includes('cancel') || rawStatus.includes('declined')) {
+      sadvInactive++;
+    } else if (rawStatus === 'pending' || rawStatus === 'scheduled' || rawStatus.includes('progress') || rawStatus.includes('book') || rawStatus.includes('order')) {
+      sadvPending++;
+    } else {
+      sadvOpen++;
+    }
   }
 
   // Get 5 most recent tickets for the dashboard list
   const recentTickets = [];
   for (let i = rows.length - 1; i > 0 && recentTickets.length < 5; i--) {
     const row = rows[i];
-    if (!row[0]) continue;
+    if (!isValidAugSepRow_(row, idx)) continue;
+
+    const custName = String(row[idx.customer] || row[7] || '').trim();
+    const descStr  = String(row[idx.desc] || row[6] || '').trim();
+
+    let rawTicket = String(row[idx.ticket] || row[15] || row[17] || '').trim();
+    if (!rawTicket) {
+      const m = (descStr + ' ' + String(row[8] || '')).match(/(#SA\d+|SA\d+|IF\d+)/i);
+      if (m) rawTicket = m[1];
+    }
+
+    let rawOrder = String(row[idx.order] || row[17] || row[19] || '').trim();
+    if (!rawOrder) {
+      const m = descStr.match(/(OV[A-Z]-\d+-\d+|IF\d+|[A-Z]{3}-\d{6}-\d+)/i);
+      if (m) rawOrder = m[1];
+    }
+
+    const displayTicket = rawTicket || rawOrder || '—';
+
     recentTickets.push({
-      ticketNumber: row[17] ? row[17].toString() : '—',
-      customer: row[7] ? row[7].toString() : '—',
-      status: row[3] ? row[3].toString() : 'Unknown',
+      ticketNumber: displayTicket,
+      customer: custName || '—',
+      status: row[idx.status] ? String(row[idx.status]).trim() : 'New',
       provider: 'SADV',
-      createdDate: row[0] ? row[0].toString() : ''
+      createdDate: row[idx.created] ? String(row[idx.created]).trim() : ''
     });
   }
 
   // Infinifi Stats
   let infActive = 0, infInactive = 0, infPending = 0, infOpen = 0;
-  const infSheet = supportDb.getSheetByName('Infinifi customers');
+  const infSheet = supportDb.getSheetByName('Infinifi customers') ||
+                   supportDb.getSheets().find(s => s.getName().toLowerCase().includes('infinifi'));
   if (infSheet) {
     const infRows = infSheet.getDataRange().getValues();
     for (let i = 1; i < infRows.length; i++) {
        const row = infRows[i];
-       if (!row[2]) continue; // Skip if no customer name
+       if (!row[2] || row[2].toString().toLowerCase() === 'customer name') continue;
        const actionType = (row[11] || '').toString().trim().toLowerCase();
        const completedDate = row[1];
        
@@ -2221,56 +2369,88 @@ function getSupportCustomers(token) {
   const supportDb = getSupportDb_();
   const customers = [];
 
-  // 1. Pull SADV Customers from AUGSEP
-  const ticketsSheet = supportDb.getSheetByName('AUGSEP');
+  // 1. Pull SADV Customers from AUG TO DATE 2026 / AUGSEP
+  const ticketsSheet = getSadvSupportSheet_(supportDb);
   if (ticketsSheet) {
     const rows = ticketsSheet.getDataRange().getValues();
-    // Use a Set to track unique customers so we don't return 100 tickets for the same person
-    const seenSadv = new Set();
-    
-    // Read backwards to get the most recent status for each customer
-    for (let i = rows.length - 1; i > 0; i--) {
-      const row = rows[i];
-      const customerName = row[7] ? row[7].toString().trim() : '';
-      if (!customerName || seenSadv.has(customerName)) continue;
+    if (rows.length > 1) {
+      const idx = getHeaderIndices_(rows[0]);
+      const seenSadv = new Set();
       
-      seenSadv.add(customerName);
-      customers.push({
-        customer:    customerName,
-        status:      row[3] ? row[3].toString() : 'Unknown',
-        orderNumber: row[19] ? row[19].toString() : '',
-        product:     row[5] ? row[5].toString() : '',
-        provider:    'SADV',
-        region:      '',
-        createdDate: row[0] ? row[0].toString() : '',
-        completedDate: ''
-      });
-      if (customers.length >= 250) break; // Limit for performance
+      // Read backwards to get the most recent status for each customer
+      for (let i = rows.length - 1; i > 0; i--) {
+        const row = rows[i];
+        if (!isValidAugSepRow_(row, idx)) continue;
+
+        const customerName = String(row[idx.customer] || row[7] || '').trim();
+        if (!customerName) continue;
+        const lowerName = customerName.toLowerCase();
+        if (seenSadv.has(lowerName)) continue;
+
+        const descStr = String(row[idx.desc] || row[6] || '').trim();
+        let ord = String(row[idx.order] || row[17] || row[19] || '').trim();
+        if (!ord && descStr) {
+          const m = descStr.match(/(OV[A-Z]-\d+-\d+|IF\d+|[A-Z]{3}-\d{6}-\d+)/i);
+          if (m) ord = m[1];
+        }
+        if (!ord) ord = String(row[idx.ticket] || row[15] || '').trim();
+
+        const createdVal  = row[idx.created] ? String(row[idx.created]).trim() : '';
+        const rawStatus   = String(row[idx.status] || row[3] || '').trim();
+        const statusLower = rawStatus.toLowerCase();
+        const completedVal = row[idx.completed] ? String(row[idx.completed]).trim() : '';
+
+        // Accurately map status: Active, Pending, or Inactive
+        let customerStatus = 'Pending';
+        if (completedVal || statusLower === 'active' || statusLower.includes('complete') || statusLower.includes('activated')) {
+          customerStatus = 'Active';
+        } else if (statusLower.includes('cancel') || statusLower.includes('expired') || statusLower.includes('inactive') || statusLower.includes('declined') || statusLower.includes('closed')) {
+          customerStatus = 'Inactive';
+        } else {
+          customerStatus = 'Pending';
+        }
+
+        seenSadv.add(lowerName);
+        customers.push({
+          customer:    customerName,
+          status:      customerStatus,
+          rawStatus:   rawStatus || 'New',
+          orderNumber: ord || '—',
+          product:     row[idx.product] ? String(row[idx.product]).trim() : String(row[5] || '').trim(),
+          provider:    'SADV',
+          region:      '',
+          createdDate: createdVal,
+          completedDate: completedVal
+        });
+        if (customers.length >= 350) break;
+      }
     }
   }
 
   // 2. Pull Infinifi Customers from 'Infinifi customers'
-  const infSheet = supportDb.getSheetByName('Infinifi customers');
+  const infSheet = supportDb.getSheetByName('Infinifi customers') ||
+                   supportDb.getSheets().find(s => s.getName().toLowerCase().includes('infinifi'));
   if (infSheet) {
     const rows = infSheet.getDataRange().getValues();
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
-      const customerName = row[2] ? row[2].toString().trim() : '';
-      if (!customerName) continue;
+      const customerName = (row[2] || '').toString().trim();
+      if (!customerName || customerName.toLowerCase() === 'customer name') continue;
       
       let status = 'Pending';
-      if (row[1]) status = 'Active'; // Completed Date exists
+      if (row[1]) status = 'Active';
       
       customers.push({
         customer:    customerName,
         status:      status,
-        orderNumber: row[5] ? row[5].toString() : '', // Lead Number
+        rawStatus:   status,
+        orderNumber: row[5] ? row[5].toString().trim() : '', // Lead Number
         product:     row[3] ? `Term: ${row[3]}` : '', // Contract Term
-        mrc:         row[4] ? row[4].toString() : '', // Total MRC Excl
-        region:      row[6] ? row[6].toString() : '', // Region
+        mrc:         row[4] ? row[4].toString().trim() : '', // Total MRC Excl
+        region:      row[6] ? row[6].toString().trim() : '', // Region
         provider:    'Infinifi',
-        createdDate: row[0] ? row[0].toString() : '',
-        completedDate: row[1] ? row[1].toString() : ''
+        createdDate: row[0] ? row[0].toString().trim() : '',
+        completedDate: row[1] ? row[1].toString().trim() : ''
       });
     }
   }
@@ -2281,51 +2461,71 @@ function getSupportCustomers(token) {
 function getSupportTickets(token, payload) {
   requireSupport_(token);
   const supportDb = getSupportDb_();
-  const ticketsSheet = supportDb.getSheetByName('AUGSEP');
-  if (!ticketsSheet) throw new Error("Could not find 'AUGSEP' sheet in Support Database.");
+  const ticketsSheet = getSadvSupportSheet_(supportDb);
+  if (!ticketsSheet) throw new Error("Could not find 'AUG TO DATE 2026' or 'AUGSEP' sheet in Support Database.");
 
   const ticketData = ticketsSheet.getDataRange().getValues();
   const tickets = [];
 
-  // 1. Pull SADV Tickets from AUGSEP
-  // Read from bottom (newest first), up to 200 rows
-  for (let i = ticketData.length - 1; i > 0 && tickets.length < 200; i--) {
-    const row = ticketData[i];
-    if (!row[0]) continue;
+  if (ticketData.length > 1) {
+    const idx = getHeaderIndices_(ticketData[0]);
 
-    // Collect all update notes, filter out blanks
-    const updates = [];
-    for (let u = 8; u <= 16; u++) {
-      if (row[u] && row[u].toString().trim()) {
-        updates.push(row[u].toString().trim());
+    // 1. Pull SADV Tickets from AUG TO DATE 2026 / AUGSEP
+    for (let i = ticketData.length - 1; i > 0 && tickets.length < 300; i--) {
+      const row = ticketData[i];
+      if (!isValidAugSepRow_(row, idx)) continue;
+
+      const custName = String(row[idx.customer] || row[7] || '').trim();
+      const descStr  = String(row[idx.desc] || row[6] || '').trim();
+
+      // Collect all update notes (cols 8 to 14 or non-blank updates)
+      const updates = [];
+      for (let u = 8; u <= 14; u++) {
+        if (row[u] && String(row[u]).trim()) {
+          updates.push(String(row[u]).trim());
+        }
       }
-    }
 
-    tickets.push({
-      createdDate:   row[0]  ? row[0].toString()  : '',
-      completedDate: row[1]  ? row[1].toString()  : '',
-      channelPartner: row[2] ? row[2].toString()  : '',
-      status:        row[3]  ? row[3].toString()  : '',
-      paymentRec:    row[4]  ? row[4].toString()  : '',
-      product:       row[5]  ? row[5].toString()  : '',
-      description:   row[6]  ? row[6].toString()  : '',
-      customer:      row[7]  ? row[7].toString()  : '',
-      updates:       updates,
-      ticketNumber:  row[17] ? row[17].toString() : '—',
-      ticket2:       row[18] ? row[18].toString() : '',
-      orderNumber:   row[19] ? row[19].toString() : '',
-      provider:      'SADV'
-    });
+      let rawTicket = String(row[idx.ticket] || row[15] || row[17] || '').trim();
+      if (!rawTicket) {
+        const m = (descStr + ' ' + (updates[0] || '')).match(/(#SA\d+|SA\d+|IF\d+)/i);
+        if (m) rawTicket = m[1];
+      }
+
+      let rawOrder = String(row[idx.order] || row[17] || row[19] || '').trim();
+      if (!rawOrder) {
+        const m = descStr.match(/(OV[A-Z]-\d+-\d+|IF\d+|[A-Z]{3}-\d{6}-\d+)/i);
+        if (m) rawOrder = m[1];
+      }
+
+      const fallbackId = rawTicket || rawOrder || '—';
+
+      tickets.push({
+        createdDate:   row[idx.created] ? String(row[idx.created]).trim() : '',
+        completedDate: row[idx.completed] ? String(row[idx.completed]).trim() : '',
+        channelPartner: row[idx.agent] ? String(row[idx.agent]).trim() : '',
+        status:        row[idx.status] ? String(row[idx.status]).trim() : 'New',
+        paymentRec:    row[idx.payment] ? String(row[idx.payment]).trim() : '',
+        product:       row[idx.product] ? String(row[idx.product]).trim() : '',
+        description:   descStr,
+        customer:      custName || '—',
+        updates:       updates,
+        ticketNumber:  fallbackId,
+        ticket2:       row[idx.ticket2] ? String(row[idx.ticket2]).trim() : '',
+        orderNumber:   rawOrder,
+        provider:      'SADV'
+      });
+    }
   }
 
   // 2. Pull Infinifi Tickets from 'Infinifi customers'
-  // (Infinifi doesn't have a separate ticket log, so their orders/fulfillment acts as the ticket)
-  const infSheet = supportDb.getSheetByName('Infinifi customers');
+  const infSheet = supportDb.getSheetByName('Infinifi customers') ||
+                   supportDb.getSheets().find(s => s.getName().toLowerCase().includes('infinifi'));
   if (infSheet) {
     const infRows = infSheet.getDataRange().getValues();
     for (let i = infRows.length - 1; i > 0; i--) {
       const row = infRows[i];
-      if (!row[2]) continue; // Skip if no customer name
+      if (!row[2] || row[2].toString().toLowerCase() === 'customer name') continue;
       
       const actionType = (row[11] || '').toString().trim().toLowerCase();
       const completedDate = row[1];
@@ -2355,7 +2555,6 @@ function getSupportTickets(token, payload) {
     }
   }
   
-  // Helper: parse DD/MM/YYYY or ISO date strings correctly
   function parseDate_(str) {
     if (!str) return 0;
     const s = str.toString().trim();
@@ -2365,17 +2564,15 @@ function getSupportTickets(token, payload) {
     return isNaN(d.getTime()) ? 0 : d.getTime();
   }
   
-  // Sort all tickets by created date descending (newest first)
   tickets.sort((a, b) => parseDate_(b.createdDate) - parseDate_(a.createdDate));
 
-  // Limit to 400 total to prevent payload bloat
   return { tickets: tickets.slice(0, 400) };
 }
 
 function logSupportTicket(token, payload) {
   requireSupport_(token);
   const supportDb = getSupportDb_();
-  const ticketsSheet = supportDb.getSheetByName('AUGSEP');
+  const ticketsSheet = getSadvSupportSheet_(supportDb);
 
   const lock = LockService.getScriptLock();
   try {
@@ -2402,18 +2599,56 @@ function updateSupportTicket(token, payload) {
   requireSupport_(token);
   const supportDb = getSupportDb_();
   
-  if (!payload.ticketId) throw new Error("Ticket ID (createdDate) required.");
+  if (!payload.ticketId) throw new Error("Ticket ID required.");
 
   if (payload.provider === 'SADV') {
-    const sheet = supportDb.getSheetByName('AUGSEP');
+    const sheet = getSadvSupportSheet_(supportDb);
     const data = sheet.getDataRange().getValues();
     let rowIndex = -1;
+
+    const targetTicket = (payload.ticketNumber || '').toString().trim().toLowerCase();
+    const targetOrder  = (payload.orderNumber || '').toString().trim().toLowerCase();
+    const targetCust   = (payload.customer || '').toString().trim().toLowerCase();
+    const targetDate   = (payload.ticketId || '').toString().trim();
+
+    // 1st priority: Match on ticketNumber or orderNumber
     for (let i = data.length - 1; i > 0; i--) {
-      if (data[i][0] && data[i][0].toString() === payload.ticketId) {
-        rowIndex = i + 1; // 1-based for sheet
+      const rowTicket = (data[i][17] || '').toString().trim().toLowerCase();
+      const rowOrder  = (data[i][19] || '').toString().trim().toLowerCase();
+      const rowDesc   = (data[i][6]  || '').toString().trim().toLowerCase();
+
+      if (targetTicket && targetTicket !== '—' && (rowTicket === targetTicket || rowDesc.includes(targetTicket))) {
+        rowIndex = i + 1;
+        break;
+      }
+      if (targetOrder && targetOrder !== '—' && (rowOrder === targetOrder || rowDesc.includes(targetOrder))) {
+        rowIndex = i + 1;
         break;
       }
     }
+
+    // 2nd priority: Match on customer + date
+    if (rowIndex === -1) {
+      for (let i = data.length - 1; i > 0; i--) {
+        const rowCust = (data[i][7] || '').toString().trim().toLowerCase();
+        const rowDate = (data[i][0] || '').toString().trim();
+        if (targetCust && rowCust === targetCust && (!targetDate || rowDate === targetDate)) {
+          rowIndex = i + 1;
+          break;
+        }
+      }
+    }
+
+    // 3rd priority: Match on created date alone
+    if (rowIndex === -1 && targetDate) {
+      for (let i = data.length - 1; i > 0; i--) {
+        if (data[i][0] && data[i][0].toString().trim() === targetDate) {
+          rowIndex = i + 1;
+          break;
+        }
+      }
+    }
+
     if (rowIndex === -1) throw new Error("Ticket not found in SADV database.");
 
     const lock = LockService.getScriptLock();
@@ -2452,6 +2687,7 @@ function updateSupportTicket(token, payload) {
     } finally {
       lock.releaseLock();
     }
+    return true;
   } else if (payload.provider === 'Infinifi') {
     const sheet = supportDb.getSheetByName('Infinifi customers');
     if (!sheet) throw new Error("Infinifi sheet not found.");
@@ -2532,7 +2768,7 @@ function getAgilitySyncHistory(token) {
   if (rows.length <= 1) return { history: [] };
   const history = rows.slice(1).reverse().slice(0, 20).map(r => ({
     syncId:        String(r[0] || ''),
-    syncedAt:      r[1] ? Utilities.formatDate(new Date(r[1]), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm") : '',
+    syncedAt:      r[1] ? Utilities.formatDate(new Date(r[1]), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss") : '',
     provider:      String(r[2] || ''),
     rowsProcessed: Number(r[3] || 0),
     rowsNew:       Number(r[4] || 0),
@@ -2581,68 +2817,79 @@ function uploadAgilityReport(token, payload) {
   if (!rows || rows.length < 2) throw new Error('File appears empty or has no data rows.');
 
   // Map header row to column indices dynamically (case-insensitive, trim)
-  const headers = rows[0].map(h => String(h).toLowerCase().trim().replace(/[^a-z0-9_]/g, '_'));
-  const col = (name) => headers.indexOf(name);
+  const IDX = getHeaderIndices_(rows[0]);
 
-  // Known column names in AUGSEP format
-  const IDX = {
-    created:    Math.max(col('created_da'), col('created_date'), 0),
-    completed:  Math.max(col('completed_'), col('completed_date'), 1),
-    agent:      Math.max(col('channel_partner_user_name'), 2),
-    status:     Math.max(col('status'), 3),
-    payment:    Math.max(col('paymentrec'), col('payment_rec'), 4),
-    product:    Math.max(col('contractproductname'), col('contract_product_name'), 5),
-    desc:       Math.max(col('description'), 6),
-    customer:   Math.max(col('customer'), 7),
-    update1:    Math.max(col('update_1'), 8),
-    update2:    Math.max(col('update_2'), 9),
-    update3:    Math.max(col('update_3'), 10),
-    update4:    Math.max(col('update_4'), 11),
-    update5:    Math.max(col('update_5'), 12),
-    ticket:     Math.max(col('ticket_number'), col('ticketnumber'), 17),
-    ticket2:    Math.max(col('ticket_2'), col('ticket2'), 18),
-    order:      Math.max(col('order_number'), col('ordernumber'), 19)
-  };
-
-  // Load existing AGILITY_DATA sheet
+  // 1. Prepare AGILITY_DATA in-memory array
   const dataSheet = getOrCreateAgilityData_();
-  const existing = dataSheet.getDataRange().getValues();
+  let existing = dataSheet.getDataRange().getValues();
+  if (existing.length === 0 || !existing[0][0]) {
+    existing = [[
+      'Ticket_Number', 'Created_Date', 'Completed_Date', 'Agent_Name',
+      'Status', 'Payment_Ref', 'Product_Name', 'Description',
+      'Customer_Name', 'Update_1', 'Update_2', 'Update_3', 'Update_4',
+      'Update_5', 'Ticket_2', 'Order_Number', 'Provider', 'Synced_At'
+    ]];
+  }
+
+  // Build map: key -> row index in `existing` array (0-based)
   const existingMap = {};
   for (let i = 1; i < existing.length; i++) {
     const t = String(existing[i][0] || '').trim();
     const o = String(existing[i][15] || '').trim();
     const c = String(existing[i][8] || '').trim().toLowerCase();
-    if (t) existingMap['T:' + t] = i + 1;
-    if (o) existingMap['O:' + o] = i + 1;
-    if (c) existingMap['C:' + c] = i + 1;
+    if (t) existingMap['T:' + t] = i;
+    if (o) existingMap['O:' + o] = i;
+    if (c) existingMap['C:' + c] = i;
   }
 
-  // Load AUGSEP sheet (SADV) or Infinifi customers (Infinifi) from support db or active ss
+  // 2. Prepare AUGSEP / Support sheet in-memory array
   let supportSheet = null;
+  let supportRows = [];
   let supportMap = {};
+
   try {
     const sDb = getSupportDb_();
-    supportSheet = sDb.getSheetByName(provider === 'Infinifi' ? 'Infinifi customers' : 'AUGSEP');
-  } catch(e) {}
+    supportSheet = provider === 'Infinifi'
+      ? (sDb.getSheetByName('Infinifi customers') || sDb.getSheets().find(s => s.getName().toLowerCase().includes('infinifi')))
+      : getSadvSupportSheet_(sDb);
+    if (supportSheet) {
+      console.log('[uploadAgilityReport] External supportSheet found: ' + supportSheet.getName());
+    } else {
+      console.warn('[uploadAgilityReport] External DB opened but target sheet not found. Available sheets: ' + sDb.getSheets().map(s => s.getName()).join(', '));
+    }
+  } catch(e) {
+    console.error('[uploadAgilityReport] Could not open external support DB: ' + e.message);
+  }
   if (!supportSheet) {
-    supportSheet = ss.getSheetByName(provider === 'Infinifi' ? 'Infinifi customers' : 'AUGSEP');
+    supportSheet = provider === 'Infinifi'
+      ? (ss.getSheetByName('Infinifi customers') || ss.getSheets().find(s => s.getName().toLowerCase().includes('infinifi')))
+      : getSadvSupportSheet_(ss);
   }
 
   if (supportSheet) {
-    const sRows = supportSheet.getDataRange().getValues();
-    for (let i = 1; i < sRows.length; i++) {
+    supportRows = supportSheet.getDataRange().getValues();
+    const sCol = supportRows.length > 0 ? getHeaderIndices_(supportRows[0]) : null;
+    for (let i = 1; i < supportRows.length; i++) {
       if (provider === 'SADV') {
-        const t = String(sRows[i][17] || '').trim();
-        const o = String(sRows[i][19] || '').trim();
-        const c = String(sRows[i][7] || '').trim().toLowerCase();
-        if (t) supportMap['T:' + t] = i + 1;
-        if (o) supportMap['O:' + o] = i + 1;
-        if (c) supportMap['C:' + c] = i + 1;
+        const sRow = supportRows[i];
+        if (sCol && !isValidAugSepRow_(sRow, sCol)) continue; // Skip non-ticket / lead divider rows
+
+        const t = String(sRow[sCol ? sCol.ticket : 15] || sRow[17] || '').trim();
+        let o = String(sRow[sCol ? sCol.order : 17] || sRow[19] || '').trim();
+        if (!o) {
+          const dStr = String(sRow[sCol ? sCol.desc : 6] || '').trim();
+          const m = dStr.match(/(OV[A-Z]-\d+-\d+|IF\d+|[A-Z]{3}-\d{6}-\d+)/i);
+          if (m) o = m[1];
+        }
+        const c = String(sRow[sCol ? sCol.customer : 7] || '').trim().toLowerCase();
+        if (t && t !== '—') supportMap['T:' + t.toLowerCase()] = i;
+        if (o && o !== '—') supportMap['O:' + o.toLowerCase()] = i;
+        if (c && c !== '—') supportMap['C:' + c] = i;
       } else {
-        const c = String(sRows[i][2] || '').trim().toLowerCase();
-        const o = String(sRows[i][5] || '').trim();
-        if (o) supportMap['O:' + o] = i + 1;
-        if (c) supportMap['C:' + c] = i + 1;
+        const c = String(supportRows[i][2] || '').trim().toLowerCase();
+        const o = String(supportRows[i][5] || '').trim();
+        if (o) supportMap['O:' + o.toLowerCase()] = i;
+        if (c) supportMap['C:' + c] = i;
       }
     }
   }
@@ -2651,11 +2898,41 @@ function uploadAgilityReport(token, payload) {
   const nowStr = Utilities.formatDate(now, Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
   let rowsNew = 0, rowsUpdated = 0, rowsProcessed = 0;
 
+  // Track which specific rows in AGILITY_DATA and AUGSEP need updating
+  const agilityUpdates = {}; // rowIdx -> newRow
+  const agilityNewRows = [];  // rows to append
+  const supportUpdates = {}; // rowIdx -> augRow
+  const supportNewRows = [];  // rows to append to support sheet (data rows only, NO headers)
+
+  const invalidHeaderNames = new Set([
+    'customer', 'customer name', 'customer_name', 'physical address', 'phone number',
+    'address', 'name', 'surname', 'channel_partner_user_name', 'status', 'description',
+    'total', 'subtotal', '—', ''
+  ]);
+
+  const sColMap = (supportRows && supportRows.length > 0) ? getHeaderIndices_(supportRows[0]) : null;
+  const numSupportCols = supportSheet ? Math.max(supportSheet.getLastColumn(), 20) : 20;
+
   const dataRows = rows.slice(1);
   for (const row of dataRows) {
-    const ticketNum = String(row[IDX.ticket] || '').trim();
-    const orderNum = String(row[IDX.order] || '').trim();
     const customerName = String(row[IDX.customer] || '').trim();
+    if (!customerName || invalidHeaderNames.has(customerName.toLowerCase())) continue;
+
+    // ── LEAD-ROW GUARD ─────────────────────────────────────────────────────────
+    if (provider === 'SADV') {
+      if (!isValidAugSepRow_(row, IDX)) continue;
+    }
+    // ───────────────────────────────────────────────────────────────────────────
+
+    const ticketNum = String(row[IDX.ticket] || '').trim();
+    let orderNum = String(row[IDX.order] || '').trim();
+    const descStr = String(row[IDX.desc] || '').trim();
+
+    // Extract order number from description if not in dedicated column
+    if (!orderNum && descStr) {
+      const m = descStr.match(/(OV[A-Z]-\d+-\d+|IF\d+|[A-Z]{3}-\d{6}-\d+)/i);
+      if (m) orderNum = m[1];
+    }
 
     if (!ticketNum && !orderNum && !customerName) continue; // skip completely empty rows
     rowsProcessed++;
@@ -2670,7 +2947,7 @@ function uploadAgilityReport(token, payload) {
       String(row[IDX.status]    || '').trim(),
       String(row[IDX.payment]   || '').trim(),
       String(row[IDX.product]   || '').trim(),
-      String(row[IDX.desc]      || '').trim(),
+      descStr,
       customerName,
       String(row[IDX.update1]   || '').trim(),
       String(row[IDX.update2]   || '').trim(),
@@ -2683,52 +2960,105 @@ function uploadAgilityReport(token, payload) {
       nowStr
     ];
 
-    // Find row index in AGILITY_DATA
-    const targetRowIdx = existingMap['T:' + ticketNum] || existingMap['O:' + orderNum] || existingMap['C:' + customerName.toLowerCase()];
-    if (targetRowIdx) {
-      dataSheet.getRange(targetRowIdx, 2, 1, newRow.length - 1).setValues([newRow.slice(1)]);
+    // ── AGILITY_DATA update ──────────────────────────────────────
+    const targetIdx = (ticketNum ? existingMap['T:' + ticketNum.toLowerCase()] : undefined) ||
+                      (orderNum ? existingMap['O:' + orderNum.toLowerCase()] : undefined) ||
+                      (customerName ? existingMap['C:' + customerName.toLowerCase()] : undefined);
+    if (targetIdx !== undefined) {
+      agilityUpdates[targetIdx] = newRow;
       rowsUpdated++;
     } else {
-      dataSheet.appendRow(newRow);
-      const newIdx = existing.length + rowsNew + 1;
-      if (ticketNum) existingMap['T:' + ticketNum] = newIdx;
-      if (orderNum) existingMap['O:' + orderNum] = newIdx;
+      const newIdx = existing.length + agilityNewRows.length;
+      agilityNewRows.push(newRow);
+      if (ticketNum) existingMap['T:' + ticketNum.toLowerCase()] = newIdx;
+      if (orderNum) existingMap['O:' + orderNum.toLowerCase()] = newIdx;
       if (customerName) existingMap['C:' + customerName.toLowerCase()] = newIdx;
       rowsNew++;
     }
 
-    // Upsert into AUGSEP sheet for SADV so main support tickets log updates directly
+    // ── Support sheet (AUGSEP) update ────────────────────────────
     if (supportSheet && provider === 'SADV') {
-      const sRowIdx = supportMap['T:' + ticketNum] || supportMap['O:' + orderNum] || supportMap['C:' + customerName.toLowerCase()];
-      const augRow = Array(20).fill('');
-      augRow[0]  = row[IDX.created]   || '';
-      augRow[1]  = row[IDX.completed] || '';
-      augRow[2]  = row[IDX.agent]     || '';
-      augRow[3]  = row[IDX.status]    || '';
-      augRow[4]  = row[IDX.payment]   || '';
-      augRow[5]  = row[IDX.product]   || '';
-      augRow[6]  = row[IDX.desc]      || '';
-      augRow[7]  = customerName;
-      augRow[8]  = row[IDX.update1]   || '';
-      augRow[9]  = row[IDX.update2]   || '';
-      augRow[10] = row[IDX.update3]   || '';
-      augRow[11] = row[IDX.update4]   || '';
-      augRow[12] = row[IDX.update5]   || '';
-      augRow[17] = ticketNum;
-      augRow[18] = row[IDX.ticket2]   || '';
-      augRow[19] = orderNum;
+      const sIdx = (ticketNum ? supportMap['T:' + ticketNum.toLowerCase()] : undefined) ||
+                   (orderNum ? supportMap['O:' + orderNum.toLowerCase()] : undefined) ||
+                   (customerName ? supportMap['C:' + customerName.toLowerCase()] : undefined);
 
-      if (sRowIdx) {
-        // Update existing row in AUGSEP
-        supportSheet.getRange(sRowIdx, 1, 1, 20).setValues([augRow]);
+      const augRow = Array(numSupportCols).fill('');
+      const cIdx = sColMap || {
+        created: 0, completed: 1, agent: 2, status: 3, payment: 4,
+        product: 5, desc: 6, customer: 7, update1: 8, update2: 9,
+        update3: 10, update4: 11, update5: 12, update6: 13, update7: 14,
+        ticket: 15, ticket2: 16, order: 17, update8: 18, update9: 19
+      };
+
+      const setVal = (destIdx, val) => {
+        if (typeof destIdx === 'number' && destIdx >= 0 && destIdx < numSupportCols) {
+          augRow[destIdx] = String(val || '').trim();
+        }
+      };
+
+      setVal(cIdx.created,   row[IDX.created]);
+      setVal(cIdx.completed, row[IDX.completed]);
+      setVal(cIdx.agent,     row[IDX.agent]);
+      setVal(cIdx.status,    row[IDX.status]);
+      setVal(cIdx.payment,   row[IDX.payment]);
+      setVal(cIdx.product,   row[IDX.product]);
+      setVal(cIdx.desc,      descStr);
+      setVal(cIdx.customer,  customerName);
+      if (IDX.update1 !== undefined) setVal(cIdx.update1 !== undefined ? cIdx.update1 : 8,  row[IDX.update1]);
+      if (IDX.update2 !== undefined) setVal(cIdx.update2 !== undefined ? cIdx.update2 : 9,  row[IDX.update2]);
+      if (IDX.update3 !== undefined) setVal(cIdx.update3 !== undefined ? cIdx.update3 : 10, row[IDX.update3]);
+      if (IDX.update4 !== undefined) setVal(cIdx.update4 !== undefined ? cIdx.update4 : 11, row[IDX.update4]);
+      if (IDX.update5 !== undefined) setVal(cIdx.update5 !== undefined ? cIdx.update5 : 12, row[IDX.update5]);
+      if (IDX.update6 !== undefined) setVal(cIdx.update6 !== undefined ? cIdx.update6 : 13, row[IDX.update6]);
+      if (IDX.update7 !== undefined) setVal(cIdx.update7 !== undefined ? cIdx.update7 : 14, row[IDX.update7]);
+      setVal(cIdx.ticket,    ticketNum);
+      setVal(cIdx.ticket2,   row[IDX.ticket2]);
+      setVal(cIdx.order,     orderNum);
+      if (IDX.update8 !== undefined) setVal(cIdx.update8 !== undefined ? cIdx.update8 : 18, row[IDX.update8]);
+      if (IDX.update9 !== undefined) setVal(cIdx.update9 !== undefined ? cIdx.update9 : 19, row[IDX.update9]);
+
+      if (sIdx !== undefined) {
+        // Update existing row: preserve all existing notes if incoming update is blank
+        const noteCols = [8, 9, 10, 11, 12, 13, 14, 18, 19];
+        for (const u of noteCols) {
+          if (u < numSupportCols && !augRow[u] && supportRows[sIdx] && supportRows[sIdx][u]) {
+            augRow[u] = supportRows[sIdx][u];
+          }
+        }
+        supportUpdates[sIdx] = augRow;
       } else {
-        // Append new row to AUGSEP
-        supportSheet.appendRow(augRow);
-        const newSIdx = sRows.length + 1;
-        if (ticketNum) supportMap['T:' + ticketNum] = newSIdx;
-        if (orderNum) supportMap['O:' + orderNum] = newSIdx;
+        // Append brand new row (NO headings, just pure data)
+        const newSIdx = supportRows.length + supportNewRows.length;
+        supportNewRows.push(augRow);
+        if (ticketNum) supportMap['T:' + ticketNum.toLowerCase()] = newSIdx;
+        if (orderNum) supportMap['O:' + orderNum.toLowerCase()] = newSIdx;
         if (customerName) supportMap['C:' + customerName.toLowerCase()] = newSIdx;
       }
+    }
+  }
+
+  // ── Write only changed rows to AGILITY_DATA ──────────────────────────────
+  for (const rowIdx in agilityUpdates) {
+    const sheetRow = parseInt(rowIdx) + 1;
+    dataSheet.getRange(sheetRow, 1, 1, 18).setValues([agilityUpdates[rowIdx]]);
+  }
+  if (agilityNewRows.length > 0) {
+    dataSheet.getRange(existing.length + 1, 1, agilityNewRows.length, 18).setValues(agilityNewRows);
+  }
+
+  // ── Write only changed rows to external support sheet ─────────────────────
+  if (supportSheet && provider === 'SADV') {
+    // 1. Update modified rows individually
+    for (const rowIdx in supportUpdates) {
+      const sheetRow = parseInt(rowIdx) + 1;
+      const updateRow = supportUpdates[rowIdx];
+      supportSheet.getRange(sheetRow, 1, 1, updateRow.length).setValues([updateRow]);
+    }
+    // 2. Append new rows in one batch starting at getLastRow() + 1 (never re-writing headers)
+    if (supportNewRows.length > 0) {
+      const appendStartRow = supportSheet.getLastRow() + 1;
+      const colCount = supportNewRows[0].length;
+      supportSheet.getRange(appendStartRow, 1, supportNewRows.length, colCount).setValues(supportNewRows);
     }
   }
 
@@ -2746,6 +3076,8 @@ function uploadAgilityReport(token, payload) {
     rowsProcessed,
     rowsNew,
     rowsUpdated,
-    syncId
+    syncId,
+    syncedAt: Utilities.formatDate(now, Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss")
   };
 }
+
