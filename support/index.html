@@ -220,6 +220,55 @@
       background: #131720;
       border: 1px solid rgba(255,255,255,0.08);
     }
+
+    /* Customer Detail Slide-Over */
+    .customer-detail-panel {
+      background: linear-gradient(160deg, #131720 0%, #0f1117 100%);
+      border-left: 1px solid rgba(255,255,255,0.08);
+      box-shadow: -24px 0 80px rgba(0,0,0,0.6);
+    }
+    @keyframes slide-in-right { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    .animate-slide-in-right { animation: slide-in-right 0.32s cubic-bezier(.22,.68,0,1.2); }
+
+    /* Info grid item */
+    .cd-field {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.05);
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+    .cd-field-label {
+      font-size: 0.65rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #6b7280;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .cd-field-value {
+      font-size: 0.82rem;
+      color: #e5e7eb;
+      font-weight: 500;
+      word-break: break-word;
+    }
+    .cd-field-value.mono { font-family: monospace; font-size: 0.78rem; color: #F1A328; }
+    .cd-section-title {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #4b5563;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .cd-section-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: rgba(255,255,255,0.05);
+    }
   </style>
 </head>
 
@@ -887,6 +936,155 @@
       <div class="px-6 py-4 border-t border-white/5 shrink-0">
         <button onclick="closeTicketDetail()"
           class="w-full py-2.5 bg-white/5 text-gray-400 hover:bg-white/10 text-sm font-medium rounded-xl transition-colors">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════ -->
+  <!-- MODAL: Customer Detail Slide-Over      -->
+  <!-- ══════════════════════════════════════ -->
+  <div id="modal-customer-detail" class="hidden fixed inset-0 z-50 modal-bg flex items-stretch justify-end">
+    <!-- Click-away backdrop -->
+    <div class="flex-1" onclick="closeCustomerDetail()"></div>
+
+    <!-- Panel -->
+    <div class="customer-detail-panel animate-slide-in-right w-full max-w-lg flex flex-col h-full overflow-hidden">
+
+      <!-- Panel Header -->
+      <div class="flex items-start justify-between px-6 py-5 border-b border-white/5 shrink-0">
+        <div class="flex items-center gap-4">
+          <!-- Avatar -->
+          <div id="cd-avatar" class="w-12 h-12 rounded-2xl bg-gradient-to-br from-fiber-500 to-gem-600 flex items-center justify-center text-lg font-bold text-white shrink-0">—</div>
+          <div>
+            <p class="text-[10px] text-fiber-400 font-bold uppercase tracking-widest mb-0.5">Customer Profile</p>
+            <h3 class="text-base font-bold text-white leading-tight" id="cd-name">—</h3>
+            <div class="flex items-center gap-2 mt-1.5" id="cd-badges">
+              <!-- status + provider badges injected here -->
+            </div>
+          </div>
+        </div>
+        <button onclick="closeCustomerDetail()" class="text-gray-500 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/5 mt-0.5 shrink-0">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Scrollable Body -->
+      <div class="flex-1 overflow-y-auto px-6 py-5 space-y-6">
+
+        <!-- ── ACCOUNT IDENTIFIERS ── -->
+        <div>
+          <p class="cd-section-title">Account Identifiers</p>
+          <div class="grid grid-cols-2 gap-2.5">
+            <div class="cd-field">
+              <p class="cd-field-label">Order / Lead #</p>
+              <p class="cd-field-value mono" id="cd-order">—</p>
+            </div>
+            <div class="cd-field">
+              <p class="cd-field-label">Provider</p>
+              <p class="cd-field-value" id="cd-provider-txt">—</p>
+            </div>
+            <div class="cd-field">
+              <p class="cd-field-label">Lead Number</p>
+              <p class="cd-field-value mono" id="cd-lead">—</p>
+            </div>
+            <div class="cd-field">
+              <p class="cd-field-label">Vuma Premise ID</p>
+              <p class="cd-field-value mono" id="cd-premise">—</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── CONTACT DETAILS ── -->
+        <div>
+          <p class="cd-section-title">Contact Details</p>
+          <div class="grid grid-cols-2 gap-2.5">
+            <div class="cd-field col-span-2">
+              <p class="cd-field-label">Full Name</p>
+              <p class="cd-field-value text-white font-semibold" id="cd-fullname">—</p>
+            </div>
+            <div class="cd-field">
+              <p class="cd-field-label">Phone Number</p>
+              <p class="cd-field-value" id="cd-phone">—</p>
+            </div>
+            <div class="cd-field">
+              <p class="cd-field-label">Email Address</p>
+              <p class="cd-field-value" id="cd-email">—</p>
+            </div>
+            <div class="cd-field col-span-2">
+              <p class="cd-field-label">Address / Region</p>
+              <p class="cd-field-value" id="cd-address">—</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── SERVICE DETAILS ── -->
+        <div>
+          <p class="cd-section-title">Service & Package</p>
+          <div class="grid grid-cols-2 gap-2.5">
+            <div class="cd-field col-span-2">
+              <p class="cd-field-label">Product / Package</p>
+              <p class="cd-field-value" id="cd-product">—</p>
+            </div>
+            <div class="cd-field">
+              <p class="cd-field-label">Contract Term</p>
+              <p class="cd-field-value" id="cd-term">—</p>
+            </div>
+            <div class="cd-field">
+              <p class="cd-field-label">Monthly MRC (excl. VAT)</p>
+              <p class="cd-field-value text-emerald-400 font-bold" id="cd-mrc">—</p>
+            </div>
+            <div class="cd-field">
+              <p class="cd-field-label">Channel Partner</p>
+              <p class="cd-field-value" id="cd-channel">—</p>
+            </div>
+            <div class="cd-field">
+              <p class="cd-field-label">Region</p>
+              <p class="cd-field-value" id="cd-region">—</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── DATES ── -->
+        <div>
+          <p class="cd-section-title">Important Dates</p>
+          <div class="grid grid-cols-2 gap-2.5">
+            <div class="cd-field">
+              <p class="cd-field-label">Created / Order Date</p>
+              <p class="cd-field-value" id="cd-created">—</p>
+            </div>
+            <div class="cd-field">
+              <p class="cd-field-label">Completed / Active Date</p>
+              <p class="cd-field-value" id="cd-completed">—</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── LINKED TICKETS ── -->
+        <div>
+          <p class="cd-section-title">Linked Support Tickets</p>
+          <div id="cd-tickets-list" class="space-y-2">
+            <div class="skeleton h-10 rounded-lg"></div>
+            <div class="skeleton h-10 rounded-lg"></div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Footer Actions -->
+      <div class="px-6 py-4 border-t border-white/5 shrink-0 flex gap-3">
+        <button id="cd-view-tickets-btn" onclick=""
+          class="flex-1 flex items-center justify-center gap-2 py-2.5 bg-gradient-to-r from-fiber-600 to-fiber-700 hover:from-fiber-500 text-white text-sm font-semibold rounded-xl transition-all">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
+          </svg>
+          View All Tickets
+        </button>
+        <button onclick="closeCustomerDetail()"
+          class="px-5 py-2.5 bg-white/5 text-gray-400 hover:bg-white/10 text-sm font-medium rounded-xl transition-colors">
           Close
         </button>
       </div>
