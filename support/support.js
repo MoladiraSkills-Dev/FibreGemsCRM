@@ -348,7 +348,8 @@ function renderCustomerTable() {
       </td>
     `;
 
-    return `<tr class="${rowClass} cursor-pointer hover:bg-white/5 transition-colors" onclick="viewCustomerTickets('${escHtml(c.customer || '').replace(/'/g, "\\'")}', '${escHtml(c.provider || '')}')">${cellsHtml}</tr>`;
+    const _fidx = filteredCustomers.indexOf(c);
+    return `<tr class="${rowClass} cursor-pointer hover:bg-white/5 transition-colors" onclick="openCustomerDetail(${_fidx >= 0 ? _fidx : 0})">${cellsHtml}</tr>`;
   }).join('');
 }
 
@@ -365,6 +366,7 @@ function nextCustomerPage() { customerPage++; renderCustomerTable(); }
 function prevCustomerPage() { if (customerPage > 0) { customerPage--; renderCustomerTable(); } }
 
 function viewCustomerTickets(customerName, provider) {
+  closeCustomerDetail();
   showView('tickets');
   document.getElementById('ticket-search').value = customerName;
   if (provider && provider !== 'all') {
@@ -376,6 +378,138 @@ function viewCustomerTickets(customerName, provider) {
   } else {
     filterTicketTable();
   }
+}
+
+// ─────────────────────────────────────────────
+// CUSTOMER DETAIL PANEL
+// ─────────────────────────────────────────────
+
+// Store a reference map for the current rendered slice
+let _customerDetailMap = {};
+
+function openCustomerDetail(c) {
+  // Accept either a customer object directly or an index into filteredCustomers
+  const customer = (typeof c === 'object' && c !== null) ? c : (filteredCustomers[c] || allCustomers[c]);
+  if (!customer) { showToast('Customer data not found.', 'error'); return; }
+
+  const modal = document.getElementById('modal-customer-detail');
+  if (!modal) return;
+
+  // ── Avatar
+  const initials = (customer.customer || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+  document.getElementById('cd-avatar').textContent = initials;
+
+  // ── Header name + badges
+  document.getElementById('cd-name').textContent = customer.customer || '—';
+  const isAct = isActive_(customer.status);
+  const isPend = isPending_(customer.status);
+  const statusLabel = isAct ? 'Active' : isPend ? 'Pending' : 'Inactive';
+  const statusClass = isAct ? 'badge-active' : isPend ? 'badge-pending' : 'badge-inactive';
+  document.getElementById('cd-badges').innerHTML = `
+    <span class="${statusClass} text-[10px] px-2.5 py-1 rounded-full font-bold">${escHtml(statusLabel)}</span>
+    <span class="${getProviderBadgeClass(customer.provider)} text-[10px] px-2.5 py-1 rounded-full font-bold">${escHtml(customer.provider || '—')}</span>
+  `;
+
+  // ── Account identifiers
+  setEl('cd-order',      customer.orderNumber   || '—');
+  setEl('cd-provider-txt', customer.provider    || '—');
+  setEl('cd-lead',       customer.leadNumber    || customer.lead || customer.orderNumber || '—');
+  setEl('cd-premise',    customer.premiseId     || customer.vumaPremiseId || customer.premise || '—');
+
+  // ── Contact details
+  setEl('cd-fullname',   customer.customer      || '—');
+  setEl('cd-phone',      customer.phone         || customer.phoneNumber || customer.mobile || '—');
+  setEl('cd-email',      customer.email         || customer.emailAddress || '—');
+  // Build address from available fields
+  const addrParts = [customer.address, customer.suburb, customer.city, customer.province]
+    .filter(Boolean);
+  const addrFull = addrParts.length ? addrParts.join(', ') : (customer.region || '—');
+  setEl('cd-address',    addrFull);
+
+  // ── Service details
+  setEl('cd-product',    customer.product       || customer.package || '—');
+  setEl('cd-term',       customer.contractTerm  || customer.term || '—');
+  const mrcVal = customer.mrc != null ? 'R' + escHtml(String(customer.mrc)) : '—';
+  document.getElementById('cd-mrc').textContent = mrcVal === '—' ? '—' : 'R' + (customer.mrc);
+  setEl('cd-channel',    customer.channelPartner || customer.channel || '—');
+  setEl('cd-region',     customer.region        || '—');
+
+  // ── Dates
+  setEl('cd-created',    formatDate_(customer.createdDate)   || '—');
+  setEl('cd-completed',  customer.completedDate ? formatDate_(customer.completedDate) : '—');
+
+  // ── Footer button
+  const viewBtn = document.getElementById('cd-view-tickets-btn');
+  if (viewBtn) {
+    viewBtn.onclick = () => viewCustomerTickets(customer.customer || '', customer.provider || '');
+  }
+
+  // ── Linked tickets (filter from already-loaded tickets or show prompt)
+  renderCustomerLinkedTickets(customer);
+
+  // Show modal
+  modal.classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+}
+
+function renderCustomerLinkedTickets(customer) {
+  const el = document.getElementById('cd-tickets-list');
+  if (!el) return;
+
+  const name = (customer.customer || '').toLowerCase();
+  const order = (customer.orderNumber || '').toLowerCase();
+
+  if (!allTickets.length) {
+    el.innerHTML = `
+      <div class="text-center py-4">
+        <p class="text-xs text-gray-500 mb-2">Tickets haven't been loaded yet.</p>
+        <button onclick="loadCustomerTicketsInPanel('${escHtml(customer.customer || '')}', '${escHtml(customer.provider || '')}')" 
+          class="text-xs text-fiber-400 hover:text-fiber-300 font-semibold">Load Tickets</button>
+      </div>`;
+    return;
+  }
+
+  const linked = allTickets.filter(t => {
+    const tName = (t.customer || '').toLowerCase();
+    const tOrder = (t.orderNumber || '').toLowerCase();
+    return (name && tName.includes(name)) || (order && tOrder && tOrder === order);
+  });
+
+  if (!linked.length) {
+    el.innerHTML = `<p class="text-xs text-gray-600 italic py-2">No tickets found for this customer.</p>`;
+    return;
+  }
+
+  el.innerHTML = linked.slice(0, 5).map(t => `
+    <div class="cd-field flex items-center justify-between gap-3">
+      <div class="min-w-0">
+        <div class="flex items-center gap-2 mb-0.5">
+          <span class="text-[10px] font-mono text-fiber-400">${escHtml(t.ticketNumber || '—')}</span>
+          <span class="${getStatusBadgeClass(t.status)} text-[9px] px-1.5 py-0.5 rounded-full font-semibold">${escHtml(t.status || 'Open')}</span>
+        </div>
+        <p class="text-xs text-gray-400 truncate">${escHtml(t.description || '—')}</p>
+        <p class="text-[10px] text-gray-600 mt-0.5">${formatDate_(t.createdDate)}</p>
+      </div>
+    </div>
+  `).join('') + (linked.length > 5 ? `<p class="text-[11px] text-gray-600 text-center pt-1">+${linked.length - 5} more — click "View All Tickets" below</p>` : '');
+}
+
+async function loadCustomerTicketsInPanel(customerName, provider) {
+  const el = document.getElementById('cd-tickets-list');
+  if (el) el.innerHTML = '<div class="skeleton h-10 rounded-lg"></div><div class="skeleton h-10 rounded-lg"></div>';
+  try {
+    const data = await callBackend('getSupportTickets', { offset: 0, limit: 500 });
+    allTickets = data?.tickets || [];
+    const fakeCustomer = { customer: customerName, provider, orderNumber: '' };
+    renderCustomerLinkedTickets(fakeCustomer);
+  } catch (err) {
+    if (el) el.innerHTML = `<p class="text-xs text-red-400 italic">Could not load tickets: ${escHtml(err.message)}</p>`;
+  }
+}
+
+function closeCustomerDetail() {
+  document.getElementById('modal-customer-detail')?.classList.add('hidden');
+  document.body.style.overflow = '';
 }
 
 // ─────────────────────────────────────────────

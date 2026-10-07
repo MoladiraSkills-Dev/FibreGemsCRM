@@ -167,6 +167,54 @@
       background: rgba(0, 0, 0, 0.75);
       backdrop-filter: blur(6px);
     }
+
+    /* Lead Detail Slide-Over */
+    .lead-detail-panel {
+      background: linear-gradient(160deg, #15192a 0%, #0f1117 100%);
+      border-left: 1px solid rgba(255,255,255,0.08);
+      box-shadow: -24px 0 80px rgba(0,0,0,0.65);
+    }
+    @keyframes slide-in-right-agent { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    .animate-slide-in-right { animation: slide-in-right-agent 0.32s cubic-bezier(.22,.68,0,1.2); }
+
+    .ld-field {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+    .ld-field-label {
+      font-size: 0.63rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #6b7280;
+      font-weight: 600;
+      margin-bottom: 3px;
+    }
+    .ld-field-value {
+      font-size: 0.82rem;
+      color: #e5e7eb;
+      font-weight: 500;
+      word-break: break-word;
+    }
+    .ld-field-value.mono { font-family: monospace; font-size: 0.78rem; color: #F1A328; }
+    .ld-section-title {
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #4b5563;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .ld-section-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: rgba(255,255,255,0.05);
+    }
   </style>
 </head>
 
@@ -384,7 +432,13 @@
           <p class="text-xs text-gray-400 mt-0.5">Streamlined contact view showing client name and number for rapid
             1-click execution.</p>
         </div>
-        <div class="flex items-center gap-2" id="callback-filter-buttons">
+        <div class="flex flex-wrap items-center gap-2" id="callback-filter-buttons">
+          <div class="relative mr-2">
+            <span class="absolute inset-y-0 left-0 flex items-center pl-3">
+              <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+            </span>
+            <input type="text" id="callback-search" onkeyup="renderCallbackCards()" placeholder="Search clients..." class="w-full sm:w-64 bg-navy-800/50 border border-white/10 rounded-xl pl-9 pr-3 py-1.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-fiber-500 transition-colors">
+          </div>
           <button onclick="setCallbackFilter('all')" data-cb-filter="all"
             class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-fiber-500 text-white transition-all">All (<span
               id="cb-count-all">0</span>)</button>
@@ -414,6 +468,12 @@
         <div>
           <h2 class="text-xl font-bold text-white">All Assigned Leads</h2>
           <p class="text-sm text-gray-500 mt-0.5"><span id="worklist-count">0 customers</span> in your pipeline</p>
+        </div>
+        <div class="relative w-full sm:w-64">
+          <span class="absolute inset-y-0 left-0 flex items-center pl-3">
+            <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+          </span>
+          <input type="text" id="worklist-search" onkeyup="handleWorklistSearch()" placeholder="Search worklist..." class="w-full bg-navy-800/50 border border-white/10 rounded-xl pl-9 pr-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-fiber-500 transition-colors">
         </div>
       </div>
 
@@ -1020,7 +1080,7 @@
             <option value="Vuma Reach 10Mbps/10Mbps">Vuma Reach 10Mbps/10Mbps</option>
             <option value="Vuma Reach 20Mbps/10Mbps">Vuma Reach 20Mbps/10Mbps</option>
             <option value="Vuma Reach 50Mbps/25Mbps">Vuma Reach 50Mbps/25Mbps</option>
-            <option value="Vuma Reach 100Mbps/50Mbps">Vuma Reach 100Mbps/50Mbps</optio
+            <option value="Vuma Reach 100Mbps/50Mbps">Vuma Reach 100Mbps/50Mbps</option>
           </select>
         </div>
         <div>
@@ -1108,6 +1168,169 @@
         <button onclick="closeDuplicate()"
           class="px-4 py-2.5 bg-white/5 text-gray-400 rounded-xl text-sm font-medium hover:bg-white/10 transition-colors">
           Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- Lead / Customer Detail Slide-Over                          -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <div id="modal-lead-detail" class="hidden fixed inset-0 z-[60] flex items-stretch justify-end" style="background:rgba(0,0,0,0.65);backdrop-filter:blur(6px)">
+    <!-- Click-away backdrop -->
+    <div class="flex-1" onclick="closeLeadDetail()"></div>
+
+    <!-- Slide-over panel -->
+    <div class="lead-detail-panel animate-slide-in-right w-full max-w-md flex flex-col h-full overflow-hidden">
+
+      <!-- Header -->
+      <div class="flex items-start justify-between px-5 py-5 border-b border-white/5 shrink-0">
+        <div class="flex items-center gap-3">
+          <div id="ld-avatar" class="w-12 h-12 rounded-2xl bg-gradient-to-br from-fiber-500 to-fiber-700 flex items-center justify-center text-lg font-bold text-white shrink-0">?</div>
+          <div>
+            <p class="text-[10px] text-fiber-400 font-bold uppercase tracking-widest mb-0.5">Lead Profile</p>
+            <h3 class="text-base font-bold text-white leading-tight" id="ld-name">—</h3>
+            <div class="flex items-center gap-2 flex-wrap mt-1.5" id="ld-badges"></div>
+          </div>
+        </div>
+        <button onclick="closeLeadDetail()" class="text-gray-500 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/5 mt-0.5 shrink-0">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Scrollable body -->
+      <div class="flex-1 overflow-y-auto px-5 py-5 space-y-5 custom-scrollbar">
+
+        <!-- Contact Details -->
+        <div>
+          <p class="ld-section-title">Contact Details</p>
+          <div class="grid grid-cols-2 gap-2">
+            <div class="ld-field col-span-2">
+              <p class="ld-field-label">Full Name</p>
+              <p class="ld-field-value font-semibold text-white" id="ld-fullname">—</p>
+            </div>
+            <div class="ld-field">
+              <p class="ld-field-label">Cell Number</p>
+              <div class="flex items-center gap-2 mt-0.5">
+                <p class="ld-field-value mono" id="ld-phone">—</p>
+                <button id="ld-copy-btn" onclick="" class="text-[10px] text-gray-500 hover:text-gray-300 transition-colors">📋</button>
+              </div>
+            </div>
+            <div class="ld-field">
+              <p class="ld-field-label">Alternate Cell</p>
+              <p class="ld-field-value mono" id="ld-alt-phone">—</p>
+            </div>
+            <div class="ld-field">
+              <p class="ld-field-label">Email</p>
+              <p class="ld-field-value text-xs" id="ld-email">—</p>
+            </div>
+            <div class="ld-field">
+              <p class="ld-field-label">WhatsApp</p>
+              <a id="ld-wa-link" href="#" target="_blank" class="ld-field-value text-emerald-400 hover:text-emerald-300 text-xs font-semibold">Open Chat →</a>
+            </div>
+            <div class="ld-field col-span-2">
+              <p class="ld-field-label">Address / Suburb</p>
+              <p class="ld-field-value" id="ld-address">—</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Lead & Sales Info -->
+        <div>
+          <p class="ld-section-title">Lead & Sales Info</p>
+          <div class="grid grid-cols-2 gap-2">
+            <div class="ld-field">
+              <p class="ld-field-label">Customer ID</p>
+              <p class="ld-field-value mono text-xs" id="ld-cid">—</p>
+            </div>
+            <div class="ld-field">
+              <p class="ld-field-label">Status</p>
+              <p class="ld-field-value" id="ld-status">—</p>
+            </div>
+            <div class="ld-field col-span-2">
+              <p class="ld-field-label">Package / Product</p>
+              <p class="ld-field-value" id="ld-package">—</p>
+            </div>
+            <div class="ld-field">
+              <p class="ld-field-label">Payment Type</p>
+              <p class="ld-field-value" id="ld-payment-type">—</p>
+            </div>
+            <div class="ld-field">
+              <p class="ld-field-label">Order Date</p>
+              <p class="ld-field-value" id="ld-order-date">—</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Order & EasyPay -->
+        <div>
+          <p class="ld-section-title">Order & EasyPay</p>
+          <div class="grid grid-cols-2 gap-2">
+            <div class="ld-field">
+              <p class="ld-field-label">Order Number</p>
+              <p class="ld-field-value mono" id="ld-order-number">—</p>
+            </div>
+            <div class="ld-field">
+              <p class="ld-field-label">EasyPay Number</p>
+              <p class="ld-field-value mono" id="ld-easypay">—</p>
+            </div>
+            <div class="ld-field">
+              <p class="ld-field-label">EP Cycle</p>
+              <p class="ld-field-value" id="ld-ep-cycle">—</p>
+            </div>
+            <div class="ld-field">
+              <p class="ld-field-label">EP Expiry Date</p>
+              <p class="ld-field-value" id="ld-ep-expiry">—</p>
+            </div>
+            <div class="ld-field">
+              <p class="ld-field-label">Promised Payment</p>
+              <p class="ld-field-value text-purple-400" id="ld-promised-pay">—</p>
+            </div>
+            <div class="ld-field">
+              <p class="ld-field-label">Referral Code</p>
+              <div class="flex items-center gap-2 mt-0.5">
+                <p class="ld-field-value mono text-amber-400" id="ld-referral-code">—</p>
+                <button id="ld-copy-ref-btn" onclick="" class="text-[10px] text-gray-500 hover:text-gray-300 transition-colors hidden">📋</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Next Action -->
+        <div>
+          <p class="ld-section-title">Scheduled Action</p>
+          <div class="grid grid-cols-2 gap-2">
+            <div class="ld-field">
+              <p class="ld-field-label">Next Action</p>
+              <p class="ld-field-value" id="ld-next-action">—</p>
+            </div>
+            <div class="ld-field">
+              <p class="ld-field-label">Next Action Date</p>
+              <p class="ld-field-value text-fiber-400 font-semibold" id="ld-next-date">—</p>
+            </div>
+            <div class="ld-field col-span-2">
+              <p class="ld-field-label">Last Outcome</p>
+              <p class="ld-field-value" id="ld-last-outcome">—</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Footer actions -->
+      <div class="px-5 py-4 border-t border-white/5 shrink-0 flex gap-3">
+        <button id="ld-log-outcome-btn" onclick=""
+          class="flex-1 flex items-center justify-center gap-2 py-2.5 bg-gradient-to-r from-fiber-500 to-fiber-600 hover:from-fiber-600 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-fiber-500/20">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
+          </svg>
+          ⚡ Log Outcome
+        </button>
+        <button onclick="closeLeadDetail()"
+          class="px-5 py-2.5 bg-white/5 text-gray-400 hover:bg-white/10 text-sm font-medium rounded-xl transition-colors">
+          Close
         </button>
       </div>
     </div>

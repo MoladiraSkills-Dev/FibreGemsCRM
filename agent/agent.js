@@ -10,7 +10,7 @@ let dailyQueueData = null;
 let currentCallbackFilter = 'all'; // default matches the 'All' button which starts highlighted in HTML
 
 let worklistOffset = 0;
-const WORKLIST_LIMIT = 20;
+let WORKLIST_LIMIT = 20;
 let worklistTotal = 0;
 
 let activityOffset = 0;
@@ -246,6 +246,20 @@ function renderCallbackCards() {
   if (currentCallbackFilter === 'pending') listToDisplay = pendingCallbacks;
   else if (currentCallbackFilter === 'completed') listToDisplay = doneCallbacks;
 
+  const st = (document.getElementById('callback-search')?.value || '').toLowerCase();
+  if (st) {
+    listToDisplay = listToDisplay.filter(c => {
+         return (c.name || '').toLowerCase().includes(st) || 
+                (c.cellNumber || '').toString().includes(st) || 
+                (c.alternateCell || '').toString().includes(st) || 
+                (c.customerId || '').toLowerCase().includes(st) ||
+                (c.orderNumber || '').toLowerCase().includes(st) ||
+                (c.easyPayNumber || '').toLowerCase().includes(st) ||
+                (c.package || '').toLowerCase().includes(st) ||
+                (c.status || '').toLowerCase().includes(st);
+    });
+  }
+
   if (listToDisplay.length === 0) {
     container.innerHTML = `
       <div class="p-12 text-center border border-white/5 bg-white/[0.01] rounded-2xl">
@@ -286,8 +300,8 @@ function renderCallbackCards() {
           ? 'bg-purple-500/20 text-purple-300'
           : (isOverdue ? 'bg-amber-500/20 text-amber-300' : 'bg-fiber-500/20 text-fiber-300');
 
-    return `
-      <div class="p-4 rounded-2xl border ${cardBorder} hover:border-fiber-500/50 transition-all shadow-sm">
+    const cStr = encodeURIComponent(JSON.stringify(c));
+    return `<div class="p-4 rounded-2xl border ${cardBorder} hover:border-fiber-500/50 transition-all shadow-sm cursor-pointer" onclick="openLeadDetail('${cStr}')">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           
           <!-- Client Name & Info -->
@@ -309,19 +323,19 @@ function renderCallbackCards() {
               <!-- Phone Number & Referral Code with 1-click Copy & WhatsApp -->
               <div class="flex items-center gap-4 mt-1.5 flex-wrap">
                 <div class="flex items-center gap-1.5">
-                  <button onclick="copyPhone('${escJs(formattedPhone)}')" title="Click to copy number" class="inline-flex items-center gap-1 text-sm font-semibold font-mono text-fiber-400 hover:text-fiber-300 transition-colors cursor-pointer text-left">
+                  <button onclick="event.stopPropagation(); copyPhone('${escJs(formattedPhone)}')" title="Click to copy number" class="inline-flex items-center gap-1 text-sm font-semibold font-mono text-fiber-400 hover:text-fiber-300 transition-colors cursor-pointer text-left">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
                     </svg>
                     ${escHtml(formattedPhone || 'No number')}
                   </button>
-                  <button onclick="copyPhone('${escJs(formattedPhone)}')" title="Copy Phone Number" class="p-1 text-gray-500 hover:text-gray-300 transition-colors">
+                  <button onclick="event.stopPropagation(); copyPhone('${escJs(formattedPhone)}')" title="Copy Phone Number" class="p-1 text-gray-500 hover:text-gray-300 transition-colors">
                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
                     </svg>
                   </button>
                   ${formattedPhone ? `
-                    <a href="https://wa.me/${waPhone}" target="_blank" title="Send WhatsApp Message" class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 text-xs font-semibold inline-flex items-center gap-1 transition-colors">
+                    <a href="https://wa.me/${waPhone}" target="_blank" onclick="event.stopPropagation()" title="Send WhatsApp Message" class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 text-xs font-semibold inline-flex items-center gap-1 transition-colors">
                       💬 WhatsApp
                     </a>
                   ` : ''}
@@ -331,7 +345,7 @@ function renderCallbackCards() {
                 ${c.referralCode ? `
                   <div class="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs font-mono">
                     <span>🎁 Ref: <strong>${escHtml(c.referralCode)}</strong></span>
-                    <button onclick="copyReferralCode('${escJs(c.referralCode)}')" title="Copy Referral Code" class="hover:text-white">
+                    <button onclick="event.stopPropagation(); copyReferralCode('${escJs(c.referralCode)}')" title="Copy Referral Code" class="hover:text-white">
                       <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
                       </svg>
@@ -374,19 +388,19 @@ function renderCallbackCards() {
           <!-- 1-Click Action Triggers -->
           <div class="flex items-center gap-2 sm:self-center flex-wrap">
             ${c.easyPayNumber && (c.isEasyPayExpired || c.status === 'Payment Pending') ? `
-              <button onclick="triggerReissueEasyPay('${escJs(c.customerId)}')" title="Re-issue EasyPay Number (Max 3 cycles)"
+              <button onclick="event.stopPropagation(); triggerReissueEasyPay('${escJs(c.customerId)}')" title="Re-issue EasyPay Number (Max 3 cycles)"
                 class="px-3 py-2 rounded-xl text-xs font-bold bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 transition-colors flex items-center gap-1">
                 🔄 Re-issue EP
               </button>
             ` : ''}
 
-            <button onclick="copyPhone('${escJs(formattedPhone)}')" title="Copy number to clipboard" class="px-3 py-2 rounded-xl text-xs font-bold bg-white/5 hover:bg-white/10 text-white border border-white/10 transition-colors flex items-center gap-1">
+            <button onclick="event.stopPropagation(); copyPhone('${escJs(formattedPhone)}')" title="Copy number to clipboard" class="px-3 py-2 rounded-xl text-xs font-bold bg-white/5 hover:bg-white/10 text-white border border-white/10 transition-colors flex items-center gap-1">
               📋 Copy No.
             </button>
-            <a href="https://wa.me/${waPhone}" target="_blank" class="px-3 py-2 rounded-xl text-xs font-bold bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 transition-colors flex items-center gap-1 cursor-pointer">
+            <a href="https://wa.me/${waPhone}" target="_blank" onclick="event.stopPropagation()" class="px-3 py-2 rounded-xl text-xs font-bold bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 transition-colors flex items-center gap-1 cursor-pointer">
               💬 WhatsApp
             </a>
-            <button onclick="openCallOutcomeModal('${escHtml(c.customerId)}', '${escJs(c.name)}', '${escJs(formattedPhone)}', '${escJs(c.package || '')}', ${isPayment ? 'true' : 'false'}, ${isActivation ? 'true' : 'false'}, '${escJs(c.paymentType || '')}', '${escJs(c.orderNumber || '')}', '${escJs(c.easyPayNumber || '')}', '${escJs(c.referralCode || '')}', '${escJs(c.easyPayExpiryDate || '')}', '${escJs(c.easyPayCycle || '')}')"
+            <button onclick="event.stopPropagation(); openCallOutcomeModal('${escHtml(c.customerId)}', '${escJs(c.name)}', '${escJs(formattedPhone)}', '${escJs(c.package || '')}', ${isPayment ? 'true' : 'false'}, ${isActivation ? 'true' : 'false'}, '${escJs(c.paymentType || '')}', '${escJs(c.orderNumber || '')}', '${escJs(c.easyPayNumber || '')}', '${escJs(c.referralCode || '')}', '${escJs(c.easyPayExpiryDate || '')}', '${escJs(c.easyPayCycle || '')}')"
               class="px-4 py-2 rounded-xl text-xs font-bold ${isActivation ? 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-md shadow-blue-500/20' : isPayment ? 'bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 shadow-md shadow-purple-500/20' : 'bg-gradient-to-r from-fiber-500 to-fiber-600 hover:from-fiber-600 hover:to-fiber-700 shadow-md shadow-fiber-500/20'} text-white transition-all flex items-center gap-1.5">
               ${isActivation ? '🚀 Log Activation Check' : isPayment ? '💳 Log Payment' : '⚡ Log Outcome'}
             </button>
@@ -399,6 +413,106 @@ function renderCallbackCards() {
 }
 
 // ── 1-Click Call Outcome Drawer / Modal ──────────────────────
+// ── Lead Detail Panel ──────────────────────────────────────────
+function openLeadDetail(cObjStr) {
+  const c = JSON.parse(decodeURIComponent(cObjStr));
+  
+  const rawPhone = '0' + (c.cellNumber || '');
+  const phoneDigits = rawPhone.replace(/\D/g, '');
+  const waPhone = phoneDigits.startsWith('0') ? '27' + phoneDigits.slice(1) : phoneDigits;
+  
+  document.getElementById('ld-avatar').textContent = escHtml((c.name || 'C').charAt(0));
+  document.getElementById('ld-name').textContent = escHtml(c.name);
+  
+  let badgesHtml = '';
+  const isPayment = c.isPromisedPayment;
+  const isActivation = c.isActivationFollowUp;
+  const isOverdue = c.isOverdue && !c.isCompletedToday;
+  
+  if (isActivation) badgesHtml += '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30">🚀 Activation</span>';
+  if (isPayment) badgesHtml += '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">💳 Payment</span>';
+  if (isOverdue && !isPayment && !isActivation) badgesHtml += '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">⚠️ Overdue</span>';
+  if (c.isCompletedToday) badgesHtml += '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">✓ Done Today</span>';
+  
+  document.getElementById('ld-badges').innerHTML = badgesHtml;
+
+  document.getElementById('ld-fullname').textContent = escHtml(c.name);
+  document.getElementById('ld-phone').textContent = escHtml(rawPhone || '—');
+  document.getElementById('ld-alt-phone').textContent = escHtml('0' + (c.alternateCell || '')).replace(/^0$/, '—');
+  document.getElementById('ld-email').textContent = escHtml(c.email || '—');
+  document.getElementById('ld-address').textContent = escHtml([c.address, c.suburb].filter(Boolean).join(', ') || '—');
+  
+  const waLink = document.getElementById('ld-wa-link');
+  if (waPhone && waPhone !== '27') {
+    waLink.href = 'https://wa.me/' + waPhone;
+    waLink.classList.remove('hidden');
+  } else {
+    waLink.classList.add('hidden');
+  }
+  
+  document.getElementById('ld-copy-btn').onclick = () => copyPhone(rawPhone);
+
+  document.getElementById('ld-cid').textContent = escHtml(c.customerId || '—');
+  document.getElementById('ld-status').textContent = escHtml(c.status || '—');
+  document.getElementById('ld-package').textContent = escHtml(c.package || '—');
+  document.getElementById('ld-payment-type').textContent = escHtml(c.paymentType || '—');
+  document.getElementById('ld-order-date').textContent = escHtml(c.orderDate || '—');
+
+  document.getElementById('ld-order-number').textContent = escHtml(c.orderNumber || '—');
+  document.getElementById('ld-easypay').textContent = escHtml(c.easyPayNumber || '—');
+  document.getElementById('ld-ep-cycle').textContent = escHtml(c.easyPayCycle || '—');
+  
+  const epExpiryEl = document.getElementById('ld-ep-expiry');
+  if (c.isEasyPayExpired) {
+    epExpiryEl.innerHTML = '<span class="text-red-400 font-bold">' + escHtml(c.easyPayExpiryDate || '—') + ' (Expired)</span>';
+  } else if (c.easyPayDaysRemaining !== null && c.easyPayDaysRemaining !== undefined) {
+    epExpiryEl.innerHTML = '<span class="text-emerald-400 font-bold">' + escHtml(c.easyPayExpiryDate || '—') + ' (' + c.easyPayDaysRemaining + 'd left)</span>';
+  } else {
+    epExpiryEl.textContent = escHtml(c.easyPayExpiryDate || '—');
+  }
+  
+  document.getElementById('ld-promised-pay').textContent = escHtml(c.promisedPaymentDate || '—');
+  document.getElementById('ld-referral-code').textContent = escHtml(c.referralCode || '—');
+  
+  const refBtn = document.getElementById('ld-copy-ref-btn');
+  if (c.referralCode) {
+    refBtn.classList.remove('hidden');
+    refBtn.onclick = () => copyReferralCode(c.referralCode);
+  } else {
+    refBtn.classList.add('hidden');
+  }
+
+  document.getElementById('ld-next-action').textContent = escHtml(c.nextAction || '—');
+  document.getElementById('ld-next-date').textContent = escHtml(c.nextActionDate || '—');
+  document.getElementById('ld-last-outcome').textContent = escHtml(c.lastOutcome || '—');
+
+  const logOutcomeBtn = document.getElementById('ld-log-outcome-btn');
+  logOutcomeBtn.onclick = (e) => {
+    e.stopPropagation();
+    closeLeadDetail();
+    openCallOutcomeModal(
+      c.customerId, 
+      c.name, 
+      rawPhone, 
+      c.package || '', 
+      isPayment, 
+      isActivation, 
+      c.paymentType || '', 
+      c.orderNumber || '', 
+      c.easyPayNumber || '', 
+      c.referralCode || '', 
+      c.easyPayExpiryDate || '', 
+      c.easyPayCycle || ''
+    );
+  };
+
+  document.getElementById('modal-lead-detail').classList.remove('hidden');
+}
+
+function closeLeadDetail() {
+  document.getElementById('modal-lead-detail').classList.add('hidden');
+}
+
 function openCallOutcomeModal(customerId, name, phone, pkg, isPaymentFollowUp = false, isActivation = false, existingPaymentType = '', existingOrderNumber = '', existingEasyPayNumber = '', referralCode = '', existingEasyPayExpiry = '', existingEasyPayCycle = '') {
   // Phone may already have leading 0 from card rendering — avoid double-prefix
   const formattedPhone = (phone && !phone.startsWith('0') && phone !== 'No number') ? '0' + phone : (phone || 'No Number');
@@ -764,16 +878,16 @@ async function loadWorklist() {
       const rawPhone = '0' + (c.cellNumber || '');
       const phoneDigits = rawPhone.replace(/\D/g, '');
       const waPhone = phoneDigits.startsWith('0') ? '27' + phoneDigits.slice(1) : phoneDigits;
-      return `
-      <tr class="border-b border-white/5 hover:bg-white/[0.03] transition-colors group">
+      const cStr = encodeURIComponent(JSON.stringify(c));
+      return `<tr class="border-b border-white/5 hover:bg-white/[0.03] transition-colors group cursor-pointer" onclick="openLeadDetail('${cStr}')">
         <td class="px-4 py-3.5">
           <p class="font-semibold text-white text-sm">${escHtml(c.name)}</p>
           <p class="text-xs text-gray-500 mt-0.5">${escHtml(c.customerId)}</p>
         </td>
         <td class="px-4 py-3.5">
           <div class="flex items-center gap-2 flex-wrap">
-            <a href="tel:${escHtml(rawPhone)}" class="text-sm font-mono text-fiber-400 hover:text-fiber-300 transition-colors">${escHtml(rawPhone || '—')}</a>
-            ${rawPhone && rawPhone !== '0' ? `<a href="https://wa.me/${waPhone}" target="_blank" title="WhatsApp" class="text-emerald-400 hover:text-emerald-300 text-xs transition-colors">💬</a>` : ''}
+            <a href="tel:${escHtml(rawPhone)}" onclick="event.stopPropagation()" class="text-sm font-mono text-fiber-400 hover:text-fiber-300 transition-colors">${escHtml(rawPhone || '—')}</a>
+            ${rawPhone && rawPhone !== '0' ? `<a href="https://wa.me/${waPhone}" target="_blank" onclick="event.stopPropagation()" title="WhatsApp" class="text-emerald-400 hover:text-emerald-300 text-xs transition-colors">💬</a>` : ''}
           </div>
         </td>
         <td class="px-4 py-3.5 text-sm text-gray-300">${escHtml(c.package || '—')}</td>
@@ -785,9 +899,9 @@ async function loadWorklist() {
         <td class="px-4 py-3.5 text-sm text-gray-400 truncate max-w-[160px]">${escHtml(c.lastOutcome || '—')}</td>
         <td class="px-4 py-3.5 text-right">
           <div class="flex items-center justify-end gap-2">
-            <button onclick="copyPhone('${escJs(rawPhone)}')" class="px-2.5 py-1.5 bg-white/5 text-gray-300 rounded-lg text-xs font-bold hover:bg-white/10 transition-all">📋 Copy No.</button>
-            <a href="https://wa.me/${waPhone}" target="_blank" class="px-2.5 py-1.5 bg-emerald-500/15 text-emerald-300 rounded-lg text-xs font-bold hover:bg-emerald-500/25 transition-all">💬 WA</a>
-            <button onclick="openCallOutcomeModal('${escHtml(c.customerId)}', '${escJs(c.name)}', '${escJs(rawPhone)}', '${escJs(c.package || '')}', false, false, '${escJs(c.paymentType || '')}', '${escJs(c.orderNumber || '')}', '${escJs(c.easyPayNumber || '')}', '${escJs(c.referralCode || '')}', '${escJs(c.easyPayExpiryDate || '')}', '${escJs(c.easyPayCycle || '')}')"
+            <button onclick="event.stopPropagation(); copyPhone('${escJs(rawPhone)}')" class="px-2.5 py-1.5 bg-white/5 text-gray-300 rounded-lg text-xs font-bold hover:bg-white/10 transition-all">📋 Copy No.</button>
+            <a href="https://wa.me/${waPhone}" target="_blank" onclick="event.stopPropagation()" class="px-2.5 py-1.5 bg-emerald-500/15 text-emerald-300 rounded-lg text-xs font-bold hover:bg-emerald-500/25 transition-all">💬 WA</a>
+            <button onclick="event.stopPropagation(); openCallOutcomeModal('${escHtml(c.customerId)}', '${escJs(c.name)}', '${escJs(rawPhone)}', '${escJs(c.package || '')}', false, false, '${escJs(c.paymentType || '')}', '${escJs(c.orderNumber || '')}', '${escJs(c.easyPayNumber || '')}', '${escJs(c.referralCode || '')}', '${escJs(c.easyPayExpiryDate || '')}', '${escJs(c.easyPayCycle || '')}')"
               class="px-3 py-1.5 bg-fiber-500/20 text-fiber-300 rounded-lg text-xs font-bold hover:bg-fiber-500 hover:text-white transition-all">
               Log Touch
             </button>
@@ -807,12 +921,22 @@ async function loadWorklist() {
   }
 }
 
+let worklistSearchTimeout = null;
+function handleWorklistSearch() {
+  if (worklistSearchTimeout) clearTimeout(worklistSearchTimeout);
+  worklistSearchTimeout = setTimeout(() => {
+    worklistOffset = 0;
+    loadWorklist();
+  }, 400);
+}
+
 function updatePagination() {
   const paginationEl = document.getElementById('pagination');
   const totalPages = Math.ceil(worklistTotal / WORKLIST_LIMIT);
   const currentPage = Math.floor(worklistOffset / WORKLIST_LIMIT) + 1;
+  const st = (document.getElementById('worklist-search')?.value || '');
 
-  if (totalPages <= 1) {
+  if (totalPages <= 1 || st) {
     paginationEl.innerHTML = '';
     return;
   }
