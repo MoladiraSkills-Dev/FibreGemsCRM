@@ -122,4 +122,134 @@ Maintains a complete historical audit trail of all agent actions, customer commu
 * **`DATE_FORMAT`:** `dd mmm yyyy` (e.g., 15 Sep 2026).
 * **`CUSTOMER_STATUS` Options:** `New Lead`, `Contact Attempted`, `Interested`, `Order Placed`, `Contacted`, `Activated`, `Payment Pending`.
 * **`PAYMENT_STATUS` Options:** `Pending`, `Paid`, `Failed`, `Expired`.
-* **`ACTIVATION_STATUS` Options:** `Not Ready`, `Pending`, `Activated`, `Cancelled`.
+* **`ACTIVATION_STATUS` Options:** `Not Ready`, `Pending`, `Activated`, `Cancelled`.-NoNewline
+
+
+---
+
+## 4. Support Tickets System
+
+### Overview
+The Support portal is a read-only reporting layer over the live AUGSEP sheet (sourced from the Support Tickets AugSep workbook). Support staff log new tickets via logSupportTicket and updates via updateSupportTicket, which write to the SUPPORT_TICKETS sheet inside the CRM spreadsheet.
+
+---
+
+### A. AUGSEP Sheet (Source-of-Truth Import - Aug 2026 to Date)
+Sheet Name: AUGSEP | Dimensions: ~21,569 rows x 20 columns
+
+| Col | Header | Description |
+|---|---|---|
+| 0 | created_da | Date ticket/order was created |
+| 1 | completed_ | Completion date (nullable) |
+| 2 | channel_partner_user_name | Agent/channel partner who handled it |
+| 3 | status | Current status (e.g., Expired, Activated, Pending) |
+| 4 | paymentrec | Payment receipt status or reference |
+| 5 | contractproductname | Fibre package (e.g., Vuma reach FTTR-20-10-once-off) |
+| 6 | description | Description/ref code - may contain OVR-.../OVK-... order refs |
+| 7 | customer | Customer full name |
+| 8-14 | Update 1 - Update 7 | Sequential tracking notes |
+| 15 | Ticket number | Primary ticket identifier |
+| 16 | Ticket 2 | Secondary ticket reference (nullable) |
+| 17 | Order Number | Explicit order number (OVR-/OVK- prefix) - PREFERRED over description |
+| 18 | Update 8 | Additional update note |
+| 19 | Update 9 | Additional update note |
+| 20 | Sync_Status | Auto-appended by runAgilitySync. Value: Synced once processed. |
+
+Date Filter: Only rows with created_da >= 2026-08-01 are processed by runAgilitySync.
+
+Order Number Resolution Logic (runAgilitySync):
+1. Check Order Number (col 17) for OVR-/OVK- prefix - use if found.
+2. Fallback: regex scan description (col 6) for (OVR|OVK)-[A-Z0-9-]+ pattern.
+3. No result found -> row is skipped (no order ref = no CRM lead).
+
+---
+
+### B. SUPPORT_TICKETS Sheet (CRM-Internal - Written by Support Portal)
+Sheet Name: SUPPORT_TICKETS
+
+| Column | Field | Description |
+|---|---|---|
+| 1 | Ticket_ID | Unique ticket ID (e.g., TKT-A1B2C3D4) |
+| 2 | Customer_ID | FK -> CUSTOMERS |
+| 3 | Customer_Name | Client name |
+| 4 | Provider | Network provider (Vuma, Infinifi, SADV) |
+| 5 | Phone | Customer contact number |
+| 6 | Product | Package / product name |
+| 7 | Order_Number | Associated OVR-/OVK- reference |
+| 8 | Description | Issue description / ticket body |
+| 9 | Status | Ticket status (Open, In Progress, Resolved, Escalated) |
+| 10 | Payment_Rec | Payment receipt reference (if applicable) |
+| 11 | Created_Date | Date ticket was logged |
+| 12 | Completed_Date | Date ticket was resolved (nullable) |
+| 13 | Agent_Name | Support staff who logged the ticket |
+| 14 | Ticket_Number | External ISP ticket number (e.g., SA711782, IF031957) |
+| 15 | Ticket_2 | Secondary external ticket reference (nullable) |
+| 16-24 | Update_1 - Update_9 | Sequential update notes |
+| 25 | Last_Updated | Timestamp of last modification |
+
+---
+
+### C. Support Portal Backend Functions (Code.gs)
+
+| Function | Auth | Description |
+|---|---|---|
+| getSupportTickets(token, payload) | Support/Admin | Paginated fetch from SUPPORT_TICKETS. Filters: search, status, provider, dateFrom, dateTo, offset, limit. |
+| getSupportCustomers(token, payload) | Support/Admin | Paginated fetch from CUSTOMERS. Same filter params. |
+| logSupportTicket(token, payload) | Support/Admin | Creates new row in SUPPORT_TICKETS. Auto-generates TKT- prefixed ID. |
+| updateSupportTicket(token, payload) | Support/Admin | Updates existing ticket row (status, update notes, completion date). |
+| runAgilitySync(token) | Admin only | Reads AUGSEP, deduplicates vs ORDERS, writes new leads to CUSTOMERS/ORDERS/PAYMENTS/ACTIVATIONS. Marks rows Synced. |
+
+---
+
+### D. Other Support Workbook Sheets (Reference Only - Not Synced to CRM)
+
+| Sheet | Rows | Purpose |
+|---|---|---|
+| Pierre leads | 11 | Lead capture form responses (Timestamp, Name, Surname, Email, Phone, Alt Phone, Address, Internal Status) |
+| Support tickets logged infinifi | 12 | Manual Infinifi ticket log (Ticket number, Date logged, Requested by, Query) |
+| Support tickets logged SADV | 6 | Manual SADV ticket log (Ticket number, Date logged, Requested by, Query) |
+| Infinifi customers | 67 | Infinifi customer records (Created Date, Customer, Lead Number, Region, Contract Term, MRC, Vuma Reach Premise ID, Action Type) |
+| Business leads - SADV | 2 | SADV business lead template (Customer Name, Surname, Contact 1, Contact 2, Address, Lead source) |
+| SS meaning | 21 | SOP: Self-Scheduling explanation and regional booking ETAs (24 hr standard) |
+| Refund of incorrect payments | 4 | SOP: EasyPay refund handling - 14-21 working day turnaround |
+| Infinifi link | 3 | SOP: Customer order verification links via SMS/email |
+| Refund process | 6 | SOP: Escalation process for uninstalled client refunds (ID + Proof of Account + PoP required) |
+| SS SOP | 4 | SOP: Self-Scheduling standard operating procedure |
+| Ticketing SOP | 11 | SOP: Call center procedures for payments, referrals, morning support tasks |
+| Premis creation | 2 | SOP: Vumatel premise creation tickets - 24-48 hr ETA |
+| Moving funds | 3 | SOP: Fund transfer between duplicate order numbers for same customer only |
+
+---
+
+### E. Support Data Flow
+
+AUGSEP sheet (~21,569 rows, Aug 2026 onwards)
+       |
+       v  runAgilitySync()  [Admin-only trigger]
+       |  - Filters: created_da >= 2026-08-01
+       |  - Extracts: customer, order number, product, agent, status, payment
+       |  - Deduplicates against ORDERS sheet (OVR/OVK maps)
+       |  - Appends new leads to CUSTOMERS, ORDERS, PAYMENTS, ACTIVATIONS
+       |  - Marks processed rows: Sync_Status = Synced
+       |
+       v
+CRM Core Sheets: CUSTOMERS . ORDERS . PAYMENTS . ACTIVATIONS
+       |
+       v  getSupportCustomers() / getSupportTickets()
+       |
+Support Portal UI (support/index.html + support/support.js)
+       |
+       +-- logSupportTicket()    -> appends to SUPPORT_TICKETS
+       +-- updateSupportTicket() -> updates SUPPORT_TICKETS row
+
+---
+
+### F. Key Business Rules (Support Context)
+
+- Refunds take 14-21 working days - agents must send the correct EasyPay number immediately to avoid activation delays.
+- EasyPay numbers are NEVER auto-generated - agents enter them manually after customer contact.
+- OVR prefix = SADV OVR order (Vumatel Reach). OVK prefix = SADV OVK tracking reference.
+- Self-Scheduling (SS): If the ISP cannot self-schedule, the order goes to the regional team with a 24-hour installation ETA.
+- Premise creation takes 24-48 hours via a Vumatel SADV ticket.
+- Fund transfers between order numbers are only permitted for the same customer with different duplicate order references.
+- POPIA compliance: No customer PII is logged to external systems - all data stays within the Google Workspace/Apps Script environment.

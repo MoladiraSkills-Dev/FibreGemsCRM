@@ -119,7 +119,7 @@ function doPost(e) {
         result = enforceLeadLifecycleRules(token);
         break;
       case 'runAgilitySync':
-        result = runAgilitySync(token);
+        result = runAgilitySync(token, payload);
         break;
       case 'getAgentList':
         result = getAgentList(token);
@@ -1862,127 +1862,200 @@ function getAdminCustomerDetail(token, customerId) {
   };
 }
 
-function runAgilitySync(token) {
-  requireAdmin_(token);
-  const agilitySheet = ss.getSheetByName('Agility REPORT');
-  if (!agilitySheet) throw new Error("Agility REPORT sheet not found.");
+function runAgilitySync(token, payload = {}) {
+  requireSupport_(token);
+
+  // ── Sheet & column mapping for AUGSEP ────────────────────────────────────
+  // Headers: created_da | completed_ | channel_partner_user_name | status |
+  //          paymentrec | contractproductname | description | customer |
+  //          Update 1–9 | Ticket number | Ticket 2 | Order Number | Update 8 | Update 9
+  // (0-based column indices)
+  const COL_CREATED    = 0;   // created_da
+  const COL_COMPLETED  = 1;   // completed_
+  const COL_AGENT      = 2;   // channel_partner_user_name
+  const COL_STATUS     = 3;   // status
+  const COL_PAYMENT    = 4;   // paymentrec
+  const COL_PRODUCT    = 5;   // contractproductname
+  const COL_DESC       = 6;   // description  (may contain OVR/OVK refs)
+  const COL_CUSTOMER   = 7;   // customer
+  // cols 8-16 = Update 1-9
+  const COL_TICKET     = 15;  // Ticket number
+  const COL_TICKET2    = 16;  // Ticket 2
+  const COL_ORDER_NUM  = 17;  // Order Number (explicit — preferred source)
+  // cols 18-19 = Update 8, Update 9
+
+  const agilitySheet = ss.getSheetByName('AUGSEP');
+  if (!agilitySheet) throw new Error("'AUGSEP' sheet not found in this spreadsheet.");
 
   const agilityData = agilitySheet.getDataRange().getValues();
   const headers = agilityData[0];
 
-  const SYNC_COL_INDEX = headers.indexOf('Sync_Status');
-  const CUSTOMER_COL_INDEX = headers.indexOf('customer');
-  const PRODUCT_COL_INDEX = headers.indexOf('contractproductname');
-  const AGENT_COL_INDEX = headers.indexOf('channel_partner_user_name');
-
-  if (SYNC_COL_INDEX === -1) throw new Error("Could not find 'Sync_Status' column header.");
-
-  const syncStatusArray = agilitySheet.getRange(1, SYNC_COL_INDEX + 1, agilityData.length, 1).getValues();
-  const orderData = ss.getSheetByName('ORDERS').getDataRange().getValues();
-  const existingOvrMap = new Map();
-  const existingOvkMap = new Map();
-
-  for (let i = 1; i < orderData.length; i++) {
-    if (orderData[i][4]) existingOvrMap.set(orderData[i][4], orderData[i][1]);
-    if (orderData[i][5]) existingOvkMap.set(orderData[i][5], orderData[i][1]);
+  // ── Ensure Sync_Status column exists (append if missing) ─────────────────
+  let SYNC_COL_INDEX = headers.indexOf('Sync_Status');
+  if (SYNC_COL_INDEX === -1) {
+    SYNC_COL_INDEX = headers.length;
+    agilitySheet.getRange(1, SYNC_COL_INDEX + 1).setValue('Sync_Status');
+    // Expand our in-memory data to include the new column (all blank)
+    for (let i = 0; i < agilityData.length; i++) {
+      agilityData[i].push(i === 0 ? 'Sync_Status' : '');
+    }
   }
 
-  let newLeads = 0; let updatedLeads = 0;
+  // Re-read sync column values so we can mark rows after processing
+  const syncStatusArray = agilitySheet.getRange(1, SYNC_COL_INDEX + 1, agilityData.length, 1).getValues();
+
+  // ── Build maps of already-known order numbers ─────────────────────────────
+  const orderData = ss.getSheetByName('ORDERS').getDataRange().getValues();
+  const existingOvrMap = new Map(); // OVR → customerId
+  const existingOvkMap = new Map(); // OVK → customerId
+  for (let i = 1; i < orderData.length; i++) {
+    if (orderData[i][4]) existingOvrMap.set(String(orderData[i][4]).toUpperCase(), orderData[i][1]);
+    if (orderData[i][5]) existingOvkMap.set(String(orderData[i][5]).toUpperCase(), orderData[i][1]);
+  }
+
+  // ── Date filter: only process rows from 1 Aug 2026 onward ────────────────
+  const AUG_2026 = new Date('2026-08-01');
+
+  let newLeads = 0; let updatedLeads = 0; let skipped = 0;
+  let debugSkipReasons = { noDate: 0, oldDate: 0, noOrderRef: 0 };
   const timestamp = new Date().toISOString();
   const todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
   const newCust = []; const newOrd = []; const newPay = []; const newAct = [];
 
   for (let i = 1; i < agilityData.length; i++) {
-    if (syncStatusArray[i][0] === 'Synced') continue;
+    // Skip already-synced rows unless force is true
+    if (!payload.force && syncStatusArray[i] && syncStatusArray[i][0] === 'Synced') continue;
 
     const row = agilityData[i];
-    const description = String(row[10] || '');
-    const match = description.match(/(OVR|OVK)-[A-Z0-9-]+/i);
 
-    if (match) {
-      const orderNum = match[0].toUpperCase();
-      const isOvr = orderNum.startsWith('OVR');
-      let customerId = isOvr ? existingOvrMap.get(orderNum) : existingOvkMap.get(orderNum);
-      if (customerId) {
-        updatedLeads++;
+    // Date filter — skip rows before Aug 2026
+    const createdRaw = row[COL_CREATED];
+    if (!createdRaw) { skipped++; debugSkipReasons.noDate++; continue; }
+    
+    let createdDate = createdRaw;
+    if (!(createdRaw instanceof Date)) {
+      let ds = String(createdRaw).trim();
+      let m = ds.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+      if (m) {
+        createdDate = new Date(`${m[3]}-${m[2]}-${m[1]}T00:00:00Z`);
       } else {
-        customerId = 'CUS-' + Utilities.getUuid().slice(0, 8).toUpperCase();
-        const referralCode = generateReferralCode_();
-        // EasyPay numbers are NEVER auto-generated — agents enter them manually after contact
-        const easyPayNum = '';
-        const easyPayExpiry = '';
-
-        let agentName = '';
-        if (AGENT_COL_INDEX !== -1 && row[AGENT_COL_INDEX]) {
-          agentName = String(row[AGENT_COL_INDEX]).trim();
-        }
-
-        const isPaid = !!row[5];
-        const isActivated = String(row[11] || '').toLowerCase().includes('activated');
-        let fullName = "Agility Import";
-        if (CUSTOMER_COL_INDEX !== -1 && row[CUSTOMER_COL_INDEX]) {
-          fullName = String(row[CUSTOMER_COL_INDEX]).trim();
-        }
-        let nameParts = fullName.split(' ');
-        let firstName = nameParts[0];
-        let surname = nameParts.length > 1 ? nameParts.slice(1).join(' ') : 'Unknown';
-
-        let rawProduct = "";
-        let mappedPackage = "Other";
-        if (PRODUCT_COL_INDEX !== -1 && row[PRODUCT_COL_INDEX]) {
-          rawProduct = String(row[PRODUCT_COL_INDEX]).toLowerCase();
-          if (rawProduct.includes("fttr-20-10")) mappedPackage = "Vuma Reach 20Mbps/10Mbps";
-          else if (rawProduct.includes("fttr-10-10")) mappedPackage = "Vuma Reach 10Mbps/10Mbps";
-        }
-
-        const nextAct = isActivated ? 'Activation Follow-Up (Check Connection)' : 'Call Back';
-        const nextActDate = isActivated ? addDaysSafe_(todayStr, 7) : todayStr;
-
-        newCust.push([
-          customerId, 'Active', timestamp, (agentName || 'Agility System'), timestamp,
-          firstName, surname, fullName, '0000000000', '', '', 'Address Missing', 'Area Missing', mappedPackage,
-          '', todayStr, orderNum, easyPayNum, 'Cycle 1 of 3',
-          referralCode, '', easyPayExpiry, isActivated ? todayStr : '', '', '', '', '', 'False', 'None', '',
-          'Agility System', '', isActivated ? 'Activated' : 'New Lead', nextAct, nextActDate, '', todayStr, 'Auto-Imported'
-        ]);
-
-        newOrd.push([
-          orderNum,                                      // 1: Order_ID
-          customerId,                                    // 2: Customer_ID
-          fullName,                                      // 3: Customer_Name
-          todayStr,                                      // 4: Order_Date
-          (isOvr ? orderNum : ''),                       // 5: SADV_OVR_Number
-          (!isOvr ? orderNum : ''),                      // 6: SADV_OVK_Number
-          (agentName || 'Agility System'),               // 7: Agent Name
-          row[11] || 'Imported via Agility',             // 8: Order Status
-          nextAct,                                       // 9: Next Action
-          nextActDate,                                   // 10: Action Date
-          todayStr,                                      // 11: Import Date
-          'Auto-Imported',                               // 12: Source
-          easyPayNum,                                    // 13: EasyPay_Number
-          'Cycle 1 of 3',                                // 14: EasyPay_Cycle
-          easyPayExpiry                                  // 15: EasyPay_Expiry_Date
-        ]);
-
-        newPay.push(['PAY-' + Utilities.getUuid().slice(0, 8), customerId, (isPaid ? 'Paid' : 'Pending'), '', (isPaid ? row[5] : ''), (isPaid ? timestamp : '')]);
-        newAct.push(['ACT-' + Utilities.getUuid().slice(0, 8), customerId, (isActivated ? 'Activated' : 'Pending'), (isActivated ? todayStr : ''), (isActivated ? timestamp : '')]);
-
-        if (isOvr) existingOvrMap.set(orderNum, customerId);
-        else existingOvkMap.set(orderNum, customerId);
-        newLeads++;
+        createdDate = new Date(createdRaw);
       }
     }
+    
+    if (isNaN(createdDate.getTime()) || createdDate < AUG_2026) { 
+      skipped++; 
+      debugSkipReasons.oldDate++; 
+      continue; 
+    }
+
+    // ── Determine order number ────────────────────────────────────────────
+    // Prefer the explicit "Order Number" column; fall back to OVR/OVK in description
+    let orderNum = '';
+    const explicitOrder = String(row[COL_ORDER_NUM] || '').trim().toUpperCase();
+    if (explicitOrder && (explicitOrder.startsWith('OVR') || explicitOrder.startsWith('OVK'))) {
+      orderNum = explicitOrder;
+    } else {
+      const desc = String(row[COL_DESC] || '');
+      const match = desc.match(/(OVR|OVK)-[A-Z0-9-]+/i);
+      if (match) orderNum = match[0].toUpperCase();
+    }
+
+    if (!orderNum) { skipped++; debugSkipReasons.noOrderRef++; continue; } // No usable order ref → skip
+
+    const isOvr = orderNum.startsWith('OVR');
+    let customerId = isOvr ? existingOvrMap.get(orderNum) : existingOvkMap.get(orderNum);
+
+    if (customerId) {
+      // ── Update existing lead's status if it has changed ──────────────
+      updatedLeads++;
+      syncStatusArray[i][0] = 'Synced';
+      continue;
+    }
+
+    // ── New lead ─────────────────────────────────────────────────────────
+    customerId = 'CUS-' + Utilities.getUuid().slice(0, 8).toUpperCase();
+    const referralCode = generateReferralCode_();
+    const easyPayNum  = '';  // Agents always enter manually after contact
+    const easyPayExpiry = '';
+
+    const agentName  = String(row[COL_AGENT]    || '').trim() || 'Agility System';
+    const fullName   = String(row[COL_CUSTOMER] || '').trim() || 'Agility Import';
+    const nameParts  = fullName.split(' ');
+    const firstName  = nameParts[0];
+    const surname    = nameParts.length > 1 ? nameParts.slice(1).join(' ') : 'Unknown';
+
+    // Map product name to CRM package
+    const rawProduct = String(row[COL_PRODUCT] || '').toLowerCase();
+    let mappedPackage = 'Other';
+    if      (rawProduct.includes('fttr-100-50') || rawProduct.includes('100mbps')) mappedPackage = 'Vuma Reach 100Mbps/50Mbps';
+    else if (rawProduct.includes('fttr-50-25')  || rawProduct.includes('50mbps'))  mappedPackage = 'Vuma Reach 50Mbps/25Mbps';
+    else if (rawProduct.includes('fttr-20-10')  || rawProduct.includes('20mbps'))  mappedPackage = 'Vuma Reach 20Mbps/10Mbps';
+    else if (rawProduct.includes('fttr-10-10')  || rawProduct.includes('10mbps'))  mappedPackage = 'Vuma Reach 10Mbps/10Mbps';
+
+    const isPaid       = !!(row[COL_PAYMENT]);
+    const statusStr    = String(row[COL_STATUS] || '').toLowerCase();
+    const isActivated  = statusStr.includes('activated') || statusStr.includes('active');
+
+    const orderDateStr = Utilities.formatDate(createdDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    const nextAct      = isActivated ? 'Activation Follow-Up (Check Connection)' : 'Call Back';
+    const nextActDate  = isActivated ? addDaysSafe_(todayStr, 7) : todayStr;
+
+    newCust.push([
+      customerId, 'Active', timestamp, agentName, timestamp,
+      firstName, surname, fullName, '0000000000', '', '', 'Address Missing', 'Area Missing', mappedPackage,
+      '', orderDateStr, orderNum, easyPayNum, 'Cycle 1 of 3',
+      referralCode, '', easyPayExpiry, isActivated ? orderDateStr : '', '', '', '', '', 'False', 'None', '',
+      'Agility System', '', isActivated ? 'Activated' : 'New Lead', nextAct, nextActDate, '', orderDateStr, 'Auto-Imported'
+    ]);
+
+    newOrd.push([
+      orderNum,                                        // 1: Order_ID
+      customerId,                                      // 2: Customer_ID
+      fullName,                                        // 3: Customer_Name
+      orderDateStr,                                    // 4: Order_Date
+      (isOvr  ? orderNum : ''),                        // 5: SADV_OVR_Number
+      (!isOvr ? orderNum : ''),                        // 6: SADV_OVK_Number
+      agentName,                                       // 7: Agent Name
+      row[COL_STATUS] || 'Imported via Agility',       // 8: Order Status
+      nextAct,                                         // 9: Next Action
+      nextActDate,                                     // 10: Action Date
+      todayStr,                                        // 11: Import Date
+      'Auto-Imported',                                 // 12: Source
+      easyPayNum,                                      // 13: EasyPay_Number
+      'Cycle 1 of 3',                                  // 14: EasyPay_Cycle
+      easyPayExpiry                                    // 15: EasyPay_Expiry_Date
+    ]);
+
+    newPay.push(['PAY-' + Utilities.getUuid().slice(0, 8), customerId,
+                 (isPaid ? 'Paid' : 'Pending'), '',
+                 (isPaid ? row[COL_PAYMENT] : ''),
+                 (isPaid ? timestamp : '')]);
+
+    newAct.push(['ACT-' + Utilities.getUuid().slice(0, 8), customerId,
+                 (isActivated ? 'Activated' : 'Pending'),
+                 (isActivated ? orderDateStr : ''),
+                 (isActivated ? timestamp : '')]);
+
+    if (isOvr) existingOvrMap.set(orderNum, customerId);
+    else        existingOvkMap.set(orderNum, customerId);
+    newLeads++;
     syncStatusArray[i][0] = 'Synced';
   }
+
+  // ── Write batched results ─────────────────────────────────────────────────
   if (newCust.length > 0) ss.getSheetByName('CUSTOMERS').getRange(ss.getSheetByName('CUSTOMERS').getLastRow() + 1, 1, newCust.length, newCust[0].length).setValues(newCust);
-  if (newOrd.length > 0) {
+  if (newOrd.length  > 0) {
     ensureOrdersSheetHeaders_();
     ss.getSheetByName('ORDERS').getRange(ss.getSheetByName('ORDERS').getLastRow() + 1, 1, newOrd.length, newOrd[0].length).setValues(newOrd);
   }
-  if (newPay.length > 0) ss.getSheetByName('PAYMENTS').getRange(ss.getSheetByName('PAYMENTS').getLastRow() + 1, 1, newPay.length, newPay[0].length).setValues(newPay);
-  if (newAct.length > 0) ss.getSheetByName('ACTIVATIONS').getRange(ss.getSheetByName('ACTIVATIONS').getLastRow() + 1, 1, newAct.length, newAct[0].length).setValues(newAct);
+  if (newPay.length  > 0) ss.getSheetByName('PAYMENTS').getRange(ss.getSheetByName('PAYMENTS').getLastRow() + 1, 1, newPay.length, newPay[0].length).setValues(newPay);
+  if (newAct.length  > 0) ss.getSheetByName('ACTIVATIONS').getRange(ss.getSheetByName('ACTIVATIONS').getLastRow() + 1, 1, newAct.length, newAct[0].length).setValues(newAct);
+
+  // Write sync status back to the AUGSEP sheet
   agilitySheet.getRange(1, SYNC_COL_INDEX + 1, syncStatusArray.length, 1).setValues(syncStatusArray);
-  return { success: true, newLeads, updatedLeads };
+
+  return { success: true, newLeads, updatedLeads, skipped, debugSkipReasons };
 }
 
 // ============================================================

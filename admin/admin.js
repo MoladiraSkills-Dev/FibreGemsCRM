@@ -782,7 +782,7 @@ async function triggerAgilitySync() {
   resultBox.classList.add('hidden');
 
   try {
-    const result = await callBackend('runAgilitySync');
+    const result = await callBackend('runAgilitySync', { force: true });
     resultBox.classList.remove('hidden');
     resultBox.innerHTML = `
       <div class="flex items-center gap-3 text-emerald-400 font-semibold mb-2">
@@ -794,6 +794,10 @@ async function triggerAgilitySync() {
       <p class="text-sm text-gray-300">
         Injected <strong class="text-white font-bold">${result.newLeads}</strong> new leads with exact order dates and updated <strong class="text-white font-bold">${result.updatedLeads}</strong> existing records.
       </p>
+      <div class="mt-2 text-xs text-gray-400 font-mono bg-black/20 p-2 rounded">
+        Skipped: ${result.skipped}<br>
+        Debug: ${JSON.stringify(result.debugSkipReasons || {})}
+      </div>
     `;
     showToast("Agility sync completed!");
   } catch (err) {
