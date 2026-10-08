@@ -46,7 +46,7 @@ const MUTATING_ACTIONS = new Set([
   'handleAgentLeadUpdate', 'logCallOutcome', 'quickUpdateSalesData', 'issueNewEasyPay',
   'createAgent', 'updateAgent', 'setAgentTempPassword', 'deleteAgent',
   'adminUpdateFollowUp', 'logSupportTicket', 'updateSupportTicket',
-  'runAgilitySync', 'uploadAgilityReport', 'enforceLeadLifecycleRules'
+  'runAgilitySync', 'uploadAgilityReport', 'enforceLeadLifecycleRules', 'markCustomerDuplicate'
 ]);
 
 const CACHE_PREFIX = 'fg_cache_';

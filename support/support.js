@@ -929,12 +929,38 @@ async function uploadAgilityReport() {
       `;
     }
 
-    showToast(`${provider} synced — ${result.rowsNew} new, ${result.rowsUpdated} updated`, 'success');
+    // ── Push new records into the CRM immediately after upload
+    if (btn) { btn.innerHTML = '<div class="spinner-sm inline-block mr-2"></div> Pushing to CRM...'; }
+    showToast('Injecting records into CRM database...', 'info');
+
+    let syncResult = null;
+    try {
+      syncResult = await callBackend('runAgilitySync', { force: true });
+    } catch (syncErr) {
+      console.warn('CRM sync failed after upload:', syncErr.message);
+    }
+
+    if (syncResult && resultEl) {
+      resultEl.innerHTML += `
+        <div class="mt-4 pt-3 border-t border-white/5">
+          <p class="text-[11px] font-bold uppercase tracking-widest mb-2" style="color:#F1A328">CRM Import Stats</p>
+          <div class="flex gap-5">
+            <div><span class="text-white font-bold text-lg">${syncResult.newLeads}</span> <span class="text-[10px] text-gray-500">New Leads</span></div>
+            <div><span class="text-white font-bold text-lg">${syncResult.updatedLeads}</span> <span class="text-[10px] text-gray-500">Updated</span></div>
+            <div><span class="text-white font-bold text-lg">${syncResult.skipped}</span> <span class="text-[10px] text-gray-500">Skipped</span></div>
+          </div>
+          ${syncResult.debugSkipReasons ? `<div class="mt-2 text-[9px] text-gray-500 font-mono bg-black/20 p-1.5 rounded">Skip reasons: ${JSON.stringify(syncResult.debugSkipReasons)}</div>` : ''}
+        </div>
+      `;
+    }
+
+    const newMsg = syncResult ? syncResult.newLeads + ' new leads' : 'check results';
+    showToast(`${provider} uploaded & CRM updated — ${newMsg}`, 'success');
     fileInput.value = '';
     loadSyncHistory();
     loadDashboard();
 
-    // Auto-refresh support tickets and customer tables with new Agility data
+    // Auto-refresh tickets and customers with freshly-imported data
     allTickets = [];
     allCustomers = [];
     loadTickets();

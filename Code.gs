@@ -47,7 +47,7 @@ function doPost(e) {
     const mutatingActions = [
       'handleAgentLeadUpdate', 'logCallOutcome', 'quickUpdateSalesData', 'issueNewEasyPay',
       'createAgent', 'updateAgent', 'setAgentTempPassword', 'deleteAgent',
-      'adminUpdateFollowUp', 'logSupportTicket', 'updateSupportTicket', 'runAgilitySync', 'uploadAgilityReport'
+      'adminUpdateFollowUp', 'logSupportTicket', 'updateSupportTicket', 'runAgilitySync', 'uploadAgilityReport', 'markCustomerDuplicate'
     ];
 
     let cacheKey = null;
@@ -165,6 +165,9 @@ function doPost(e) {
         break;
       case 'pingSession':
         result = pingSession(token);
+        break;
+      case 'markCustomerDuplicate':
+        result = markCustomerDuplicate(token, payload);
         break;
       default:
         throw new Error("Invalid API action requested: " + action);
@@ -877,6 +880,10 @@ function logCallOutcome(token, payload) {
   } else if (outcome === 'No Payment - Reschedule' || outcome === 'New Payment Date') {
     newStatus = 'Payment Promised';
     computedNextAction = 'Payment Follow-Up';
+  } else if (outcome === 'Duplicate') {
+    newStatus = 'Duplicate';
+    computedNextAction = 'No Further Action';
+    computedNextActionDate = '';
   }
 
   // Update CUSTOMERS record
@@ -2056,6 +2063,54 @@ function runAgilitySync(token, payload = {}) {
   agilitySheet.getRange(1, SYNC_COL_INDEX + 1, syncStatusArray.length, 1).setValues(syncStatusArray);
 
   return { success: true, newLeads, updatedLeads, skipped, debugSkipReasons };
+}
+
+// ============================================================
+// 8b. MARK CUSTOMER AS DUPLICATE (Agent / Support / Admin)
+// ============================================================
+
+/**
+ * markCustomerDuplicate — soft-deletes a customer by setting their status to
+ * "Duplicate" and record_status to "Inactive". The row is preserved for admin
+ * audit but is excluded from all agent worklist queries (which filter on status).
+ *
+ * Payload: { customerId, reason? }
+ */
+function markCustomerDuplicate(token, payload) {
+  const sess = getSessionUser(token);  // Any authenticated user can mark duplicates
+  const { customerId, reason } = payload || {};
+  if (!customerId) throw new Error('customerId is required.');
+
+  const sheet = ss.getSheetByName('CUSTOMERS');
+  if (!sheet) throw new Error('CUSTOMERS sheet not found.');
+
+  const data = sheet.getDataRange().getValues();
+  let targetRow = -1;
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]).trim() === String(customerId).trim()) {
+      targetRow = i + 1; // 1-based row index for Sheets API
+      break;
+    }
+  }
+
+  if (targetRow === -1) throw new Error('Customer not found: ' + customerId);
+
+  const now = new Date().toISOString();
+  const note = reason ? ('Duplicate — ' + reason) : 'Duplicate';
+
+  // Col 2 = Record_Status (index 1), Col 17 = Status (index 16), Col 5 = Last_Updated (index 4)
+  // Col 18 = Next_Action (index 17), Col 32 = Escalation_Reason (index 30)
+  sheet.getRange(targetRow, 2).setValue('Inactive');       // Record_Status → Inactive
+  sheet.getRange(targetRow, 17).setValue('Duplicate');     // Status → Duplicate
+  sheet.getRange(targetRow, 5).setValue(now);              // Last_Updated
+  sheet.getRange(targetRow, 30).setValue(note);            // Escalation_Reason (repurposed for notes)
+
+  // Invalidate any caches touching CUSTOMERS
+  try { CacheService.getScriptCache().removeAll([]); } catch(e) {}
+
+  Logger.log('[markCustomerDuplicate] %s marked %s as Duplicate. Reason: %s', sess.name, customerId, note);
+
+  return { success: true, customerId, markedBy: sess.name, reason: note };
 }
 
 // ============================================================
