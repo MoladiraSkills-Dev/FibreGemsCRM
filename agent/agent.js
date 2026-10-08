@@ -506,11 +506,67 @@ function openLeadDetail(cObjStr) {
     );
   };
 
+  // Wire up Duplicate button
+  const dupBtn = document.getElementById('ld-mark-duplicate-btn');
+  if (dupBtn) {
+    dupBtn.onclick = (e) => {
+      e.stopPropagation();
+      document.getElementById('dup-confirm-name').textContent = c.name || '—';
+      document.getElementById('dup-confirm-id').textContent = c.customerId || '—';
+      document.getElementById('dup-reason-input').value = '';
+      document.getElementById('modal-confirm-duplicate').dataset.customerId = c.customerId;
+      document.getElementById('modal-confirm-duplicate').dataset.customerName = c.name;
+      document.getElementById('modal-confirm-duplicate').classList.remove('hidden');
+    };
+  }
+
   document.getElementById('modal-lead-detail').classList.remove('hidden');
 }
 
 function closeLeadDetail() {
   document.getElementById('modal-lead-detail').classList.add('hidden');
+}
+
+async function confirmMarkDuplicate() {
+  const modal = document.getElementById('modal-confirm-duplicate');
+  const customerId = modal.dataset.customerId;
+  const customerName = modal.dataset.customerName;
+  const reason = (document.getElementById('dup-reason-input').value || '').trim();
+  const btn = document.getElementById('dup-confirm-btn');
+
+  if (!customerId) { showToast('No customer selected.', 'error'); return; }
+
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner-sm inline-block mr-1"></div> Processing...';
+
+  try {
+    try {
+      await callBackend('markCustomerDuplicate', { customerId, reason });
+    } catch (apiErr) {
+      // Fallback if live Google Apps Script web app hasn't been re-deployed with new markCustomerDuplicate action yet
+      if (apiErr.message && apiErr.message.includes('Invalid API action')) {
+        await callBackend('logCallOutcome', {
+          customerId: customerId,
+          outcome: 'Duplicate',
+          notes: reason ? ('Duplicate — ' + reason) : 'Duplicate'
+        });
+      } else {
+        throw apiErr;
+      }
+    }
+
+    modal.classList.add('hidden');
+    closeLeadDetail();
+    showToast(`"${customerName}" marked as duplicate and removed from worklists.`, 'success');
+
+    // Refresh the current view
+    await refreshDailyData();
+  } catch (err) {
+    showToast('Failed to mark duplicate: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'Yes, Mark Duplicate';
+  }
 }
 
 function openCallOutcomeModal(customerId, name, phone, pkg, isPaymentFollowUp = false, isActivation = false, existingPaymentType = '', existingOrderNumber = '', existingEasyPayNumber = '', referralCode = '', existingEasyPayExpiry = '', existingEasyPayCycle = '') {

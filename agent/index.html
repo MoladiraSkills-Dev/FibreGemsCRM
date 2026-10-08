@@ -1328,9 +1328,50 @@
           </svg>
           ⚡ Log Outcome
         </button>
+        <button id="ld-mark-duplicate-btn" onclick=""
+          title="Mark this customer as a duplicate — it will be hidden from your worklist"
+          class="px-3 py-2.5 bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 hover:text-red-300 text-sm font-medium rounded-xl transition-colors flex items-center gap-1.5">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          Duplicate
+        </button>
         <button onclick="closeLeadDetail()"
-          class="px-5 py-2.5 bg-white/5 text-gray-400 hover:bg-white/10 text-sm font-medium rounded-xl transition-colors">
+          class="px-4 py-2.5 bg-white/5 text-gray-400 hover:bg-white/10 text-sm font-medium rounded-xl transition-colors">
           Close
+        </button>
+      </div>
+  </div>
+
+  <!-- Duplicate Confirmation Modal -->
+  <div id="modal-confirm-duplicate" class="hidden fixed inset-0 z-[70] flex items-center justify-center" style="background:rgba(0,0,0,0.75);backdrop-filter:blur(8px)">
+    <div class="w-full max-w-sm mx-4 rounded-2xl border border-red-500/20 p-6" style="background:#131720">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-10 h-10 rounded-xl bg-red-500/15 flex items-center justify-center shrink-0">
+          <svg class="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+          </svg>
+        </div>
+        <div>
+          <h3 class="text-sm font-bold text-white">Mark as Duplicate?</h3>
+          <p class="text-xs text-gray-400 mt-0.5">This customer will be hidden from all worklists.</p>
+        </div>
+      </div>
+      <p class="text-xs text-gray-400 mb-1">Customer: <span class="text-white font-semibold" id="dup-confirm-name"></span></p>
+      <p class="text-xs text-gray-400 mb-3">ID: <span class="text-gray-300 font-mono text-[11px]" id="dup-confirm-id"></span></p>
+      <div class="mb-4">
+        <label class="text-[11px] text-gray-400 font-semibold uppercase tracking-wider block mb-1.5">Reason (optional)</label>
+        <input id="dup-reason-input" type="text" placeholder="e.g. Same phone as CUS-XXXXXXXX"
+          class="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-red-500/40" />
+      </div>
+      <div class="flex gap-3">
+        <button onclick="confirmMarkDuplicate()" id="dup-confirm-btn"
+          class="flex-1 py-2.5 bg-red-500/20 border border-red-500/30 text-red-300 hover:bg-red-500/30 text-sm font-bold rounded-xl transition-colors">
+          Yes, Mark Duplicate
+        </button>
+        <button onclick="document.getElementById('modal-confirm-duplicate').classList.add('hidden')"
+          class="flex-1 py-2.5 bg-white/5 text-gray-400 hover:bg-white/10 text-sm font-medium rounded-xl transition-colors">
+          Cancel
         </button>
       </div>
     </div>
