@@ -328,27 +328,37 @@ If a callback was missed, you can force-reschedule it directly from this report.
 
 ## Master Grid — See Every Customer
 
-The Master Grid shows every customer in the entire system across all agents. Use it to search, audit, and monitor the pipeline at a detailed level.
+The Master Grid shows every customer in the entire system across all agents. Use it to search, filter, audit, monitor pipeline health, and identify and delete duplicate clients.
 
-**How to get there:** Click **"Master Grid"** in the top navigation.
+**How to get there:** Click **"Master Grid"** in the sidebar navigation.
 
-### What you will see per customer:
+### Searching & Filtering Clients:
+1. **Live Search Bar**: Type any part of a customer's name, primary or alternate cell number, email, order number, EasyPay number, referral code, address/suburb, or assigned agent.
+2. **Filters**:
+   - **Pipeline Status**: Filter by specific stage (e.g., *New Lead*, *Callback Scheduled*, *Pitch Complete*, *Active*, *Escalated*, *Duplicate*).
+   - **Assigned Agent**: View leads owned by a specific agent or view *Unassigned* leads.
+   - **Payment & EasyPay**: Filter by *Paid*, *Pending*, *Expired EasyPay (14d)*, or *Promised Payment*.
+   - **Duplicates**: Filter to show *⚠️ Potential Duplicates Only*, *🗑️ Marked Duplicates*, or *✨ Unique Records*.
+   - **Date Range**: Filter by *Today*, *Yesterday*, *Last 7 Days*, *Last 30 Days*, or set a *Custom Date Range*.
+3. **Quick Stat Pills**: 1-click filter buttons at the top of the table for instant access to *All*, *Duplicates*, *Expired EasyPay*, *Promised Payments*, and *7d+ Escalations*.
+4. **Column Sorting**: Click any column header (Customer, Phone, Agent, Order Date, EasyPay Expiry, Status, Payment) to sort ascending or descending.
+5. **Export CSV**: Click **"Export CSV"** to download the current filtered view into a spreadsheet.
 
-| Column | Meaning |
-|---|---|
-| Name | Customer full name |
-| Cell | Phone number |
-| Agent | Which agent owns this customer |
-| Status | Pipeline status |
-| Order Number | OVR/OVK reference (if applicable) |
-| EasyPay Number | EasyPay reference (if applicable) |
-| EasyPay Cycle | Which cycle they are on |
-| Referral Code | The customer's unique referral code |
-| EasyPay Expiry | When the current EasyPay expires |
-| Activation Date | When they were activated (if applicable) |
-| Payment Status | From the PAYMENTS table |
+### Finding & Deleting Duplicate Clients:
 
-The grid is paginated (50 records per page). Use the Prev/Next buttons to navigate.
+1. **Automatic Duplicate Detection**:
+   - The system automatically detects potential duplicate accounts matching on normalized **Primary Cell Number**, **Email Address**, or **Order Number**.
+   - Duplicates are tagged directly in the grid with a warning badge (`⚠️ Dup`).
+2. **Find & Clean Duplicates Tool**:
+   - Click **"🔍 Find & Clean Duplicates"** at the top right of the Master Grid.
+   - The Duplicate Manager modal displays all matching records grouped side-by-side.
+   - The system highlights the recommended **★ Primary (Keep)** record and candidate duplicates.
+   - Click **"Select All Secondary Records"** or select individual duplicates via checkbox.
+   - Click **"🏷️ Soft-Delete (Mark Duplicate)"** to set the record to *Duplicate / Inactive* (removes from agent queues, keeps audit trail).
+   - Or click **"🗑️ Permanently Delete"** to purge the duplicate row completely.
+3. **Deleting Individual Clients / Duplicates**:
+   - On any table row or from inside the Customer Details modal, click the **🗑️ Delete / Mark Duplicate** button.
+   - Choose between **Soft Delete (Mark as Duplicate)** or **Permanent Hard Purge**, enter an optional reason note, and confirm.
 
 ---
 

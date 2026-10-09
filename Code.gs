@@ -47,7 +47,8 @@ function doPost(e) {
     const mutatingActions = [
       'handleAgentLeadUpdate', 'logCallOutcome', 'quickUpdateSalesData', 'issueNewEasyPay',
       'createAgent', 'updateAgent', 'setAgentTempPassword', 'deleteAgent',
-      'adminUpdateFollowUp', 'logSupportTicket', 'updateSupportTicket', 'runAgilitySync', 'uploadAgilityReport', 'markCustomerDuplicate'
+      'adminUpdateFollowUp', 'logSupportTicket', 'updateSupportTicket', 'runAgilitySync', 'uploadAgilityReport', 'markCustomerDuplicate',
+      'deleteCustomer', 'deleteDuplicateCustomers'
     ];
 
     let cacheKey = null;
@@ -168,6 +169,12 @@ function doPost(e) {
         break;
       case 'markCustomerDuplicate':
         result = markCustomerDuplicate(token, payload);
+        break;
+      case 'deleteCustomer':
+        result = deleteCustomer(token, payload);
+        break;
+      case 'deleteDuplicateCustomers':
+        result = deleteDuplicateCustomers(token, payload);
         break;
       default:
         throw new Error("Invalid API action requested: " + action);
@@ -2111,6 +2118,144 @@ function markCustomerDuplicate(token, payload) {
   Logger.log('[markCustomerDuplicate] %s marked %s as Duplicate. Reason: %s', sess.name, customerId, note);
 
   return { success: true, customerId, markedBy: sess.name, reason: note };
+}
+
+/**
+ * deleteCustomer — Deletes or archives a single customer record (Admin / Team Lead only).
+ * Supports both soft delete (marked as Duplicate / Inactive) and permanent hard delete.
+ *
+ * Payload: { customerId, hardDelete: boolean, reason: string }
+ */
+function deleteCustomer(token, payload) {
+  const sess = requireAdmin_(token);
+  const { customerId, hardDelete, reason } = payload || {};
+  if (!customerId) throw new Error('customerId is required.');
+
+  const sheet = ss.getSheetByName('CUSTOMERS');
+  if (!sheet) throw new Error('CUSTOMERS sheet not found.');
+
+  const data = sheet.getDataRange().getValues();
+  let targetRow = -1;
+  let customerName = '';
+
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]).trim() === String(customerId).trim()) {
+      targetRow = i + 1;
+      customerName = data[i][5] || '';
+      break;
+    }
+  }
+
+  if (targetRow === -1) throw new Error('Customer not found: ' + customerId);
+
+  const note = reason ? ('Duplicate removed: ' + reason) : 'Duplicate removed by Team Lead';
+
+  if (hardDelete) {
+    // Permanently remove from CUSTOMERS sheet
+    sheet.deleteRow(targetRow);
+
+    // Clean up corresponding rows in ORDERS, PAYMENTS, ACTIVATIONS
+    const cleanLinkedSheet = (sheetName) => {
+      try {
+        const sh = ss.getSheetByName(sheetName);
+        if (!sh) return;
+        const shData = sh.getDataRange().getValues();
+        // Traverse backwards to safely delete multiple matching rows without index shift
+        for (let j = shData.length - 1; j >= 1; j--) {
+          if (String(shData[j][1]).trim() === String(customerId).trim()) {
+            sh.deleteRow(j + 1);
+          }
+        }
+      } catch (e) {
+        Logger.log('[deleteCustomer] Error cleaning %s: %s', sheetName, e.message);
+      }
+    };
+
+    cleanLinkedSheet('ORDERS');
+    cleanLinkedSheet('PAYMENTS');
+    cleanLinkedSheet('ACTIVATIONS');
+
+    Logger.log('[deleteCustomer] Permanent delete: Customer %s (%s) purged by %s. Reason: %s', customerId, customerName, sess.name, note);
+  } else {
+    // Soft delete / mark as duplicate
+    markCustomerDuplicate(token, { customerId, reason: note });
+  }
+
+  incrementCacheVersion_();
+  return { success: true, customerId, customerName, hardDelete: !!hardDelete, deletedBy: sess.name };
+}
+
+/**
+ * deleteDuplicateCustomers — Bulk deletes/archives duplicate customers (Admin / Team Lead only).
+ *
+ * Payload: { customerIds: string[], hardDelete: boolean, reason: string }
+ */
+function deleteDuplicateCustomers(token, payload) {
+  const sess = requireAdmin_(token);
+  const { customerIds, hardDelete, reason } = payload || {};
+  if (!customerIds || !Array.isArray(customerIds) || customerIds.length === 0) {
+    throw new Error('customerIds array is required.');
+  }
+
+  const sheet = ss.getSheetByName('CUSTOMERS');
+  if (!sheet) throw new Error('CUSTOMERS sheet not found.');
+
+  const idSet = new Set(customerIds.map(id => String(id).trim()));
+  const data = sheet.getDataRange().getValues();
+  const note = reason ? ('Bulk duplicate cleanup: ' + reason) : 'Bulk duplicate cleanup by Team Lead';
+
+  if (hardDelete) {
+    // Identify row indices in reverse order to safely delete without shifting remaining targets
+    const rowsToDelete = [];
+    for (let i = 1; i < data.length; i++) {
+      if (idSet.has(String(data[i][0]).trim())) {
+        rowsToDelete.push(i + 1);
+      }
+    }
+
+    rowsToDelete.sort((a, b) => b - a); // Descending
+    rowsToDelete.forEach(rowIdx => {
+      sheet.deleteRow(rowIdx);
+    });
+
+    // Clean linked sheets in reverse order
+    ['ORDERS', 'PAYMENTS', 'ACTIVATIONS'].forEach(sheetName => {
+      try {
+        const sh = ss.getSheetByName(sheetName);
+        if (!sh) return;
+        const shData = sh.getDataRange().getValues();
+        for (let j = shData.length - 1; j >= 1; j--) {
+          if (idSet.has(String(shData[j][1]).trim())) {
+            sh.deleteRow(j + 1);
+          }
+        }
+      } catch (e) {
+        Logger.log('[deleteDuplicateCustomers] Error cleaning %s: %s', sheetName, e.message);
+      }
+    });
+
+    Logger.log('[deleteDuplicateCustomers] %d customers permanently purged by %s.', rowsToDelete.length, sess.name);
+    incrementCacheVersion_();
+    return { success: true, count: rowsToDelete.length, hardDelete: true, deletedBy: sess.name };
+  } else {
+    // Soft delete all matched rows
+    const now = new Date().toISOString();
+    let updatedCount = 0;
+    for (let i = 1; i < data.length; i++) {
+      if (idSet.has(String(data[i][0]).trim())) {
+        const row = i + 1;
+        sheet.getRange(row, 2).setValue('Inactive');
+        sheet.getRange(row, 17).setValue('Duplicate');
+        sheet.getRange(row, 5).setValue(now);
+        sheet.getRange(row, 30).setValue(note);
+        updatedCount++;
+      }
+    }
+
+    Logger.log('[deleteDuplicateCustomers] %d customers soft-deleted/marked duplicate by %s.', updatedCount, sess.name);
+    incrementCacheVersion_();
+    return { success: true, count: updatedCount, hardDelete: false, deletedBy: sess.name };
+  }
 }
 
 // ============================================================
