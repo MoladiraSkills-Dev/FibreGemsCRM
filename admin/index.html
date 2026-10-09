@@ -651,40 +651,241 @@
 
     <!-- ─── MASTER GRID VIEW ───────────────────────────────── -->
     <div id="view-grid" class="hidden">
-      <div
-        class="px-6 lg:px-8 py-6 border-b border-white/5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <!-- Grid Header -->
+      <div class="px-6 lg:px-8 py-6 border-b border-white/5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 class="text-xl font-bold text-white">Master Lead & Order Grid</h2>
-          <p class="text-sm text-gray-500 mt-0.5"><span id="grid-count">0 records</span></p>
+          <div class="flex items-center gap-3">
+            <h2 class="text-xl font-bold text-white">Client Management & Master Grid</h2>
+            <span id="grid-dup-badge" onclick="setGridQuickFilter('duplicates')" class="hidden cursor-pointer px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:bg-amber-500/30 transition-colors">
+              ⚠️ 0 Duplicates Detected
+            </span>
+          </div>
+          <p class="text-xs text-gray-400 mt-0.5">Search, filter, inspect clients, and manage duplicate records across the ecosystem.</p>
         </div>
-        <button onclick="loadMasterGrid()"
-          class="inline-flex items-center gap-2 px-4 py-2.5 bg-white/5 text-gray-400 rounded-xl text-sm font-medium hover:bg-white/10 transition-colors">
-          ↻ Refresh
-        </button>
+        <div class="flex items-center gap-2 flex-wrap">
+          <button onclick="openDuplicateManagerModal()" class="px-4 py-2.5 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm">
+            <span>🔍</span> Find &amp; Clean Duplicates
+          </button>
+          <button onclick="exportMasterGridCsv()" title="Export current filtered view to CSV" class="p-2.5 bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 rounded-xl text-xs font-medium transition-all flex items-center gap-1.5">
+            <span>📥</span> <span class="hidden sm:inline">Export CSV</span>
+          </button>
+          <button onclick="loadMasterGrid()" class="p-2.5 bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 rounded-xl text-xs font-medium transition-all flex items-center gap-1.5">
+            <span>↻</span> Refresh
+          </button>
+        </div>
       </div>
 
+      <!-- Search & Filters Container -->
+      <div class="px-6 lg:px-8 py-5 border-b border-white/5 bg-white/[0.01] space-y-4">
+        <!-- Main Search Bar -->
+        <div class="flex flex-col sm:flex-row gap-3 items-stretch">
+          <div class="relative flex-1">
+            <svg class="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+            </svg>
+            <input type="text" id="grid-search-input" oninput="handleGridSearch(this.value)" placeholder="Search clients by Name, Phone, Email, Order #, EasyPay, Agent, Suburb, Ref Code..." class="input-field !pl-10 !pr-10 !py-2.5 !text-xs !rounded-xl !bg-white/[0.04]">
+            <button id="grid-search-clear" onclick="clearGridSearch()" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white text-base">
+              &times;
+            </button>
+          </div>
+          <button onclick="toggleGridAdvancedFilters()" id="btn-toggle-filters" class="px-3.5 py-2.5 bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 rounded-xl text-xs font-medium transition-all flex items-center justify-center gap-1.5 whitespace-nowrap">
+            <span>⚙️</span> Filters <span id="grid-active-filter-count" class="hidden px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-fiber-500 text-white">0</span>
+          </button>
+        </div>
+
+        <!-- Advanced Filter Controls Grid -->
+        <div id="grid-advanced-filters" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-1">
+          <div>
+            <label class="field-label text-[10px]">Pipeline Status</label>
+            <select id="grid-filter-status" onchange="applyGridFilters()" class="input-field !py-2 !text-xs">
+              <option value="">All Statuses</option>
+              <option value="New Lead">New Lead</option>
+              <option value="Validated">Validated</option>
+              <option value="Callback Scheduled">Callback Scheduled</option>
+              <option value="Pitch Complete">Pitch Complete</option>
+              <option value="Paid - Pending Provisioning">Paid - Pending Provisioning</option>
+              <option value="Active / Provisioned">Active / Provisioned</option>
+              <option value="Escalated - Stale Lead">Escalated - Stale Lead</option>
+              <option value="Lost">Lost</option>
+              <option value="Duplicate">Duplicate (Archived)</option>
+              <option value="Inactive">Inactive</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="field-label text-[10px]">Assigned Agent</label>
+            <select id="grid-filter-agent" onchange="applyGridFilters()" class="input-field !py-2 !text-xs">
+              <option value="">All Agents</option>
+              <option value="__unassigned__">Unassigned</option>
+              <!-- Dynamic Agent List Populated via JS -->
+            </select>
+          </div>
+
+          <div>
+            <label class="field-label text-[10px]">Payment &amp; EasyPay</label>
+            <select id="grid-filter-payment" onchange="applyGridFilters()" class="input-field !py-2 !text-xs">
+              <option value="">All Payment States</option>
+              <option value="Paid">Paid</option>
+              <option value="Pending">Pending Payment</option>
+              <option value="Failed">Failed</option>
+              <option value="Expired_EasyPay">Expired EasyPay (14d)</option>
+              <option value="Promised_Payment">Promised Payment Scheduled</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="field-label text-[10px] text-amber-300">Duplicates Filter</label>
+            <select id="grid-filter-duplicate" onchange="applyGridFilters()" class="input-field !py-2 !text-xs border-amber-500/30">
+              <option value="">All Records</option>
+              <option value="potential_duplicates">⚠️ Potential Duplicates Only</option>
+              <option value="marked_duplicate">🗑️ Marked as Duplicate</option>
+              <option value="unique_only">✨ Unique Records Only</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="field-label text-[10px]">Date Range</label>
+            <select id="grid-filter-date" onchange="handleDateRangeFilterChange(this.value)" class="input-field !py-2 !text-xs">
+              <option value="all">All Time</option>
+              <option value="today">Today</option>
+              <option value="yesterday">Yesterday</option>
+              <option value="last7">Last 7 Days</option>
+              <option value="last30">Last 30 Days</option>
+              <option value="custom">Custom Date Range...</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Custom Date Inputs (Collapsible) -->
+        <div id="grid-custom-date-container" class="hidden flex items-center gap-3 pt-1 text-xs">
+          <span class="text-gray-400">From:</span>
+          <input type="date" id="grid-date-from" onchange="applyGridFilters()" class="input-field !py-1.5 !px-3 !w-auto !text-xs">
+          <span class="text-gray-400">To:</span>
+          <input type="date" id="grid-date-to" onchange="applyGridFilters()" class="input-field !py-1.5 !px-3 !w-auto !text-xs">
+        </div>
+
+        <!-- Quick Filter Pills / Stats Strip -->
+        <div class="flex items-center justify-between flex-wrap gap-2 pt-2 border-t border-white/5 text-xs">
+          <div class="flex items-center gap-2 flex-wrap" id="grid-quick-pills">
+            <button onclick="setGridQuickFilter('all')" id="pill-all" class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-fiber-500/20 text-fiber-300 border border-fiber-500/30 transition-all">
+              All (<span id="pill-count-all">0</span>)
+            </button>
+            <button onclick="setGridQuickFilter('duplicates')" id="pill-duplicates" class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-white/5 text-amber-300 hover:bg-amber-500/15 border border-white/5 transition-all">
+              ⚠️ Duplicates (<span id="pill-count-duplicates">0</span>)
+            </button>
+            <button onclick="setGridQuickFilter('expired_ep')" id="pill-expired-ep" class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-white/5 text-red-300 hover:bg-red-500/15 border border-white/5 transition-all">
+              🔴 Expired EasyPay (<span id="pill-count-expired-ep">0</span>)
+            </button>
+            <button onclick="setGridQuickFilter('promised')" id="pill-promised" class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-white/5 text-purple-300 hover:bg-purple-500/15 border border-white/5 transition-all">
+              💳 Promised (<span id="pill-count-promised">0</span>)
+            </button>
+            <button onclick="setGridQuickFilter('escalated')" id="pill-escalated" class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-white/5 text-red-400 hover:bg-red-500/15 border border-white/5 transition-all">
+              🚨 7d+ Escalations (<span id="pill-count-escalated">0</span>)
+            </button>
+            <button onclick="setGridQuickFilter('marked_duplicate')" id="pill-marked-dup" class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-white/5 text-gray-400 hover:bg-white/10 border border-white/5 transition-all">
+              🗑️ Marked Duplicates (<span id="pill-count-marked-dup">0</span>)
+            </button>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <span class="text-gray-400 font-mono text-[11px]" id="grid-status-summary">Showing 0 of 0 clients</span>
+            <button onclick="resetGridFilters()" id="btn-reset-filters" class="hidden text-fiber-400 hover:text-fiber-300 underline text-xs font-medium">
+              Reset Filters
+            </button>
+          </div>
+        </div>
+
+        <!-- Bulk Selection Action Bar -->
+        <div id="grid-batch-bar" class="hidden p-3 rounded-xl bg-fiber-500/10 border border-fiber-500/30 flex items-center justify-between flex-wrap gap-3">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-fiber-400 animate-pulse"></span>
+            <span class="text-xs font-bold text-fiber-200"><span id="grid-selected-count">0</span> clients selected</span>
+          </div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <button onclick="batchDeleteSelectedDuplicates(false)" class="px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-200 border border-amber-500/30 hover:bg-amber-500/30 text-xs font-semibold transition-all">
+              🏷️ Mark Selected as Duplicate
+            </button>
+            <button onclick="batchDeleteSelectedDuplicates(true)" class="px-3 py-1.5 rounded-lg bg-red-500/20 text-red-200 border border-red-500/30 hover:bg-red-500/30 text-xs font-semibold transition-all">
+              🗑️ Permanently Delete Selected
+            </button>
+            <button onclick="deselectAllGridRows()" class="px-2.5 py-1.5 text-xs text-gray-400 hover:text-white transition-colors">
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Master Grid Table -->
       <div class="overflow-x-auto">
         <table class="w-full">
           <thead>
             <tr class="border-b border-white/10 bg-white/[0.02]">
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Customer</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Phone</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Agent</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Referral Code
+              <th class="px-4 py-3 text-left w-10">
+                <input type="checkbox" id="grid-select-all" onchange="toggleSelectAllGrid(this.checked)" class="rounded bg-white/10 border-white/20 text-fiber-500 focus:ring-0 cursor-pointer">
               </th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Order & Date
+              <th onclick="sortGridBy('name')" class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider cursor-pointer hover:text-white select-none">
+                <div class="flex items-center gap-1.5">
+                  <span>Customer</span>
+                  <span id="sort-icon-name" class="text-[10px] text-gray-600">↕</span>
+                </div>
               </th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">EasyPay (14d
-                Expiry)</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Payment</th>
+              <th onclick="sortGridBy('cellNumber')" class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider cursor-pointer hover:text-white select-none">
+                <div class="flex items-center gap-1.5">
+                  <span>Phone</span>
+                  <span id="sort-icon-cellNumber" class="text-[10px] text-gray-600">↕</span>
+                </div>
+              </th>
+              <th onclick="sortGridBy('agent')" class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider cursor-pointer hover:text-white select-none">
+                <div class="flex items-center gap-1.5">
+                  <span>Agent</span>
+                  <span id="sort-icon-agent" class="text-[10px] text-gray-600">↕</span>
+                </div>
+              </th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Referral Code</th>
+              <th onclick="sortGridBy('orderDate')" class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider cursor-pointer hover:text-white select-none">
+                <div class="flex items-center gap-1.5">
+                  <span>Order &amp; Date</span>
+                  <span id="sort-icon-orderDate" class="text-[10px] text-gray-600">↕</span>
+                </div>
+              </th>
+              <th onclick="sortGridBy('easyPayExpiry')" class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider cursor-pointer hover:text-white select-none">
+                <div class="flex items-center gap-1.5">
+                  <span>EasyPay (14d Expiry)</span>
+                  <span id="sort-icon-easyPayExpiry" class="text-[10px] text-gray-600">↕</span>
+                </div>
+              </th>
+              <th onclick="sortGridBy('status')" class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider cursor-pointer hover:text-white select-none">
+                <div class="flex items-center gap-1.5">
+                  <span>Status</span>
+                  <span id="sort-icon-status" class="text-[10px] text-gray-600">↕</span>
+                </div>
+              </th>
+              <th onclick="sortGridBy('payStatus')" class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider cursor-pointer hover:text-white select-none">
+                <div class="flex items-center gap-1.5">
+                  <span>Payment</span>
+                  <span id="sort-icon-payStatus" class="text-[10px] text-gray-600">↕</span>
+                </div>
+              </th>
+              <th class="px-4 py-3 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
           <tbody id="grid-body"></tbody>
         </table>
       </div>
 
-      <div id="grid-pagination" class="px-6 py-4 flex items-center justify-center gap-4 border-t border-white/5"></div>
+      <!-- Master Grid Pagination & Page Size -->
+      <div id="grid-pagination-container" class="px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-white/5">
+        <div class="flex items-center gap-2 text-xs text-gray-400">
+          <span>Rows per page:</span>
+          <select id="grid-page-size" onchange="changeGridPageSize(this.value)" class="input-field !py-1 !px-2 !w-auto !text-xs">
+            <option value="25">25</option>
+            <option value="50" selected>50</option>
+            <option value="100">100</option>
+            <option value="all">All</option>
+          </select>
+        </div>
+        <div id="grid-pagination" class="flex items-center gap-2"></div>
+      </div>
     </div>
 
     <!-- ─── AGILITY SYNC VIEW ──────────────────────────────── -->
@@ -886,6 +1087,9 @@
         <div class="flex items-center gap-2">
           <button onclick="openReassignModalFromDetail()" class="px-3 py-1.5 rounded-lg bg-amber-500/15 text-amber-300 border border-amber-500/30 hover:bg-amber-500/25 font-semibold transition-colors flex items-center gap-1.5">
             <span>⇄</span> Reassign / Reschedule Follow-up
+          </button>
+          <button onclick="openDeleteCustomerModal(currentViewingCustomerId)" class="px-3 py-1.5 rounded-lg bg-red-500/15 text-red-300 border border-red-500/30 hover:bg-red-500/25 font-semibold transition-colors flex items-center gap-1.5">
+            <span>🗑️</span> Delete / Mark Duplicate
           </button>
         </div>
       </div>
@@ -1093,10 +1297,15 @@
 
       <!-- Modal Footer -->
       <div class="px-6 py-4 border-t border-white/10 bg-navy-900/60 flex items-center justify-between">
-        <span class="text-[11px] text-gray-500">Team Leader Management Hub</span>
-        <button onclick="closeCustomerDetailModal()" class="px-5 py-2 bg-white/10 text-white rounded-xl text-xs font-semibold hover:bg-white/15 transition-colors">
-          Close
+        <button onclick="openDeleteCustomerModal(currentViewingCustomerId)" class="px-3.5 py-2 bg-red-500/15 text-red-300 border border-red-500/30 rounded-xl text-xs font-semibold hover:bg-red-500/25 transition-colors flex items-center gap-1.5">
+          <span>🗑️</span> Delete Client Record
         </button>
+        <div class="flex items-center gap-3">
+          <span class="text-[11px] text-gray-500 hidden sm:inline">Team Leader Management Hub</span>
+          <button onclick="closeCustomerDetailModal()" class="px-5 py-2 bg-white/10 text-white rounded-xl text-xs font-semibold hover:bg-white/15 transition-colors">
+            Close
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -1153,6 +1362,168 @@
         </button>
         <button onclick="closeAdminFollowUpModal()"
           class="px-4 py-2.5 bg-white/5 text-gray-400 rounded-xl text-sm font-medium hover:bg-white/10 transition-colors">
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- Duplicate Clients Manager Modal (Team Leader Deduplication)  -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <div id="modal-duplicate-manager" class="hidden fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+    <div class="modal-overlay absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="closeDuplicateManagerModal()"></div>
+    <div class="relative bg-navy-800 border border-amber-500/30 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[92vh] flex flex-col z-10 animate-slide-in overflow-hidden">
+      <!-- Modal Header -->
+      <div class="px-6 py-5 border-b border-white/10 flex items-start justify-between bg-navy-900/80">
+        <div class="flex items-start gap-3.5">
+          <div class="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold text-lg flex-shrink-0">
+            🔍
+          </div>
+          <div>
+            <div class="flex items-center gap-2.5">
+              <h3 class="text-lg font-bold text-white tracking-tight">Duplicate Clients Manager</h3>
+              <span id="dup-modal-badge" class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">0 Duplicates</span>
+            </div>
+            <p class="text-xs text-gray-400 mt-0.5">Detect, compare side-by-side, and clean up duplicate client profiles across all agents.</p>
+          </div>
+        </div>
+        <button onclick="closeDuplicateManagerModal()" class="p-2 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white transition-colors">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Controls & Match Criteria -->
+      <div class="px-6 py-3.5 bg-white/[0.02] border-b border-white/5 flex items-center justify-between flex-wrap gap-3 text-xs">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="text-gray-400 font-semibold">Match Duplicates By:</span>
+          <button onclick="switchDuplicateGrouping('phone')" id="btn-group-phone" class="px-3 py-1.5 rounded-lg font-semibold bg-fiber-500 text-white transition-colors">
+            📱 Primary Cell Number
+          </button>
+          <button onclick="switchDuplicateGrouping('email')" id="btn-group-email" class="px-3 py-1.5 rounded-lg font-semibold bg-white/5 text-gray-400 hover:text-white transition-colors">
+            ✉️ Email Address
+          </button>
+          <button onclick="switchDuplicateGrouping('order')" id="btn-group-order" class="px-3 py-1.5 rounded-lg font-semibold bg-white/5 text-gray-400 hover:text-white transition-colors">
+            📦 Order Number
+          </button>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button onclick="selectAllSecondaryDuplicates()" class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 font-medium transition-colors">
+            Select All Secondary Records
+          </button>
+        </div>
+      </div>
+
+      <!-- Duplicate Groups Body -->
+      <div class="p-6 overflow-y-auto flex-1 space-y-5" id="dup-modal-body">
+        <div class="py-12 text-center text-gray-500">
+          <div class="spinner mx-auto mb-2"></div>
+          <p class="text-xs">Analyzing records for duplicates...</p>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="px-6 py-4 border-t border-white/10 bg-navy-900/80 flex items-center justify-between flex-wrap gap-3">
+        <div class="flex items-center gap-2 text-xs">
+          <span class="text-gray-400">Selected for cleanup:</span>
+          <strong class="text-white font-mono" id="dup-modal-selected-count">0</strong>
+        </div>
+        <div class="flex items-center gap-3">
+          <button onclick="submitBulkDuplicateAction(false)" id="dup-bulk-soft-btn" class="px-4 py-2 bg-amber-500/20 text-amber-200 border border-amber-500/30 hover:bg-amber-500/30 rounded-xl text-xs font-bold transition-colors">
+            🏷️ Soft-Delete (Mark Duplicate)
+          </button>
+          <button onclick="submitBulkDuplicateAction(true)" id="dup-bulk-hard-btn" class="px-4 py-2 bg-red-500/20 text-red-200 border border-red-500/30 hover:bg-red-500/30 rounded-xl text-xs font-bold transition-colors">
+            🗑️ Permanently Delete
+          </button>
+          <button onclick="closeDuplicateManagerModal()" class="px-4 py-2 bg-white/5 text-gray-300 hover:bg-white/10 rounded-xl text-xs font-medium transition-colors">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- Delete / Mark Duplicate Single Client Modal                  -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <div id="modal-delete-customer" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div class="modal-overlay absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="closeDeleteCustomerModal()"></div>
+    <div class="relative bg-navy-800 border border-red-500/30 rounded-2xl shadow-2xl w-full max-w-lg p-6 z-10 animate-slide-in">
+      <div class="flex items-center justify-between pb-4 border-b border-white/10 mb-4">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-red-500/20 text-red-400 flex items-center justify-center text-lg font-bold">
+            🗑️
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-white">Delete Client Record</h3>
+            <p class="text-xs text-gray-400">Team Leader Record Management</p>
+          </div>
+        </div>
+        <button onclick="closeDeleteCustomerModal()" class="p-2 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white transition-colors">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <input type="hidden" id="del-cust-id">
+
+      <!-- Target Customer Preview Card -->
+      <div class="bg-white/[0.03] border border-white/10 rounded-xl p-3.5 mb-4 text-xs space-y-1.5">
+        <div class="flex justify-between items-center">
+          <span class="text-gray-400 font-medium">Customer:</span>
+          <span class="text-white font-bold" id="del-cust-name">—</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-gray-400">ID &amp; Phone:</span>
+          <span class="font-mono text-gray-300"><span id="del-cust-id-preview">—</span> • <span id="del-cust-phone">—</span></span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-gray-400">Assigned Agent:</span>
+          <span class="text-fiber-300 font-semibold" id="del-cust-agent">—</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-gray-400">Current Status:</span>
+          <span class="text-amber-300" id="del-cust-status">—</span>
+        </div>
+      </div>
+
+      <!-- Deletion Mode Selection -->
+      <div class="space-y-3 mb-4">
+        <label class="field-label text-red-300">Choose Action</label>
+        
+        <label class="flex items-start gap-3 p-3 rounded-xl bg-white/[0.02] border border-amber-500/30 cursor-pointer hover:bg-white/[0.04] transition-colors">
+          <input type="radio" name="del-mode" value="soft" checked class="mt-0.5 text-fiber-500 focus:ring-0">
+          <div>
+            <p class="text-xs font-bold text-white">Soft Delete / Mark as Duplicate (Recommended)</p>
+            <p class="text-[11px] text-gray-400 mt-0.5">Sets Status to "Duplicate" and Record Status to "Inactive". Removed from agent worklists and pipeline queues while preserving historical audit log.</p>
+          </div>
+        </label>
+
+        <label class="flex items-start gap-3 p-3 rounded-xl bg-white/[0.02] border border-red-500/20 cursor-pointer hover:bg-white/[0.04] transition-colors">
+          <input type="radio" name="del-mode" value="hard" class="mt-0.5 text-red-500 focus:ring-0">
+          <div>
+            <p class="text-xs font-bold text-red-300">Permanent Hard Delete / Purge</p>
+            <p class="text-[11px] text-gray-400 mt-0.5">Completely removes row from database sheets (CUSTOMERS, ORDERS, PAYMENTS). Use only for redundant duplicate imports or junk test data.</p>
+          </div>
+        </label>
+      </div>
+
+      <!-- Reason Input -->
+      <div class="mb-5">
+        <label class="field-label">Reason / Notes</label>
+        <input type="text" id="del-cust-reason" placeholder="e.g. Duplicate entry of lead CUS-123456" class="input-field !py-2 !text-xs">
+      </div>
+
+      <!-- Actions -->
+      <div class="flex items-center gap-3 pt-3 border-t border-white/10">
+        <button id="del-confirm-btn" onclick="submitDeleteCustomer()" class="flex-1 py-2.5 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl text-xs font-bold hover:shadow-lg hover:shadow-red-500/20 transition-all">
+          Confirm Deletion
+        </button>
+        <button onclick="closeDeleteCustomerModal()" class="px-4 py-2.5 bg-white/5 text-gray-400 hover:text-white rounded-xl text-xs font-medium transition-colors">
           Cancel
         </button>
       </div>

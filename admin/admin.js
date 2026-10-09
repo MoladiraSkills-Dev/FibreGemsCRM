@@ -392,42 +392,559 @@ async function runLifecycleEngine() {
 }
 
 // ── Master Grid ──────────────────────────────────────────────
+// ── Master Grid State & Deduplication Engine ──────────────────
+let rawMasterGridData = [];
+let filteredMasterGridData = [];
 let masterGridRecordsMap = new Map();
 let currentViewingCustomerId = null;
 
+let gridSearchQuery = '';
+let gridFilterStatus = '';
+let gridFilterAgent = '';
+let gridFilterPayment = '';
+let gridFilterDuplicate = '';
+let gridFilterDate = 'all';
+let gridDateFrom = '';
+let gridDateTo = '';
+let activeQuickFilter = 'all';
+
+let gridSortColumn = 'orderDate';
+let gridSortDirection = 'desc';
+
+let gridCurrentPage = 1;
+let gridPageSize = 50;
+
+let gridSelectedIds = new Set();
+let detectedDuplicateClusters = {
+  byPhone: new Map(),
+  byEmail: new Map(),
+  byOrder: new Map(),
+  clientDupMap: new Map() // customerId -> { isDuplicate, type, count, isPrimary, matchKey, group }
+};
+let currentDuplicateGrouping = 'phone';
+let duplicateManagerSelectedIds = new Set();
+
+// Normalization Helpers
+function normalizePhoneNumber(phone) {
+  if (!phone) return '';
+  let str = String(phone).replace(/\D/g, '');
+  if (!str) return '';
+  if (str.startsWith('27') && str.length === 11) {
+    str = '0' + str.slice(2);
+  }
+  return str;
+}
+
+function normalizeEmailAddress(email) {
+  if (!email) return '';
+  return String(email).trim().toLowerCase();
+}
+
+function normalizeOrderNumber(order) {
+  if (!order) return '';
+  const clean = String(order).trim().toUpperCase();
+  if (clean === '—' || clean === 'NONE' || clean === 'N/A') return '';
+  return clean;
+}
+
+// Analyze records and group duplicates
+function analyzeDuplicates(records) {
+  const byPhone = new Map();
+  const byEmail = new Map();
+  const byOrder = new Map();
+  const clientDupMap = new Map();
+
+  records.forEach(r => {
+    const p = normalizePhoneNumber(r.cellNumber);
+    if (p && p.length >= 9) {
+      if (!byPhone.has(p)) byPhone.set(p, []);
+      byPhone.get(p).push(r);
+    }
+    const e = normalizeEmailAddress(r.email);
+    if (e && e.includes('@') && !e.includes('example.com') && !e.includes('test.com')) {
+      if (!byEmail.has(e)) byEmail.set(e, []);
+      byEmail.get(e).push(r);
+    }
+    const o = normalizeOrderNumber(r.orderNumber);
+    if (o && (o.startsWith('OVR-') || o.startsWith('OVK-') || o.length >= 6)) {
+      if (!byOrder.has(o)) byOrder.set(o, []);
+      byOrder.get(o).push(r);
+    }
+  });
+
+  const filterDups = (map, type) => {
+    const dupOnly = new Map();
+    map.forEach((list, key) => {
+      if (list.length > 1) {
+        // Sort cluster so most active/paid/oldest is candidate primary (index 0)
+        list.sort((a, b) => {
+          if (a.payStatus === 'Paid' && b.payStatus !== 'Paid') return -1;
+          if (b.payStatus === 'Paid' && a.payStatus !== 'Paid') return 1;
+          if (a.status !== 'Duplicate' && b.status === 'Duplicate') return -1;
+          if (b.status !== 'Duplicate' && a.status === 'Duplicate') return 1;
+          const dateA = a.createdDate || a.orderDate || '9999';
+          const dateB = b.createdDate || b.orderDate || '9999';
+          return dateA.localeCompare(dateB);
+        });
+
+        dupOnly.set(key, list);
+
+        list.forEach((rec, idx) => {
+          const isPrimary = (idx === 0);
+          if (!clientDupMap.has(String(rec.id))) {
+            clientDupMap.set(String(rec.id), {
+              isDuplicate: true,
+              type: type,
+              count: list.length,
+              isPrimary: isPrimary,
+              matchKey: key,
+              group: list
+            });
+          }
+        });
+      }
+    });
+    return dupOnly;
+  };
+
+  detectedDuplicateClusters.byPhone = filterDups(byPhone, 'phone');
+  detectedDuplicateClusters.byEmail = filterDups(byEmail, 'email');
+  detectedDuplicateClusters.byOrder = filterDups(byOrder, 'order');
+  detectedDuplicateClusters.clientDupMap = clientDupMap;
+
+  // Update header badge and pill counts
+  const totalDupRecords = clientDupMap.size;
+  const dupBadge = document.getElementById('grid-dup-badge');
+  if (dupBadge) {
+    if (totalDupRecords > 0) {
+      dupBadge.textContent = `⚠️ ${totalDupRecords} Duplicates Detected`;
+      dupBadge.classList.remove('hidden');
+    } else {
+      dupBadge.classList.add('hidden');
+    }
+  }
+
+  const dupModalBadge = document.getElementById('dup-modal-badge');
+  if (dupModalBadge) {
+    const totalGroups = detectedDuplicateClusters.byPhone.size + detectedDuplicateClusters.byEmail.size + detectedDuplicateClusters.byOrder.size;
+    dupModalBadge.textContent = `${totalDupRecords} Records across ${totalGroups} Groups`;
+  }
+}
+
+// ── Master Grid Loader ─────────────────────────────────────────
 async function loadMasterGrid() {
   const tbody = document.getElementById('grid-body');
-  const countEl = document.getElementById('grid-count');
-  tbody.innerHTML = `<tr><td colspan="8" class="px-6 py-12 text-center"><div class="spinner mx-auto mb-2"></div><p class="text-gray-500 text-sm">Loading master records...</p></td></tr>`;
+  if (!tbody) return;
+  tbody.innerHTML = `<tr><td colspan="10" class="px-6 py-12 text-center"><div class="spinner mx-auto mb-2"></div><p class="text-gray-500 text-sm">Loading client database...</p></td></tr>`;
 
   try {
-    const result = await callBackend('getAdminMasterGrid', { offset: gridOffset, limit: GRID_LIMIT });
-    gridTotal = result.total;
-    countEl.textContent = `${result.total} records`;
-
-    if (result.data.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="8" class="px-6 py-12 text-center text-gray-500">No records found</td></tr>`;
-      return;
-    }
+    // Fetch a large window so Team Lead can search, filter, and dedup instantly
+    const result = await callBackend('getAdminMasterGrid', { offset: 0, limit: 1500 });
+    rawMasterGridData = result.data || [];
+    gridTotal = result.total || rawMasterGridData.length;
 
     masterGridRecordsMap.clear();
-    result.data.forEach(r => masterGridRecordsMap.set(String(r.id), r));
+    rawMasterGridData.forEach(r => masterGridRecordsMap.set(String(r.id), r));
 
-    tbody.innerHTML = result.data.map(r => {
-      let isEpExpired = false;
-      if (r.easyPayExpiry && r.easyPayExpiry < getTodayStr()) {
-        isEpExpired = true;
+    // Populate agent dropdown for filtering
+    populateGridAgentFilter();
+
+    // Run duplicate analysis
+    analyzeDuplicates(rawMasterGridData);
+
+    // Apply active filters & render
+    applyGridFilters();
+
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="10" class="px-6 py-8 text-center text-red-400 text-xs">Failed to load grid: ${escHtml(err.message)}</td></tr>`;
+  }
+}
+
+function populateGridAgentFilter() {
+  const select = document.getElementById('grid-filter-agent');
+  if (!select) return;
+
+  // Extract unique agents from loaded data
+  const currentVal = select.value;
+  const agentSet = new Set();
+  rawMasterGridData.forEach(r => {
+    if (r.agent && r.agent !== '—' && r.agent !== 'Unassigned') {
+      agentSet.add(r.agent);
+    }
+  });
+
+  const sortedAgents = Array.from(agentSet).sort();
+  select.innerHTML = `<option value="">All Agents</option><option value="__unassigned__">Unassigned</option>`;
+  sortedAgents.forEach(ag => {
+    const opt = document.createElement('option');
+    opt.value = ag;
+    opt.textContent = ag;
+    select.appendChild(opt);
+  });
+
+  if (currentVal) select.value = currentVal;
+}
+
+// ── Search & Filter Logic ─────────────────────────────────────
+let gridSearchDebounce = null;
+function handleGridSearch(val) {
+  gridSearchQuery = (val || '').trim().toLowerCase();
+  const clearBtn = document.getElementById('grid-search-clear');
+  if (clearBtn) {
+    clearBtn.classList.toggle('hidden', !gridSearchQuery);
+  }
+  clearTimeout(gridSearchDebounce);
+  gridSearchDebounce = setTimeout(() => {
+    applyGridFilters();
+  }, 150);
+}
+
+function clearGridSearch() {
+  const input = document.getElementById('grid-search-input');
+  if (input) input.value = '';
+  handleGridSearch('');
+}
+
+function toggleGridAdvancedFilters() {
+  const filterGrid = document.getElementById('grid-advanced-filters');
+  if (filterGrid) filterGrid.classList.toggle('hidden');
+}
+
+function handleDateRangeFilterChange(val) {
+  gridFilterDate = val;
+  const customContainer = document.getElementById('grid-custom-date-container');
+  if (customContainer) {
+    customContainer.classList.toggle('hidden', val !== 'custom');
+  }
+  applyGridFilters();
+}
+
+function setGridQuickFilter(type) {
+  activeQuickFilter = type;
+
+  // Reset pills active styling
+  const pills = ['all', 'duplicates', 'expired_ep', 'promised', 'escalated', 'marked_duplicate'];
+  pills.forEach(p => {
+    const el = document.getElementById(`pill-${p}`);
+    if (el) {
+      if (p === type || (p === 'marked_duplicate' && type === 'marked_duplicate')) {
+        el.className = 'px-2.5 py-1 rounded-lg text-xs font-bold bg-fiber-500/25 text-fiber-300 border border-fiber-500/40 transition-all shadow-sm';
+      } else {
+        el.className = 'px-2.5 py-1 rounded-lg text-xs font-semibold bg-white/5 text-gray-300 hover:bg-white/10 border border-white/5 transition-all';
       }
+    }
+  });
 
-      return `
-      <tr class="border-b border-white/5 hover:bg-white/[0.06] transition-colors text-xs cursor-pointer group" onclick="openCustomerDetail('${escHtml(r.id)}')" title="Click to view full customer details & models">
-        <td class="px-4 py-3 cursor-pointer group" onclick="openCustomerDetail('${escHtml(r.id)}')" title="Click to view full customer details from Team Lead perspective">
-          <p class="font-semibold text-fiber-400 group-hover:text-fiber-300 group-hover:underline flex items-center gap-1.5 transition-colors">
-            ${escHtml(r.name || 'Unnamed Customer')}
-            <svg class="w-3.5 h-3.5 opacity-60 group-hover:opacity-100 transition-opacity text-fiber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-            </svg>
-          </p>
+  // Sync with dropdowns if applicable
+  const dupSelect = document.getElementById('grid-filter-duplicate');
+  const paySelect = document.getElementById('grid-filter-payment');
+  const statusSelect = document.getElementById('grid-filter-status');
+
+  if (type === 'duplicates') {
+    if (dupSelect) dupSelect.value = 'potential_duplicates';
+  } else if (type === 'marked_duplicate') {
+    if (dupSelect) dupSelect.value = 'marked_duplicate';
+  } else if (type === 'expired_ep') {
+    if (paySelect) paySelect.value = 'Expired_EasyPay';
+  } else if (type === 'promised') {
+    if (paySelect) paySelect.value = 'Promised_Payment';
+  } else if (type === 'escalated') {
+    if (statusSelect) statusSelect.value = 'Escalated - Stale Lead';
+  } else if (type === 'all') {
+    if (dupSelect) dupSelect.value = '';
+    if (paySelect) paySelect.value = '';
+    if (statusSelect) statusSelect.value = '';
+  }
+
+  applyGridFilters();
+}
+
+function resetGridFilters() {
+  gridSearchQuery = '';
+  const searchInput = document.getElementById('grid-search-input');
+  if (searchInput) searchInput.value = '';
+  const clearBtn = document.getElementById('grid-search-clear');
+  if (clearBtn) clearBtn.classList.add('hidden');
+
+  const statusSel = document.getElementById('grid-filter-status');
+  if (statusSel) statusSel.value = '';
+  const agentSel = document.getElementById('grid-filter-agent');
+  if (agentSel) agentSel.value = '';
+  const paySel = document.getElementById('grid-filter-payment');
+  if (paySel) paySel.value = '';
+  const dupSel = document.getElementById('grid-filter-duplicate');
+  if (dupSel) dupSel.value = '';
+  const dateSel = document.getElementById('grid-filter-date');
+  if (dateSel) dateSel.value = 'all';
+
+  const customContainer = document.getElementById('grid-custom-date-container');
+  if (customContainer) customContainer.classList.add('hidden');
+
+  const dateFrom = document.getElementById('grid-date-from');
+  if (dateFrom) dateFrom.value = '';
+  const dateTo = document.getElementById('grid-date-to');
+  if (dateTo) dateTo.value = '';
+
+  activeQuickFilter = 'all';
+  applyGridFilters();
+}
+
+function applyGridFilters() {
+  const statusVal = (document.getElementById('grid-filter-status')?.value || '').trim();
+  const agentVal = (document.getElementById('grid-filter-agent')?.value || '').trim();
+  const paymentVal = (document.getElementById('grid-filter-payment')?.value || '').trim();
+  const dupVal = (document.getElementById('grid-filter-duplicate')?.value || '').trim();
+  const dateVal = (document.getElementById('grid-filter-date')?.value || 'all').trim();
+  const dateFromVal = (document.getElementById('grid-date-from')?.value || '').trim();
+  const dateToVal = (document.getElementById('grid-date-to')?.value || '').trim();
+
+  const today = getTodayStr();
+  const yesterday = addDaysToToday(-1);
+  const last7 = addDaysToToday(-7);
+  const last30 = addDaysToToday(-30);
+
+  // Compute stats for pills
+  let countDups = 0;
+  let countExpiredEp = 0;
+  let countPromised = 0;
+  let countEscalated = 0;
+  let countMarkedDup = 0;
+
+  rawMasterGridData.forEach(r => {
+    if (detectedDuplicateClusters.clientDupMap.has(String(r.id))) countDups++;
+    if (r.easyPayExpiry && r.easyPayExpiry < today) countExpiredEp++;
+    if (r.promisedPaymentDate) countPromised++;
+    if (r.status === 'Escalated - Stale Lead') countEscalated++;
+    if (r.status === 'Duplicate' || r.recordStatus === 'Inactive') countMarkedDup++;
+  });
+
+  const setPillCount = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val;
+  };
+  setPillCount('pill-count-all', rawMasterGridData.length);
+  setPillCount('pill-count-duplicates', countDups);
+  setPillCount('pill-count-expired-ep', countExpiredEp);
+  setPillCount('pill-count-promised', countPromised);
+  setPillCount('pill-count-escalated', countEscalated);
+  setPillCount('pill-count-marked-dup', countMarkedDup);
+
+  // Filter dataset
+  filteredMasterGridData = rawMasterGridData.filter(r => {
+    // Search Query (across name, id, phone, altPhone, email, address, suburb, agent, orderNumber, easyPayNumber, referralCode)
+    if (gridSearchQuery) {
+      const q = gridSearchQuery;
+      const match = (
+        (r.name && r.name.toLowerCase().includes(q)) ||
+        (r.id && r.id.toLowerCase().includes(q)) ||
+        (r.cellNumber && r.cellNumber.replace(/\s+/g, '').includes(q.replace(/\s+/g, ''))) ||
+        (r.alternateCell && r.alternateCell.replace(/\s+/g, '').includes(q.replace(/\s+/g, ''))) ||
+        (r.email && r.email.toLowerCase().includes(q)) ||
+        (r.address && r.address.toLowerCase().includes(q)) ||
+        (r.suburb && r.suburb.toLowerCase().includes(q)) ||
+        (r.agent && r.agent.toLowerCase().includes(q)) ||
+        (r.orderNumber && r.orderNumber.toLowerCase().includes(q)) ||
+        (r.easyPayNumber && r.easyPayNumber.toLowerCase().includes(q)) ||
+        (r.referralCode && r.referralCode.toLowerCase().includes(q)) ||
+        (r.referredByCode && r.referredByCode.toLowerCase().includes(q)) ||
+        (r.status && r.status.toLowerCase().includes(q))
+      );
+      if (!match) return false;
+    }
+
+    // Status Filter
+    if (statusVal) {
+      if (statusVal === 'Duplicate') {
+        if (r.status !== 'Duplicate' && r.recordStatus !== 'Inactive') return false;
+      } else if (statusVal === 'Inactive') {
+        if (r.recordStatus !== 'Inactive') return false;
+      } else {
+        if (r.status !== statusVal) return false;
+      }
+    }
+
+    // Agent Filter
+    if (agentVal) {
+      if (agentVal === '__unassigned__') {
+        if (r.agent && r.agent !== '—' && r.agent !== 'Unassigned') return false;
+      } else {
+        if (r.agent !== agentVal) return false;
+      }
+    }
+
+    // Payment Filter
+    if (paymentVal) {
+      if (paymentVal === 'Paid') {
+        if (r.payStatus !== 'Paid') return false;
+      } else if (paymentVal === 'Pending') {
+        if (r.payStatus !== 'Pending') return false;
+      } else if (paymentVal === 'Failed') {
+        if (r.payStatus !== 'Failed') return false;
+      } else if (paymentVal === 'Expired_EasyPay') {
+        if (!r.easyPayExpiry || r.easyPayExpiry >= today) return false;
+      } else if (paymentVal === 'Promised_Payment') {
+        if (!r.promisedPaymentDate) return false;
+      }
+    }
+
+    // Duplicate Filter
+    if (dupVal) {
+      if (dupVal === 'potential_duplicates') {
+        if (!detectedDuplicateClusters.clientDupMap.has(String(r.id))) return false;
+      } else if (dupVal === 'marked_duplicate') {
+        if (r.status !== 'Duplicate' && r.recordStatus !== 'Inactive') return false;
+      } else if (dupVal === 'unique_only') {
+        if (detectedDuplicateClusters.clientDupMap.has(String(r.id)) || r.status === 'Duplicate') return false;
+      }
+    }
+
+    // Date Range Filter (checking createdDate or orderDate)
+    const recDate = r.orderDate || r.createdDate;
+    if (dateVal === 'today') {
+      if (!recDate || recDate !== today) return false;
+    } else if (dateVal === 'yesterday') {
+      if (!recDate || recDate !== yesterday) return false;
+    } else if (dateVal === 'last7') {
+      if (!recDate || recDate < last7) return false;
+    } else if (dateVal === 'last30') {
+      if (!recDate || recDate < last30) return false;
+    } else if (dateVal === 'custom') {
+      if (dateFromVal && (!recDate || recDate < dateFromVal)) return false;
+      if (dateToVal && (!recDate || recDate > dateToVal)) return false;
+    }
+
+    return true;
+  });
+
+  // Active filters count badge & reset button toggle
+  let activeFilterCount = 0;
+  if (gridSearchQuery) activeFilterCount++;
+  if (statusVal) activeFilterCount++;
+  if (agentVal) activeFilterCount++;
+  if (paymentVal) activeFilterCount++;
+  if (dupVal) activeFilterCount++;
+  if (dateVal !== 'all') activeFilterCount++;
+
+  const badgeEl = document.getElementById('grid-active-filter-count');
+  if (badgeEl) {
+    badgeEl.textContent = activeFilterCount;
+    badgeEl.classList.toggle('hidden', activeFilterCount === 0);
+  }
+
+  const resetBtn = document.getElementById('btn-reset-filters');
+  if (resetBtn) resetBtn.classList.toggle('hidden', activeFilterCount === 0);
+
+  // Status summary label
+  const summaryEl = document.getElementById('grid-status-summary');
+  if (summaryEl) {
+    summaryEl.textContent = `Showing ${filteredMasterGridData.length} of ${rawMasterGridData.length} clients`;
+  }
+
+  // Sort and Render
+  sortFilteredData();
+  gridCurrentPage = 1;
+  renderMasterGridPage();
+}
+
+// ── Sorting ───────────────────────────────────────────────────
+function sortGridBy(column) {
+  if (gridSortColumn === column) {
+    gridSortDirection = gridSortDirection === 'asc' ? 'desc' : 'asc';
+  } else {
+    gridSortColumn = column;
+    gridSortDirection = 'asc';
+  }
+
+  // Update icons
+  const columns = ['name', 'cellNumber', 'agent', 'orderDate', 'easyPayExpiry', 'status', 'payStatus'];
+  columns.forEach(col => {
+    const icon = document.getElementById(`sort-icon-${col}`);
+    if (icon) {
+      if (col === gridSortColumn) {
+        icon.textContent = gridSortDirection === 'asc' ? '▲' : '▼';
+        icon.className = 'text-[10px] text-fiber-400 font-bold';
+      } else {
+        icon.textContent = '↕';
+        icon.className = 'text-[10px] text-gray-600';
+      }
+    }
+  });
+
+  sortFilteredData();
+  renderMasterGridPage();
+}
+
+function sortFilteredData() {
+  filteredMasterGridData.sort((a, b) => {
+    let valA = a[gridSortColumn] || '';
+    let valB = b[gridSortColumn] || '';
+
+    if (typeof valA === 'string') valA = valA.toLowerCase();
+    if (typeof valB === 'string') valB = valB.toLowerCase();
+
+    if (valA < valB) return gridSortDirection === 'asc' ? -1 : 1;
+    if (valA > valB) return gridSortDirection === 'asc' ? 1 : -1;
+    return 0;
+  });
+}
+
+// ── Pagination & Rendering ────────────────────────────────────
+function changeGridPageSize(val) {
+  gridPageSize = val === 'all' ? Infinity : parseInt(val, 10);
+  gridCurrentPage = 1;
+  renderMasterGridPage();
+}
+
+function renderMasterGridPage() {
+  const tbody = document.getElementById('grid-body');
+  if (!tbody) return;
+
+  if (filteredMasterGridData.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="10" class="px-6 py-12 text-center text-gray-400">
+          <p class="text-base font-semibold text-gray-300">No matching client records found</p>
+          <p class="text-xs text-gray-500 mt-1">Try adjusting your search terms or clearing active filters.</p>
+          <button onclick="resetGridFilters()" class="mt-3 px-3 py-1.5 bg-fiber-500/20 text-fiber-300 border border-fiber-500/30 rounded-lg text-xs font-semibold hover:bg-fiber-500/30 transition-colors">
+            Reset Filters
+          </button>
+        </td>
+      </tr>`;
+    renderGridPaginationControls(0, 0);
+    return;
+  }
+
+  const today = getTodayStr();
+  const startIdx = gridPageSize === Infinity ? 0 : (gridCurrentPage - 1) * gridPageSize;
+  const endIdx = gridPageSize === Infinity ? filteredMasterGridData.length : Math.min(startIdx + gridPageSize, filteredMasterGridData.length);
+  const pageItems = filteredMasterGridData.slice(startIdx, endIdx);
+
+  tbody.innerHTML = pageItems.map(r => {
+    const isEpExpired = (r.easyPayExpiry && r.easyPayExpiry < today);
+    const dupInfo = detectedDuplicateClusters.clientDupMap.get(String(r.id));
+    const isSelected = gridSelectedIds.has(String(r.id));
+
+    let dupBadgeHtml = '';
+    if (dupInfo) {
+      if (dupInfo.isPrimary) {
+        dupBadgeHtml = `<span class="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30" title="Primary record in duplicate cluster">★ Primary</span>`;
+      } else {
+        dupBadgeHtml = `<span class="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30" title="Duplicate detected (${dupInfo.type}: ${dupInfo.count} entries)">⚠️ Dup (${dupInfo.type})</span>`;
+      }
+    }
+
+    return `
+      <tr class="border-b border-white/5 hover:bg-white/[0.04] transition-colors text-xs ${isSelected ? 'bg-fiber-500/10' : ''}">
+        <td class="px-4 py-3" onclick="event.stopPropagation()">
+          <input type="checkbox" onchange="toggleSelectGridRow('${escJs(r.id)}', this.checked)" ${isSelected ? 'checked' : ''} class="rounded bg-white/10 border-white/20 text-fiber-500 focus:ring-0 cursor-pointer">
+        </td>
+        <td class="px-4 py-3 cursor-pointer group" onclick="openCustomerDetail('${escJs(r.id)}')" title="Click to view full customer details from Team Lead perspective">
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <p class="font-bold text-white group-hover:text-fiber-300 group-hover:underline transition-colors">
+              ${escHtml(r.name || 'Unnamed Customer')}
+            </p>
+            ${dupBadgeHtml}
+          </div>
           <p class="text-[11px] text-gray-500 font-mono group-hover:text-gray-400">${escHtml(r.id)}</p>
         </td>
         <td class="px-4 py-3 font-mono text-gray-300">${escHtml(r.cellNumber || '—')}</td>
@@ -451,12 +968,434 @@ async function loadMasterGrid() {
           ` : `<span class="text-gray-600">—</span>`}
         </td>
         <td class="px-4 py-3">${statusBadge(r.status)}</td>
-        <td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-white/5 text-gray-300">${escHtml(r.payStatus)}</span></td>
+        <td class="px-4 py-3">
+          <span class="px-2 py-0.5 rounded text-[10px] font-semibold ${r.payStatus === 'Paid' ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' : 'bg-white/5 text-gray-300'}">
+            ${escHtml(r.payStatus || 'Pending')}
+          </span>
+        </td>
+        <td class="px-4 py-3 text-right" onclick="event.stopPropagation()">
+          <div class="flex items-center justify-end gap-1.5">
+            <button onclick="openCustomerDetail('${escJs(r.id)}')" class="p-1.5 rounded-lg bg-white/5 hover:bg-white/15 text-gray-300 hover:text-white transition-colors" title="View customer profile">
+              👁️
+            </button>
+            <button onclick="openDeleteCustomerModal('${escJs(r.id)}')" class="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-300 hover:text-red-200 border border-red-500/20 transition-colors" title="Delete / Mark Duplicate">
+              🗑️
+            </button>
+          </div>
+        </td>
       </tr>
-      `;
-    }).join('');
+    `;
+  }).join('');
+
+  renderGridPaginationControls(filteredMasterGridData.length, startIdx);
+}
+
+function renderGridPaginationControls(total, startIdx) {
+  const container = document.getElementById('grid-pagination');
+  if (!container) return;
+
+  if (total === 0 || gridPageSize === Infinity) {
+    container.innerHTML = '';
+    return;
+  }
+
+  const totalPages = Math.ceil(total / gridPageSize);
+  let html = `
+    <button onclick="goToGridPage(1)" ${gridCurrentPage === 1 ? 'disabled' : ''} class="px-2.5 py-1 rounded-lg text-xs bg-white/5 text-gray-300 hover:bg-white/10 disabled:opacity-30 disabled:pointer-events-none transition-colors">&laquo;</button>
+    <button onclick="goToGridPage(${gridCurrentPage - 1})" ${gridCurrentPage === 1 ? 'disabled' : ''} class="px-2.5 py-1 rounded-lg text-xs bg-white/5 text-gray-300 hover:bg-white/10 disabled:opacity-30 disabled:pointer-events-none transition-colors">&lsaquo;</button>
+  `;
+
+  // Page Numbers
+  const maxButtons = 5;
+  let startPage = Math.max(1, gridCurrentPage - Math.floor(maxButtons / 2));
+  let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+  if (endPage - startPage < maxButtons - 1) {
+    startPage = Math.max(1, endPage - maxButtons + 1);
+  }
+
+  for (let p = startPage; p <= endPage; p++) {
+    html += `
+      <button onclick="goToGridPage(${p})" class="px-2.5 py-1 rounded-lg text-xs font-semibold ${p === gridCurrentPage ? 'bg-fiber-500 text-white' : 'bg-white/5 text-gray-300 hover:bg-white/10'} transition-colors">
+        ${p}
+      </button>
+    `;
+  }
+
+  html += `
+    <button onclick="goToGridPage(${gridCurrentPage + 1})" ${gridCurrentPage === totalPages ? 'disabled' : ''} class="px-2.5 py-1 rounded-lg text-xs bg-white/5 text-gray-300 hover:bg-white/10 disabled:opacity-30 disabled:pointer-events-none transition-colors">&rsaquo;</button>
+    <button onclick="goToGridPage(${totalPages})" ${gridCurrentPage === totalPages ? 'disabled' : ''} class="px-2.5 py-1 rounded-lg text-xs bg-white/5 text-gray-300 hover:bg-white/10 disabled:opacity-30 disabled:pointer-events-none transition-colors">&raquo;</button>
+    <span class="text-xs text-gray-500 ml-2">Page ${gridCurrentPage} of ${totalPages}</span>
+  `;
+
+  container.innerHTML = html;
+}
+
+function goToGridPage(page) {
+  const totalPages = Math.ceil(filteredMasterGridData.length / gridPageSize);
+  if (page < 1 || page > totalPages) return;
+  gridCurrentPage = page;
+  renderMasterGridPage();
+}
+
+// ── Batch Selection ───────────────────────────────────────────
+function toggleSelectAllGrid(checked) {
+  if (checked) {
+    filteredMasterGridData.forEach(r => gridSelectedIds.add(String(r.id)));
+  } else {
+    gridSelectedIds.clear();
+  }
+  updateGridBatchBar();
+  renderMasterGridPage();
+}
+
+function toggleSelectGridRow(id, checked) {
+  if (checked) gridSelectedIds.add(String(id));
+  else gridSelectedIds.delete(String(id));
+  updateGridBatchBar();
+}
+
+function deselectAllGridRows() {
+  gridSelectedIds.clear();
+  const selectAllEl = document.getElementById('grid-select-all');
+  if (selectAllEl) selectAllEl.checked = false;
+  updateGridBatchBar();
+  renderMasterGridPage();
+}
+
+function updateGridBatchBar() {
+  const bar = document.getElementById('grid-batch-bar');
+  const countEl = document.getElementById('grid-selected-count');
+  if (!bar || !countEl) return;
+
+  const count = gridSelectedIds.size;
+  countEl.textContent = count;
+  bar.classList.toggle('hidden', count === 0);
+
+  const selectAllEl = document.getElementById('grid-select-all');
+  if (selectAllEl) {
+    selectAllEl.checked = (filteredMasterGridData.length > 0 && count === filteredMasterGridData.length);
+  }
+}
+
+async function batchDeleteSelectedDuplicates(hardDelete = false) {
+  const ids = Array.from(gridSelectedIds);
+  if (ids.length === 0) {
+    showToast('No clients selected for deletion.', 'warning');
+    return;
+  }
+
+  const modeName = hardDelete ? 'PERMANENTLY DELETE' : 'mark as DUPLICATE';
+  if (!confirm(`Are you sure you want to ${modeName} ${ids.length} selected client record(s)?`)) {
+    return;
+  }
+
+  try {
+    const res = await callBackend('deleteDuplicateCustomers', {
+      customerIds: ids,
+      hardDelete: hardDelete,
+      reason: `Bulk ${hardDelete ? 'hard purge' : 'soft delete'} by Team Lead`
+    });
+
+    showToast(`Successfully processed ${ids.length} client record(s).`, 'success');
+    deselectAllGridRows();
+    await loadMasterGrid();
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="8" class="px-6 py-8 text-center text-red-400 text-xs">Failed to load grid: ${escHtml(err.message)}</td></tr>`;
+    showToast(`Failed bulk delete: ${err.message}`, 'error');
+  }
+}
+
+// ── CSV Export ────────────────────────────────────────────────
+function exportMasterGridCsv() {
+  if (filteredMasterGridData.length === 0) {
+    showToast('No records to export.', 'warning');
+    return;
+  }
+
+  const headers = ['Customer ID', 'Record Status', 'Name', 'Primary Phone', 'Alternate Phone', 'Email', 'Address', 'Suburb', 'Agent', 'Status', 'Order Number', 'Order Date', 'EasyPay Number', 'EasyPay Expiry', 'Payment Status', 'Promised Payment Date', 'Referral Code'];
+  const rows = filteredMasterGridData.map(r => [
+    r.id || '',
+    r.recordStatus || '',
+    `"${(r.name || '').replace(/"/g, '""')}"`,
+    r.cellNumber || '',
+    r.alternateCell || '',
+    r.email || '',
+    `"${(r.address || '').replace(/"/g, '""')}"`,
+    `"${(r.suburb || '').replace(/"/g, '""')}"`,
+    `"${(r.agent || '').replace(/"/g, '""')}"`,
+    r.status || '',
+    r.orderNumber || '',
+    r.orderDate || '',
+    r.easyPayNumber || '',
+    r.easyPayExpiry || '',
+    r.payStatus || '',
+    r.promisedPaymentDate || '',
+    r.referralCode || ''
+  ]);
+
+  const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement('a');
+  link.setAttribute('href', encodedUri);
+  link.setAttribute('download', `fibregems_clients_${getTodayStr()}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  showToast('Exported CSV successfully.');
+}
+
+// ── Delete Customer Modal Logic ───────────────────────────────
+function openDeleteCustomerModal(customerId) {
+  const c = masterGridRecordsMap.get(String(customerId));
+  if (!c) {
+    showToast('Client record not found.', 'error');
+    return;
+  }
+
+  document.getElementById('del-cust-id').value = customerId;
+  document.getElementById('del-cust-name').textContent = c.name || 'Unnamed Client';
+  document.getElementById('del-cust-id-preview').textContent = customerId;
+  document.getElementById('del-cust-phone').textContent = c.cellNumber || 'No Phone';
+  document.getElementById('del-cust-agent').textContent = c.agent || 'Unassigned';
+  document.getElementById('del-cust-status').textContent = `${c.status || 'Active'} (${c.payStatus || 'Pending'})`;
+  document.getElementById('del-cust-reason').value = '';
+
+  const modal = document.getElementById('modal-delete-customer');
+  if (modal) modal.classList.remove('hidden');
+}
+
+function closeDeleteCustomerModal() {
+  const modal = document.getElementById('modal-delete-customer');
+  if (modal) modal.classList.add('hidden');
+}
+
+async function submitDeleteCustomer() {
+  const customerId = document.getElementById('del-cust-id').value;
+  const hardDeleteRadio = document.querySelector('input[name="del-mode"]:checked');
+  const isHardDelete = hardDeleteRadio ? hardDeleteRadio.value === 'hard' : false;
+  const reason = document.getElementById('del-cust-reason').value.trim();
+
+  if (!customerId) return;
+
+  const btn = document.getElementById('del-confirm-btn');
+  btn.disabled = true;
+  btn.innerHTML = `<div class="spinner-sm mx-auto"></div>`;
+
+  try {
+    try {
+      await callBackend('deleteCustomer', {
+        customerId,
+        hardDelete: isHardDelete,
+        reason: reason || (isHardDelete ? 'Permanent purge by Team Lead' : 'Marked as Duplicate by Team Lead')
+      });
+    } catch (apiErr) {
+      // Graceful fallback to markCustomerDuplicate if deleteCustomer is not deployed
+      if (!isHardDelete) {
+        await callBackend('markCustomerDuplicate', { customerId, reason });
+      } else {
+        throw apiErr;
+      }
+    }
+
+    showToast(`Customer ${customerId} successfully ${isHardDelete ? 'purged' : 'marked as duplicate'}.`, 'success');
+    closeDeleteCustomerModal();
+    closeCustomerDetailModal();
+    await loadMasterGrid();
+    if (document.getElementById('modal-duplicate-manager') && !document.getElementById('modal-duplicate-manager').classList.contains('hidden')) {
+      renderDuplicateManagerBody();
+    }
+  } catch (err) {
+    showToast(`Failed to delete record: ${err.message}`, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Confirm Deletion';
+  }
+}
+
+// ── Duplicate Clients Manager Modal ───────────────────────────
+function openDuplicateManagerModal() {
+  duplicateManagerSelectedIds.clear();
+  const modal = document.getElementById('modal-duplicate-manager');
+  if (!modal) return;
+  modal.classList.remove('hidden');
+  renderDuplicateManagerBody();
+}
+
+function closeDuplicateManagerModal() {
+  const modal = document.getElementById('modal-duplicate-manager');
+  if (modal) modal.classList.add('hidden');
+}
+
+function switchDuplicateGrouping(criteria) {
+  currentDuplicateGrouping = criteria;
+  const buttons = ['phone', 'email', 'order'];
+  buttons.forEach(b => {
+    const btn = document.getElementById(`btn-group-${b}`);
+    if (btn) {
+      if (b === criteria) {
+        btn.className = 'px-3 py-1.5 rounded-lg font-semibold bg-fiber-500 text-white transition-colors';
+      } else {
+        btn.className = 'px-3 py-1.5 rounded-lg font-semibold bg-white/5 text-gray-400 hover:text-white transition-colors';
+      }
+    }
+  });
+  renderDuplicateManagerBody();
+}
+
+function selectAllSecondaryDuplicates() {
+  const groupMap = currentDuplicateGrouping === 'phone'
+    ? detectedDuplicateClusters.byPhone
+    : (currentDuplicateGrouping === 'email' ? detectedDuplicateClusters.byEmail : detectedDuplicateClusters.byOrder);
+
+  groupMap.forEach((list) => {
+    // Select all items except index 0 (primary)
+    for (let i = 1; i < list.length; i++) {
+      duplicateManagerSelectedIds.add(String(list[i].id));
+    }
+  });
+
+  updateDuplicateModalSelectedCount();
+  renderDuplicateManagerBody();
+}
+
+function toggleDupManagerSelect(id, checked) {
+  if (checked) duplicateManagerSelectedIds.add(String(id));
+  else duplicateManagerSelectedIds.delete(String(id));
+  updateDuplicateModalSelectedCount();
+}
+
+function updateDuplicateModalSelectedCount() {
+  const countEl = document.getElementById('dup-modal-selected-count');
+  if (countEl) countEl.textContent = duplicateManagerSelectedIds.size;
+}
+
+function renderDuplicateManagerBody() {
+  const container = document.getElementById('dup-modal-body');
+  if (!container) return;
+
+  const groupMap = currentDuplicateGrouping === 'phone'
+    ? detectedDuplicateClusters.byPhone
+    : (currentDuplicateGrouping === 'email' ? detectedDuplicateClusters.byEmail : detectedDuplicateClusters.byOrder);
+
+  if (groupMap.size === 0) {
+    container.innerHTML = `
+      <div class="py-16 text-center text-gray-400">
+        <div class="w-12 h-12 rounded-full bg-emerald-500/10 text-emerald-400 flex items-center justify-center mx-auto mb-3 text-xl font-bold">✓</div>
+        <h4 class="text-base font-bold text-white">No Duplicates Found</h4>
+        <p class="text-xs text-gray-500 mt-1">No duplicate records detected matching by ${currentDuplicateGrouping === 'phone' ? 'Phone Number' : (currentDuplicateGrouping === 'email' ? 'Email Address' : 'Order Number')}.</p>
+      </div>
+    `;
+    updateDuplicateModalSelectedCount();
+    return;
+  }
+
+  let html = '';
+  groupMap.forEach((list, matchKey) => {
+    html += `
+      <div class="bg-white/[0.02] border border-white/10 rounded-2xl p-4 space-y-3">
+        <div class="flex items-center justify-between pb-2 border-b border-white/5 flex-wrap gap-2">
+          <div class="flex items-center gap-2">
+            <span class="text-base">${currentDuplicateGrouping === 'phone' ? '📱' : (currentDuplicateGrouping === 'email' ? '✉️' : '📦')}</span>
+            <strong class="text-xs text-amber-300 font-mono">${escHtml(matchKey)}</strong>
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-400">${list.length} Records</span>
+          </div>
+          <button onclick="selectClusterDuplicates('${escJs(matchKey)}')" class="text-xs text-fiber-400 hover:text-fiber-300 underline font-medium">
+            Select duplicates in this cluster
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-${Math.min(list.length, 3)} gap-3">
+    `;
+
+    list.forEach((rec, idx) => {
+      const isPrimary = (idx === 0);
+      const isChecked = duplicateManagerSelectedIds.has(String(rec.id));
+
+      html += `
+        <div class="p-3.5 rounded-xl border ${isPrimary ? 'border-emerald-500/30 bg-emerald-500/[0.03]' : (isChecked ? 'border-red-500/40 bg-red-500/[0.04]' : 'border-white/5 bg-white/[0.02]')} text-xs space-y-2 relative">
+          <div class="flex items-start justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <input type="checkbox" onchange="toggleDupManagerSelect('${escJs(rec.id)}', this.checked)" ${isChecked ? 'checked' : ''} class="rounded bg-white/10 border-white/20 text-fiber-500 focus:ring-0 cursor-pointer">
+              <div>
+                <p class="font-bold text-white">${escHtml(rec.name || 'Unnamed Client')}</p>
+                <p class="text-[10px] font-mono text-gray-400">${escHtml(rec.id)}</p>
+              </div>
+            </div>
+            ${isPrimary ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">★ Keep (Primary)</span>' : '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300">Duplicate</span>'}
+          </div>
+
+          <div class="space-y-1 text-[11px] pt-1 text-gray-300 border-t border-white/5">
+            <div class="flex justify-between"><span class="text-gray-500">Agent:</span> <span class="font-semibold text-fiber-300">${escHtml(rec.agent || '—')}</span></div>
+            <div class="flex justify-between"><span class="text-gray-500">Status:</span> <span>${statusBadge(rec.status)}</span></div>
+            <div class="flex justify-between"><span class="text-gray-500">Payment:</span> <span class="font-semibold text-white">${escHtml(rec.payStatus || 'Pending')}</span></div>
+            <div class="flex justify-between"><span class="text-gray-500">Order #:</span> <span class="font-mono text-fiber-400">${escHtml(rec.orderNumber || '—')}</span></div>
+            <div class="flex justify-between"><span class="text-gray-500">Created:</span> <span class="font-mono text-gray-400">${escHtml(rec.createdDate || '—')}</span></div>
+          </div>
+
+          <div class="pt-2 flex items-center justify-between border-t border-white/5">
+            <button onclick="openCustomerDetail('${escJs(rec.id)}')" class="text-[11px] text-gray-400 hover:text-white underline">Inspect Details</button>
+            <button onclick="openDeleteCustomerModal('${escJs(rec.id)}')" class="px-2 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-300 rounded text-[10px] font-bold transition-colors">
+              Delete
+            </button>
+          </div>
+        </div>
+      `;
+    });
+
+    html += `
+        </div>
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
+  updateDuplicateModalSelectedCount();
+}
+
+function selectClusterDuplicates(matchKey) {
+  const groupMap = currentDuplicateGrouping === 'phone'
+    ? detectedDuplicateClusters.byPhone
+    : (currentDuplicateGrouping === 'email' ? detectedDuplicateClusters.byEmail : detectedDuplicateClusters.byOrder);
+
+  const list = groupMap.get(matchKey);
+  if (list) {
+    for (let i = 1; i < list.length; i++) {
+      duplicateManagerSelectedIds.add(String(list[i].id));
+    }
+    updateDuplicateModalSelectedCount();
+    renderDuplicateManagerBody();
+  }
+}
+
+async function submitBulkDuplicateAction(hardDelete = false) {
+  const ids = Array.from(duplicateManagerSelectedIds);
+  if (ids.length === 0) {
+    showToast('Please select duplicate records to clean up.', 'warning');
+    return;
+  }
+
+  const modeName = hardDelete ? 'PERMANENTLY PURGE' : 'mark as DUPLICATE';
+  if (!confirm(`Are you sure you want to ${modeName} ${ids.length} selected duplicate record(s)?`)) {
+    return;
+  }
+
+  const btn = document.getElementById(hardDelete ? 'dup-bulk-hard-btn' : 'dup-bulk-soft-btn');
+  if (btn) btn.disabled = true;
+
+  try {
+    await callBackend('deleteDuplicateCustomers', {
+      customerIds: ids,
+      hardDelete: hardDelete,
+      reason: `Duplicate Manager cleanup by Team Lead (${currentDuplicateGrouping})`
+    });
+
+    showToast(`Successfully processed ${ids.length} duplicate record(s).`, 'success');
+    duplicateManagerSelectedIds.clear();
+    await loadMasterGrid();
+    renderDuplicateManagerBody();
+  } catch (err) {
+    showToast(`Duplicate cleanup failed: ${err.message}`, 'error');
+  } finally {
+    if (btn) btn.disabled = false;
   }
 }
 
