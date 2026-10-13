@@ -828,6 +828,19 @@ function handleLeadStatusChange(status) {
   }
 }
 
+function handleOrderNumberValidation(input) {
+  if (!input) return;
+  
+  // Allow only uppercase letters and numbers
+  let value = input.value.toUpperCase();
+
+  
+
+
+  value = value.replace(/[^A-Z0-9]/g, '');
+  input.value = value;
+}
+
 async function submitLead(overrideId = null) {
   const submitBtn = document.getElementById('lead-submit-btn');
   const today = getTodayStr();
@@ -870,7 +883,35 @@ async function submitLead(overrideId = null) {
     nextActionTime: document.getElementById('nf-next-action-time') ? document.getElementById('nf-next-action-time').value : ''
   };
 
+  
+  const orderPattern = /^[A-Z]{3}-\d{6}-\d{8}$/;
+  
+  const orderNumberEl = document.getElementById('nf-order-number');
+  const orderNumberVal = orderNumberEl ? orderNumberEl.value.trim() : '';
+  
+  if (orderNumberVal && !orderPattern.test(orderNumberVal)) {
+    showToast("❌ Invalid order number format. It must be like OVR-041026-04058014.", "error");
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = "Capture Lead";
+    return;
+  }
+
+
+  const easypayPattern = /^\d{18}$/;
+
+  const easyPayNumberEl = document.getElementById('nf-easypay-number');
+  const easyPayNumberVal = easyPayNumberEl ? easyPayNumberEl.value.trim() : '';
+
+  if (easyPayNumberVal && !easypayPattern.test(easyPayNumberVal)) {
+    showToast("❌ Invalid EasyPay number format. It must be 18 digits.", "error");
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = "Capture Lead";
+    return;
+  }
+
+
   submitBtn.disabled = true;
+  
   submitBtn.innerHTML = `<div class="spinner-sm mx-auto"></div>`;
 
   try {
