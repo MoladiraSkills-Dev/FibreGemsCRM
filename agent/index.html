@@ -47,14 +47,17 @@
       width: 6px;
       height: 6px;
     }
+
     ::-webkit-scrollbar-track {
       background: rgba(255, 255, 255, 0.02);
       border-radius: 8px;
     }
+
     ::-webkit-scrollbar-thumb {
       background: #E07C2A;
       border-radius: 8px;
     }
+
     ::-webkit-scrollbar-thumb:hover {
       background: #CE5926;
     }
@@ -62,14 +65,17 @@
     .custom-scrollbar::-webkit-scrollbar {
       width: 4px;
     }
+
     .custom-scrollbar::-webkit-scrollbar-track {
       background: rgba(255, 255, 255, 0.02);
       border-radius: 8px;
     }
+
     .custom-scrollbar::-webkit-scrollbar-thumb {
       background: rgba(224, 124, 42, 0.4);
       border-radius: 10px;
     }
+
     .custom-scrollbar::-webkit-scrollbar-thumb:hover {
       background: rgba(224, 124, 42, 0.7);
     }
@@ -171,18 +177,33 @@
     /* Lead Detail Slide-Over */
     .lead-detail-panel {
       background: linear-gradient(160deg, #15192a 0%, #0f1117 100%);
-      border-left: 1px solid rgba(255,255,255,0.08);
-      box-shadow: -24px 0 80px rgba(0,0,0,0.65);
+      border-left: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: -24px 0 80px rgba(0, 0, 0, 0.65);
     }
-    @keyframes slide-in-right-agent { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-    .animate-slide-in-right { animation: slide-in-right-agent 0.32s cubic-bezier(.22,.68,0,1.2); }
+
+    @keyframes slide-in-right-agent {
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    .animate-slide-in-right {
+      animation: slide-in-right-agent 0.32s cubic-bezier(.22, .68, 0, 1.2);
+    }
 
     .ld-field {
-      background: rgba(255,255,255,0.03);
-      border: 1px solid rgba(255,255,255,0.06);
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
       border-radius: 10px;
       padding: 10px 12px;
     }
+
     .ld-field-label {
       font-size: 0.63rem;
       letter-spacing: 0.08em;
@@ -191,13 +212,20 @@
       font-weight: 600;
       margin-bottom: 3px;
     }
+
     .ld-field-value {
       font-size: 0.82rem;
       color: #e5e7eb;
       font-weight: 500;
       word-break: break-word;
     }
-    .ld-field-value.mono { font-family: monospace; font-size: 0.78rem; color: #F1A328; }
+
+    .ld-field-value.mono {
+      font-family: monospace;
+      font-size: 0.78rem;
+      color: #F1A328;
+    }
+
     .ld-section-title {
       font-size: 0.68rem;
       font-weight: 700;
@@ -209,11 +237,12 @@
       align-items: center;
       gap: 8px;
     }
+
     .ld-section-title::after {
       content: '';
       flex: 1;
       height: 1px;
-      background: rgba(255,255,255,0.05);
+      background: rgba(255, 255, 255, 0.05);
     }
   </style>
 </head>
@@ -224,7 +253,8 @@
   <div id="toast-container" class="fixed top-4 right-4 z-[9999] flex flex-col gap-3"></div>
 
   <!-- Global Loading Overlay -->
-  <div id="global-loader" class="hidden fixed inset-0 z-[80] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+  <div id="global-loader"
+    class="hidden fixed inset-0 z-[80] flex items-center justify-center bg-black/60 backdrop-blur-sm">
     <div class="flex flex-col items-center gap-3">
       <div class="w-10 h-10 rounded-full border-4 border-fiber-500/30 border-t-fiber-500 animate-spin"></div>
       <p class="text-xs text-gray-300 font-semibold tracking-wide">Processing...</p>
@@ -435,9 +465,13 @@
         <div class="flex flex-wrap items-center gap-2" id="callback-filter-buttons">
           <div class="relative mr-2">
             <span class="absolute inset-y-0 left-0 flex items-center pl-3">
-              <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+              <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
             </span>
-            <input type="text" id="callback-search" onkeyup="renderCallbackCards()" placeholder="Search clients..." class="w-full sm:w-64 bg-navy-800/50 border border-white/10 rounded-xl pl-9 pr-3 py-1.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-fiber-500 transition-colors">
+            <input type="text" id="callback-search" onkeyup="renderCallbackCards()" placeholder="Search clients..."
+              class="w-full sm:w-64 bg-navy-800/50 border border-white/10 rounded-xl pl-9 pr-3 py-1.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-fiber-500 transition-colors">
           </div>
           <button onclick="setCallbackFilter('all')" data-cb-filter="all"
             class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-fiber-500 text-white transition-all">All (<span
@@ -471,9 +505,13 @@
         </div>
         <div class="relative w-full sm:w-64">
           <span class="absolute inset-y-0 left-0 flex items-center pl-3">
-            <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+            <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
           </span>
-          <input type="text" id="worklist-search" onkeyup="handleWorklistSearch()" placeholder="Search worklist..." class="w-full bg-navy-800/50 border border-white/10 rounded-xl pl-9 pr-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-fiber-500 transition-colors">
+          <input type="text" id="worklist-search" onkeyup="handleWorklistSearch()" placeholder="Search worklist..."
+            class="w-full bg-navy-800/50 border border-white/10 rounded-xl pl-9 pr-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-fiber-500 transition-colors">
         </div>
       </div>
 
@@ -604,19 +642,19 @@
 
             <div>
               <label for="nf-order-number" class="field-label">Order Number
-                <span class="text-gray-500 font-normal normal-case ml-1">(e.g., OVR-051026-04058014)</span>
+                <span class="text-gray-500 font-normal normal-case ml-1">(e.g., OVR-DDMMYY-XXXXXXXX)</span>
                 :
               </label>
-              <input type="text" id="nf-order-number" placeholder="e.g. OVR-12345 or OVK-9988" class="input-field font-mono uppercase"
-                oninput="this.value = this.value.toUpperCase()">
+              <input type="text" id="nf-order-number" placeholder="e.g. OVR-DDMMYY-XXXXXXXX or OVK-DDMMYY-XXXXXXXX"
+                class="input-field font-mono uppercase" oninput="this.value = this.value.toUpperCase()">
               <p class="text-[11px] text-gray-500 mt-1">Order numbers are entered manually.</p>
             </div>
             <div>
               <label for="nf-easypay-number" class="field-label">EasyPay Number
                 <span class="text-gray-500 font-normal normal-case ml-1">(optional — if already issued)</span>
               </label>
-              <input type="text" id="nf-easypay-number" placeholder="e.g. 123456789101112131" class="input-field font-mono uppercase"
-                oninput="this.value = this.value.toUpperCase()">
+              <input type="text" id="nf-easypay-number" placeholder="e.g. 123456789101112131"
+                class="input-field font-mono uppercase" oninput="this.value = this.value.toUpperCase()">
               <p class="text-[11px] text-gray-500 mt-1">Max 3 cycles (14 days each).</p>
             </div>
 
@@ -626,8 +664,10 @@
             </div>
             <div class="sm:col-span-2">
               <label for="nf-referred-by" class="field-label">Referred By (Customer Referral Code - Optional)</label>
-              <input type="text" id="nf-referred-by" placeholder="e.g. REF-A98B2C" class="input-field uppercase font-mono">
-              <span class="text-[11px] text-gray-500 mt-1 block">A unique referral code will be automatically generated for this customer upon capture.</span>
+              <input type="text" id="nf-referred-by" placeholder="e.g. REF-A98B2C"
+                class="input-field uppercase font-mono">
+              <span class="text-[11px] text-gray-500 mt-1 block">A unique referral code will be automatically generated
+                for this customer upon capture.</span>
             </div>
           </div>
         </fieldset>
@@ -688,14 +728,17 @@
               </select>
             </div>
             <div>
-              <label for="nf-next-action-date" class="field-label">Next Action Date (Max +8 Days / +7 Days Activation)</label>
+              <label for="nf-next-action-date" class="field-label">Next Action Date (Max +8 Days / +7 Days
+                Activation)</label>
               <input type="date" id="nf-next-action-date" class="input-field">
-              <span class="text-[11px] text-gray-500 mt-1 block">Scheduled leads only show on their exact target date.</span>
+              <span class="text-[11px] text-gray-500 mt-1 block">Scheduled leads only show on their exact target
+                date.</span>
             </div>
             <div>
               <label for="nf-next-action-time" class="field-label">Next Action Time (For Same-Day Callbacks)</label>
               <input type="time" id="nf-next-action-time" class="input-field">
-              <span class="text-[11px] text-gray-500 mt-1 block">Only displays on dashboard 5 minutes before this time.</span>
+              <span class="text-[11px] text-gray-500 mt-1 block">Only displays on dashboard 5 minutes before this
+                time.</span>
             </div>
           </div>
         </fieldset>
@@ -722,8 +765,14 @@
           <p class="text-sm text-gray-400 mt-0.5">Chronological audit of calls and actions you have logged</p>
         </div>
         <div class="relative w-full sm:w-64">
-          <input type="text" id="activity-search" onkeyup="filterTable('activity-tbody', this.value)" placeholder="Search activity..." class="w-full bg-black/40 border border-white/10 rounded-lg pl-9 pr-3 py-2 text-sm text-white focus:outline-none focus:border-fiber-500 transition-colors">
-          <svg class="w-4 h-4 text-gray-500 absolute left-3 top-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          <input type="text" id="activity-search" onkeyup="filterTable('activity-tbody', this.value)"
+            placeholder="Search activity..."
+            class="w-full bg-black/40 border border-white/10 rounded-lg pl-9 pr-3 py-2 text-sm text-white focus:outline-none focus:border-fiber-500 transition-colors">
+          <svg class="w-4 h-4 text-gray-500 absolute left-3 top-2.5" fill="none" viewBox="0 0 24 24"
+            stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
         </div>
       </div>
 
@@ -757,7 +806,8 @@
   <!-- ═══════════════════════════════════════════════════════════ -->
   <div id="modal-call-outcome" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
     <div class="modal-overlay absolute inset-0" onclick="closeCallOutcomeModal()"></div>
-    <div class="relative bg-navy-800 border border-white/15 rounded-2xl shadow-2xl w-full max-w-lg p-6 z-10 animate-slide-in max-h-[90vh] overflow-y-auto custom-scrollbar">
+    <div
+      class="relative bg-navy-800 border border-white/15 rounded-2xl shadow-2xl w-full max-w-lg p-6 z-10 animate-slide-in max-h-[90vh] overflow-y-auto custom-scrollbar">
 
       <!-- Header -->
       <div class="flex items-start justify-between pb-4 border-b border-white/10">
@@ -766,10 +816,12 @@
           <h3 class="text-lg font-bold text-white mt-0.5" id="co-client-name">Client Name</h3>
           <div class="flex items-center gap-3 mt-1 flex-wrap">
             <p class="text-sm font-mono text-emerald-400" id="co-client-phone">000 000 0000</p>
-            <button id="co-copy-btn" onclick="copyPhone(document.getElementById('co-client-phone').textContent)" class="px-2.5 py-0.5 rounded-lg bg-white/5 text-gray-300 border border-white/10 hover:bg-white/10 text-xs font-semibold inline-flex items-center gap-1 transition-colors">
+            <button id="co-copy-btn" onclick="copyPhone(document.getElementById('co-client-phone').textContent)"
+              class="px-2.5 py-0.5 rounded-lg bg-white/5 text-gray-300 border border-white/10 hover:bg-white/10 text-xs font-semibold inline-flex items-center gap-1 transition-colors">
               📋 Copy No.
             </button>
-            <a id="co-wa-btn" href="#" target="_blank" class="px-2.5 py-0.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 text-xs font-semibold inline-flex items-center gap-1 transition-colors">
+            <a id="co-wa-btn" href="#" target="_blank"
+              class="px-2.5 py-0.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 text-xs font-semibold inline-flex items-center gap-1 transition-colors">
               💬 WhatsApp
             </a>
           </div>
@@ -828,7 +880,8 @@
             <p class="text-[11px] text-gray-400 mt-1">Auto schedules 1-week check (+7d)</p>
           </button>
 
-          <button type="button" onclick="selectOutcomePreset('Activation Follow-Up Completed')" data-outcome-btn="Activation Follow-Up Completed"
+          <button type="button" onclick="selectOutcomePreset('Activation Follow-Up Completed')"
+            data-outcome-btn="Activation Follow-Up Completed"
             class="outcome-preset-btn p-3 rounded-xl border border-teal-500/40 bg-teal-500/10 hover:bg-teal-500/20 text-left transition-all">
             <div class="flex items-center gap-2">
               <span class="text-base">🤝</span>
@@ -867,7 +920,8 @@
             <p class="text-[11px] text-gray-400 mt-1">Client promises payment on a new date</p>
           </button>
 
-          <button type="button" onclick="selectOutcomePreset('No Payment - Reschedule')" data-outcome-btn="No Payment - Reschedule"
+          <button type="button" onclick="selectOutcomePreset('No Payment - Reschedule')"
+            data-outcome-btn="No Payment - Reschedule"
             class="outcome-preset-btn p-3 rounded-xl border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-left transition-all">
             <div class="flex items-center gap-2">
               <span class="text-base">📵</span>
@@ -876,7 +930,8 @@
             <p class="text-[11px] text-gray-400 mt-1">No answer / not ready — reschedule call back</p>
           </button>
 
-          <button type="button" onclick="selectOutcomePreset('No Answer / Voicemail')" data-outcome-btn="No Answer / Voicemail"
+          <button type="button" onclick="selectOutcomePreset('No Answer / Voicemail')"
+            data-outcome-btn="No Answer / Voicemail"
             class="outcome-preset-btn p-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-left transition-all">
             <div class="flex items-center gap-2">
               <span class="text-base">📵</span>
@@ -924,15 +979,18 @@
       </div>
 
       <!-- Promised Payment Date Section (shown for New Payment Date outcome) -->
-      <div id="co-promised-pay-section" class="hidden mt-4 p-3.5 bg-purple-500/5 border border-purple-500/20 rounded-xl">
+      <div id="co-promised-pay-section"
+        class="hidden mt-4 p-3.5 bg-purple-500/5 border border-purple-500/20 rounded-xl">
         <label class="field-label text-purple-300">New Promised Payment Date *</label>
         <input type="date" id="co-new-promised-pay-date" class="input-field">
-        <p class="text-[11px] text-purple-400 mt-1">⚡ No date limit — client will automatically appear in your queue on this date.</p>
+        <p class="text-[11px] text-purple-400 mt-1">⚡ No date limit — client will automatically appear in your queue on
+          this date.</p>
       </div>
 
       <!-- Existing Order Context Bar (shown when customer already has an order/EasyPay) -->
       <div id="co-existing-order-bar" class="hidden mt-4 p-3 bg-white/[0.04] border border-white/10 rounded-xl">
-        <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Current Order &amp; EasyPay Details</p>
+        <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Current Order &amp; EasyPay
+          Details</p>
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
           <div>
             <span class="text-gray-400 block text-[10px] uppercase">Order No.</span>
@@ -960,9 +1018,10 @@
           <label class="field-label text-emerald-300">Order Number *
             <span class="text-gray-400 font-normal normal-case ml-1">(from Agility or Order confirmation)</span>
           </label>
-          <input type="text" id="co-order-number" placeholder="e.g. OVR-12345 or OVK-9988" class="input-field font-mono uppercase"
-            oninput="this.value = this.value.toUpperCase()">
-          <p class="text-[11px] text-gray-500 mt-1">Order numbers are manual (never auto-generated). Pre-filled if on file.</p>
+          <input type="text" id="co-order-number" placeholder="e.g. OVR-12345 or OVK-9988"
+            class="input-field font-mono uppercase" oninput="this.value = this.value.toUpperCase()">
+          <p class="text-[11px] text-gray-500 mt-1">Order numbers are manual (never auto-generated). Pre-filled if on
+            file.</p>
         </div>
         <div>
           <label class="field-label text-emerald-300">EasyPay Number
@@ -970,7 +1029,8 @@
           </label>
           <input type="text" id="co-easypay-number" placeholder="e.g. 123456789" class="input-field font-mono"
             oninput="this.value = this.value.replace(/[^0-9]/g,'')">
-          <p class="text-[11px] text-amber-400 mt-1">⚡ Entering a new EasyPay number restarts the 14-day expiry cycle.</p>
+          <p class="text-[11px] text-amber-400 mt-1">⚡ Entering a new EasyPay number restarts the 14-day expiry cycle.
+          </p>
         </div>
         <div>
           <label class="field-label text-emerald-300">Package Sold *</label>
@@ -988,7 +1048,8 @@
             <option value="Debit Order">Debit Order</option>
             <option value="Prepaid">Prepaid</option>
           </select>
-          <p class="text-[11px] text-gray-500 mt-1">If previously selected, your choice is pre-filled above &mdash; change if needed.</p>
+          <p class="text-[11px] text-gray-500 mt-1">If previously selected, your choice is pre-filled above &mdash;
+            change if needed.</p>
         </div>
         <div>
           <label class="field-label text-emerald-300">Promised Payment Date (Optional)
@@ -1000,7 +1061,8 @@
       </div>
 
       <!-- 1-Week Activation Check: Referral Lead Capture -->
-      <div id="co-activation-referral-section" class="hidden mt-4 p-3.5 bg-blue-500/5 border border-blue-500/20 rounded-xl">
+      <div id="co-activation-referral-section"
+        class="hidden mt-4 p-3.5 bg-blue-500/5 border border-blue-500/20 rounded-xl">
         <div class="flex items-start gap-2.5 mb-3">
           <span class="text-lg mt-0.5">🎁</span>
           <div>
@@ -1059,7 +1121,8 @@
   <!-- ═══════════════════════════════════════════════════════════ -->
   <div id="modal-quick-edit" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
     <div class="modal-overlay absolute inset-0" onclick="closeQuickEdit()"></div>
-    <div class="relative bg-navy-800 border border-white/10 rounded-2xl shadow-2xl w-full max-w-md p-6 z-10 max-h-[90vh] overflow-y-auto custom-scrollbar">
+    <div
+      class="relative bg-navy-800 border border-white/10 rounded-2xl shadow-2xl w-full max-w-md p-6 z-10 max-h-[90vh] overflow-y-auto custom-scrollbar">
       <div class="flex items-center justify-between mb-5">
         <div>
           <h3 class="text-lg font-semibold text-white">Quick Edit Lead</h3>
@@ -1177,7 +1240,8 @@
   <!-- ═══════════════════════════════════════════════════════════ -->
   <!-- Lead / Customer Detail Slide-Over                          -->
   <!-- ═══════════════════════════════════════════════════════════ -->
-  <div id="modal-lead-detail" class="hidden fixed inset-0 z-[60] flex items-stretch justify-end" style="background:rgba(0,0,0,0.65);backdrop-filter:blur(6px)">
+  <div id="modal-lead-detail" class="hidden fixed inset-0 z-[60] flex items-stretch justify-end"
+    style="background:rgba(0,0,0,0.65);backdrop-filter:blur(6px)">
     <!-- Click-away backdrop -->
     <div class="flex-1" onclick="closeLeadDetail()"></div>
 
@@ -1187,14 +1251,17 @@
       <!-- Header -->
       <div class="flex items-start justify-between px-5 py-5 border-b border-white/5 shrink-0">
         <div class="flex items-center gap-3">
-          <div id="ld-avatar" class="w-12 h-12 rounded-2xl bg-gradient-to-br from-fiber-500 to-fiber-700 flex items-center justify-center text-lg font-bold text-white shrink-0">?</div>
+          <div id="ld-avatar"
+            class="w-12 h-12 rounded-2xl bg-gradient-to-br from-fiber-500 to-fiber-700 flex items-center justify-center text-lg font-bold text-white shrink-0">
+            ?</div>
           <div>
             <p class="text-[10px] text-fiber-400 font-bold uppercase tracking-widest mb-0.5">Lead Profile</p>
             <h3 class="text-base font-bold text-white leading-tight" id="ld-name">—</h3>
             <div class="flex items-center gap-2 flex-wrap mt-1.5" id="ld-badges"></div>
           </div>
         </div>
-        <button onclick="closeLeadDetail()" class="text-gray-500 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/5 mt-0.5 shrink-0">
+        <button onclick="closeLeadDetail()"
+          class="text-gray-500 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/5 mt-0.5 shrink-0">
           <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>
@@ -1216,7 +1283,8 @@
               <p class="ld-field-label">Cell Number</p>
               <div class="flex items-center gap-2 mt-0.5">
                 <p class="ld-field-value mono" id="ld-phone">—</p>
-                <button id="ld-copy-btn" onclick="" class="text-[10px] text-gray-500 hover:text-gray-300 transition-colors">📋</button>
+                <button id="ld-copy-btn" onclick=""
+                  class="text-[10px] text-gray-500 hover:text-gray-300 transition-colors">📋</button>
               </div>
             </div>
             <div class="ld-field">
@@ -1229,7 +1297,8 @@
             </div>
             <div class="ld-field">
               <p class="ld-field-label">WhatsApp</p>
-              <a id="ld-wa-link" href="#" target="_blank" class="ld-field-value text-emerald-400 hover:text-emerald-300 text-xs font-semibold">Open Chat →</a>
+              <a id="ld-wa-link" href="#" target="_blank"
+                class="ld-field-value text-emerald-400 hover:text-emerald-300 text-xs font-semibold">Open Chat →</a>
             </div>
             <div class="ld-field col-span-2">
               <p class="ld-field-label">Address / Suburb</p>
@@ -1293,7 +1362,8 @@
               <p class="ld-field-label">Referral Code</p>
               <div class="flex items-center gap-2 mt-0.5">
                 <p class="ld-field-value mono text-amber-400" id="ld-referral-code">—</p>
-                <button id="ld-copy-ref-btn" onclick="" class="text-[10px] text-gray-500 hover:text-gray-300 transition-colors hidden">📋</button>
+                <button id="ld-copy-ref-btn" onclick=""
+                  class="text-[10px] text-gray-500 hover:text-gray-300 transition-colors hidden">📋</button>
               </div>
             </div>
           </div>
@@ -1325,7 +1395,8 @@
         <button id="ld-log-outcome-btn" onclick=""
           class="flex-1 flex items-center justify-center gap-2 py-2.5 bg-gradient-to-r from-fiber-500 to-fiber-600 hover:from-fiber-600 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-fiber-500/20">
           <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
+            <path stroke-linecap="round" stroke-linejoin="round"
+              d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
           </svg>
           ⚡ Log Outcome
         </button>
@@ -1342,63 +1413,68 @@
           Close
         </button>
       </div>
-  </div>
+    </div>
 
-  <!-- Duplicate Confirmation Modal -->
-  <div id="modal-confirm-duplicate" class="hidden fixed inset-0 z-[70] flex items-center justify-center" style="background:rgba(0,0,0,0.75);backdrop-filter:blur(8px)">
-    <div class="w-full max-w-sm mx-4 rounded-2xl border border-red-500/20 p-6" style="background:#131720">
-      <div class="flex items-center gap-3 mb-4">
-        <div class="w-10 h-10 rounded-xl bg-red-500/15 flex items-center justify-center shrink-0">
-          <svg class="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-          </svg>
+    <!-- Duplicate Confirmation Modal -->
+    <div id="modal-confirm-duplicate" class="hidden fixed inset-0 z-[70] flex items-center justify-center"
+      style="background:rgba(0,0,0,0.75);backdrop-filter:blur(8px)">
+      <div class="w-full max-w-sm mx-4 rounded-2xl border border-red-500/20 p-6" style="background:#131720">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-10 h-10 rounded-xl bg-red-500/15 flex items-center justify-center shrink-0">
+            <svg class="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round"
+                d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+            </svg>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-white">Mark as Duplicate?</h3>
+            <p class="text-xs text-gray-400 mt-0.5">This customer will be hidden from all worklists.</p>
+          </div>
         </div>
-        <div>
-          <h3 class="text-sm font-bold text-white">Mark as Duplicate?</h3>
-          <p class="text-xs text-gray-400 mt-0.5">This customer will be hidden from all worklists.</p>
+        <p class="text-xs text-gray-400 mb-1">Customer: <span class="text-white font-semibold"
+            id="dup-confirm-name"></span></p>
+        <p class="text-xs text-gray-400 mb-3">ID: <span class="text-gray-300 font-mono text-[11px]"
+            id="dup-confirm-id"></span></p>
+        <div class="mb-4">
+          <label class="text-[11px] text-gray-400 font-semibold uppercase tracking-wider block mb-1.5">Reason
+            (optional)</label>
+          <input id="dup-reason-input" type="text" placeholder="e.g. Same phone as CUS-XXXXXXXX"
+            class="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-red-500/40" />
         </div>
-      </div>
-      <p class="text-xs text-gray-400 mb-1">Customer: <span class="text-white font-semibold" id="dup-confirm-name"></span></p>
-      <p class="text-xs text-gray-400 mb-3">ID: <span class="text-gray-300 font-mono text-[11px]" id="dup-confirm-id"></span></p>
-      <div class="mb-4">
-        <label class="text-[11px] text-gray-400 font-semibold uppercase tracking-wider block mb-1.5">Reason (optional)</label>
-        <input id="dup-reason-input" type="text" placeholder="e.g. Same phone as CUS-XXXXXXXX"
-          class="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-red-500/40" />
-      </div>
-      <div class="flex gap-3">
-        <button onclick="confirmMarkDuplicate()" id="dup-confirm-btn"
-          class="flex-1 py-2.5 bg-red-500/20 border border-red-500/30 text-red-300 hover:bg-red-500/30 text-sm font-bold rounded-xl transition-colors">
-          Yes, Mark Duplicate
-        </button>
-        <button onclick="document.getElementById('modal-confirm-duplicate').classList.add('hidden')"
-          class="flex-1 py-2.5 bg-white/5 text-gray-400 hover:bg-white/10 text-sm font-medium rounded-xl transition-colors">
-          Cancel
-        </button>
+        <div class="flex gap-3">
+          <button onclick="confirmMarkDuplicate()" id="dup-confirm-btn"
+            class="flex-1 py-2.5 bg-red-500/20 border border-red-500/30 text-red-300 hover:bg-red-500/30 text-sm font-bold rounded-xl transition-colors">
+            Yes, Mark Duplicate
+          </button>
+          <button onclick="document.getElementById('modal-confirm-duplicate').classList.add('hidden')"
+            class="flex-1 py-2.5 bg-white/5 text-gray-400 hover:bg-white/10 text-sm font-medium rounded-xl transition-colors">
+            Cancel
+          </button>
+        </div>
       </div>
     </div>
-  </div>
 
-  <!-- Scripts -->
-  <script src="../js/api.js"></script>
-  <script src="../js/auth.js"></script>
-  <script src="agent.js"></script>
-  <script>
-    function toggleSidebar() {
-      const sidebar = document.getElementById('sidebar');
-      const overlay = document.getElementById('sidebar-overlay');
-      sidebar.classList.toggle('-translate-x-full');
-      overlay.classList.toggle('hidden');
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-      if (session) {
-        const mobileEl = document.getElementById('agent-name-mobile');
-        if (mobileEl) mobileEl.textContent = session.name;
-        const avatarEl = document.getElementById('agent-avatar');
-        if (avatarEl && session.name) avatarEl.textContent = session.name.charAt(0).toUpperCase();
+    <!-- Scripts -->
+    <script src="../js/api.js"></script>
+    <script src="../js/auth.js"></script>
+    <script src="agent.js"></script>
+    <script>
+      function toggleSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('sidebar-overlay');
+        sidebar.classList.toggle('-translate-x-full');
+        overlay.classList.toggle('hidden');
       }
-    });
-  </script>
+
+      document.addEventListener('DOMContentLoaded', () => {
+        if (session) {
+          const mobileEl = document.getElementById('agent-name-mobile');
+          if (mobileEl) mobileEl.textContent = session.name;
+          const avatarEl = document.getElementById('agent-avatar');
+          if (avatarEl && session.name) avatarEl.textContent = session.name.charAt(0).toUpperCase();
+        }
+      });
+    </script>
 </body>
 
 </html>
