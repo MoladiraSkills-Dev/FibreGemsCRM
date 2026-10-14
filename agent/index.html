@@ -689,18 +689,15 @@
                 <option value="Contact Attempted">Contact Attempted</option>
                 <option value="Contacted">Contacted</option>
                 <option value="Interested">Interested</option>
-                <option value="Order Placed">Order Placed (Sale Won)</option>
-                <option value="Payment Pending">Payment Pending</option>
                 <option value="Payment Promised">Payment Promised</option>
                 <option value="Payment Received">Payment Received</option>
                 <option value="Activation Pending">Activation Pending</option>
                 <option value="Activated">Activated (Auto 1-Week Follow-Up)</option>
-                <option value="After-Sales Due">After-Sales Due</option>
                 <option value="After-Sales Completed">After-Sales Completed</option>
                 <option value="Win-back Required">Win-back Required</option>
                 <option value="Win-back In Progress">Win-back In Progress</option>
-                <option value="Unable to Reach">Unable to Reach</option>
                 <option value="Not Interested">Not Interested</option>
+                <option value="Wrong Number">Wrong Number</option>
                 <option value="Cancelled">Cancelled</option>
                 <option value="Closed">Closed</option>
               </select>
@@ -716,7 +713,6 @@
                 <option value="Initial Call">Initial Call</option>
                 <option value="Customer Callback">Call Back</option>
                 <option value="Payment Follow-Up">Payment Follow-Up</option>
-                <option value="Easypay Reminder">Easypay Reminder</option>
                 <option value="Easypay Expiry Follow-Up">Easypay Expiry Follow-Up</option>
                 <option value="Payment Verification">Payment Verification</option>
                 <option value="After-Sales Call">After Sales Call</option>
@@ -1300,9 +1296,13 @@
               <a id="ld-wa-link" href="#" target="_blank"
                 class="ld-field-value text-emerald-400 hover:text-emerald-300 text-xs font-semibold">Open Chat →</a>
             </div>
-            <div class="ld-field col-span-2">
-              <p class="ld-field-label">Address / Suburb</p>
-              <p class="ld-field-value" id="ld-address">—</p>
+            <div class="ld-field">
+              <p class="ld-field-label">Street Address</p>
+              <p class="ld-field-value text-xs" id="ld-address">—</p>
+            </div>
+            <div class="ld-field">
+              <p class="ld-field-label">Area / Suburb</p>
+              <p class="ld-field-value text-xs" id="ld-suburb">—</p>
             </div>
           </div>
         </div>
@@ -1321,7 +1321,7 @@
             </div>
             <div class="ld-field col-span-2">
               <p class="ld-field-label">Package / Product</p>
-              <p class="ld-field-value" id="ld-package">—</p>
+              <p class="ld-field-value text-fiber-400 font-semibold" id="ld-package">—</p>
             </div>
             <div class="ld-field">
               <p class="ld-field-label">Payment Type</p>
@@ -1330,6 +1330,10 @@
             <div class="ld-field">
               <p class="ld-field-label">Order Date</p>
               <p class="ld-field-value" id="ld-order-date">—</p>
+            </div>
+            <div class="ld-field col-span-2">
+              <p class="ld-field-label">Activation Date</p>
+              <p class="ld-field-value text-blue-400" id="ld-activation-date">—</p>
             </div>
           </div>
         </div>
@@ -1366,6 +1370,10 @@
                   class="text-[10px] text-gray-500 hover:text-gray-300 transition-colors hidden">📋</button>
               </div>
             </div>
+            <div class="ld-field col-span-2">
+              <p class="ld-field-label">Referred By Code</p>
+              <p class="ld-field-value mono text-xs text-amber-300" id="ld-referred-by">—</p>
+            </div>
           </div>
         </div>
 
@@ -1382,8 +1390,16 @@
               <p class="ld-field-value text-fiber-400 font-semibold" id="ld-next-date">—</p>
             </div>
             <div class="ld-field col-span-2">
+              <p class="ld-field-label">Last Contact</p>
+              <p class="ld-field-value text-xs" id="ld-last-contact">—</p>
+            </div>
+            <div class="ld-field col-span-2">
               <p class="ld-field-label">Last Outcome</p>
               <p class="ld-field-value" id="ld-last-outcome">—</p>
+            </div>
+            <div class="ld-field col-span-2">
+              <p class="ld-field-label">Notes</p>
+              <p class="ld-field-value" id="ld-notes">No notes</p>
             </div>
           </div>
         </div>

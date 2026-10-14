@@ -417,7 +417,8 @@ function renderCallbackCards() {
 function openLeadDetail(cObjStr) {
   const c = JSON.parse(decodeURIComponent(cObjStr));
   
-  const rawPhone = '0' + (c.cellNumber || '');
+  const cellRaw = String(c.cellNumber || '').trim();
+  const rawPhone = cellRaw ? (cellRaw.startsWith('0') ? cellRaw : '0' + cellRaw) : '';
   const phoneDigits = rawPhone.replace(/\D/g, '');
   const waPhone = phoneDigits.startsWith('0') ? '27' + phoneDigits.slice(1) : phoneDigits;
   
@@ -438,9 +439,22 @@ function openLeadDetail(cObjStr) {
 
   document.getElementById('ld-fullname').textContent = escHtml(c.name);
   document.getElementById('ld-phone').textContent = escHtml(rawPhone || '—');
-  document.getElementById('ld-alt-phone').textContent = escHtml('0' + (c.alternateCell || '')).replace(/^0$/, '—');
+  
+  const altRaw = String(c.alternateCell || '').trim();
+  const altPhone = altRaw ? (altRaw.startsWith('0') ? altRaw : '0' + altRaw) : '—';
+  document.getElementById('ld-alt-phone').textContent = escHtml(altPhone);
+  
   document.getElementById('ld-email').textContent = escHtml(c.email || '—');
-  document.getElementById('ld-address').textContent = escHtml([c.address, c.suburb].filter(Boolean).join(', ') || '—');
+  
+  const addressVal = String(c.address || '').trim();
+  const suburbVal = String(c.suburb || '').trim();
+  const fullAddress = [addressVal, suburbVal].filter(Boolean).join(', ');
+  
+  const addrEl = document.getElementById('ld-address');
+  if (addrEl) addrEl.textContent = escHtml(addressVal || fullAddress || '—');
+  
+  const suburbEl = document.getElementById('ld-suburb');
+  if (suburbEl) suburbEl.textContent = escHtml(suburbVal || '—');
   
   const waLink = document.getElementById('ld-wa-link');
   if (waPhone && waPhone !== '27') {
@@ -454,21 +468,51 @@ function openLeadDetail(cObjStr) {
 
   document.getElementById('ld-cid').textContent = escHtml(c.customerId || '—');
   document.getElementById('ld-status').textContent = escHtml(c.status || '—');
-  document.getElementById('ld-package').textContent = escHtml(c.package || '—');
+  
+  // Package and Order Date protection (packages must NEVER display as dates)
+  let pkgVal = String(c.package || '').trim();
+  let ordDateVal = String(c.orderDate || '').trim();
+  const isDatePattern = (s) => /^\d{4}-\d{2}-\d{2}/.test(s) || /^\d{1,2}\/\d{1,2}\/\d{2,4}/.test(s) || (s && s.includes('T00:00:00'));
+  if (isDatePattern(pkgVal)) {
+    if (!ordDateVal || ordDateVal === '—') {
+      ordDateVal = pkgVal.split('T')[0];
+    }
+    pkgVal = '—';
+  }
+  document.getElementById('ld-package').textContent = escHtml(pkgVal || '—');
   document.getElementById('ld-payment-type').textContent = escHtml(c.paymentType || '—');
-  document.getElementById('ld-order-date').textContent = escHtml(c.orderDate || '—');
+  document.getElementById('ld-order-date').textContent = escHtml(ordDateVal || '—');
+
+  const actDateEl = document.getElementById('ld-activation-date');
+  if (actDateEl) actDateEl.textContent = escHtml(c.activationDate || '—');
 
   document.getElementById('ld-order-number').textContent = escHtml(c.orderNumber || '—');
   document.getElementById('ld-easypay').textContent = escHtml(c.easyPayNumber || '—');
   document.getElementById('ld-ep-cycle').textContent = escHtml(c.easyPayCycle || '—');
   
   const epExpiryEl = document.getElementById('ld-ep-expiry');
+  const epExpiry = c.easyPayExpiryDate || c.easyPayExpiry || '';
   if (c.isEasyPayExpired) {
-    epExpiryEl.innerHTML = '<span class="text-red-400 font-bold">' + escHtml(c.easyPayExpiryDate || '—') + ' (Expired)</span>';
+    epExpiryEl.innerHTML = '<span class="text-red-400 font-bold">' + escHtml(epExpiry || '—') + ' (Expired)</span>';
   } else if (c.easyPayDaysRemaining !== null && c.easyPayDaysRemaining !== undefined) {
-    epExpiryEl.innerHTML = '<span class="text-emerald-400 font-bold">' + escHtml(c.easyPayExpiryDate || '—') + ' (' + c.easyPayDaysRemaining + 'd left)</span>';
+    const d = c.easyPayDaysRemaining;
+    if (d < 0) {
+      epExpiryEl.innerHTML = '<span class="text-red-400 font-bold">' + escHtml(epExpiry || '—') + ' (Expired)</span>';
+    } else {
+      epExpiryEl.innerHTML = '<span class="text-emerald-400 font-bold">' + escHtml(epExpiry || '—') + ' (' + d + 'd left)</span>';
+    }
+  } else if (epExpiry) {
+    const expDate = new Date(epExpiry + 'T00:00:00');
+    const now = new Date();
+    now.setHours(0,0,0,0);
+    const dLeft = Math.round((expDate - now) / (1000 * 60 * 60 * 24));
+    if (dLeft < 0) {
+      epExpiryEl.innerHTML = '<span class="text-red-400 font-bold">' + escHtml(epExpiry) + ' (Expired)</span>';
+    } else {
+      epExpiryEl.innerHTML = '<span class="text-emerald-400 font-bold">' + escHtml(epExpiry) + ' (' + dLeft + 'd left)</span>';
+    }
   } else {
-    epExpiryEl.textContent = escHtml(c.easyPayExpiryDate || '—');
+    epExpiryEl.textContent = '—';
   }
   
   document.getElementById('ld-promised-pay').textContent = escHtml(c.promisedPaymentDate || '—');
@@ -482,9 +526,19 @@ function openLeadDetail(cObjStr) {
     refBtn.classList.add('hidden');
   }
 
+  const refByEl = document.getElementById('ld-referred-by');
+  if (refByEl) refByEl.textContent = escHtml(c.referredByCode || '—');
+
   document.getElementById('ld-next-action').textContent = escHtml(c.nextAction || '—');
-  document.getElementById('ld-next-date').textContent = escHtml(c.nextActionDate || '—');
+  
+  const nextDateFormatted = c.nextActionDate ? (c.nextActionTime ? `${c.nextActionDate} at ${c.nextActionTime}` : c.nextActionDate) : '—';
+  document.getElementById('ld-next-date').textContent = escHtml(nextDateFormatted);
+
+  const lastContactEl = document.getElementById('ld-last-contact');
+  if (lastContactEl) lastContactEl.textContent = escHtml(c.lastContactDate || '—');
+
   document.getElementById('ld-last-outcome').textContent = escHtml(c.lastOutcome || '—');
+  document.getElementById('ld-notes').textContent = escHtml(c.notes || 'No notes');
 
   const logOutcomeBtn = document.getElementById('ld-log-outcome-btn');
   logOutcomeBtn.onclick = (e) => {
