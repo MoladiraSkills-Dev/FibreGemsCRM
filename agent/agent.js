@@ -531,14 +531,83 @@ function openLeadDetail(cObjStr) {
 
   document.getElementById('ld-next-action').textContent = escHtml(c.nextAction || '—');
   
-  const nextDateFormatted = c.nextActionDate ? (c.nextActionTime ? `${c.nextActionDate} at ${c.nextActionTime}` : c.nextActionDate) : '—';
+  const formatTimeClean = (t) => {
+    if (!t) return '';
+    const s = String(t).trim();
+    // Handle 1899-epoch date string leaked from Google Sheets time cells
+    const epochMatch = s.match(/1899[\s\S]*?(\d{1,2}):(\d{2}):\d{2}/);
+    if (epochMatch) {
+      return String(parseInt(epochMatch[1], 10)).padStart(2, '0') + ':' + epochMatch[2];
+    }
+    const m = s.match(/(?:(?:[01]?\d|2[0-3]):[0-5]\d)/);
+    if (m) {
+      const parts = m[0].split(':');
+      return parts[0].padStart(2, '0') + ':' + parts[1];
+    }
+    return '';
+  };
+  const cleanTime = formatTimeClean(c.nextActionTime);
+  const nextDateFormatted = c.nextActionDate ? (cleanTime ? `${c.nextActionDate} at ${cleanTime}` : c.nextActionDate) : '—';
   document.getElementById('ld-next-date').textContent = escHtml(nextDateFormatted);
 
   const lastContactEl = document.getElementById('ld-last-contact');
   if (lastContactEl) lastContactEl.textContent = escHtml(c.lastContactDate || '—');
 
   document.getElementById('ld-last-outcome').textContent = escHtml(c.lastOutcome || '—');
-  document.getElementById('ld-notes').textContent = escHtml(c.notes || 'No notes');
+
+  // Show notes immediately from worklist/queue data
+  const notesEl = document.getElementById('ld-notes');
+  const initialNote = (c.notes || '').trim();
+  if (notesEl) {
+    notesEl.textContent = (initialNote && initialNote !== 'No notes' && initialNote !== '—') ? initialNote : 'No notes';
+  }
+
+  // Also check in-memory activity log cache immediately
+  if ((!notesEl.textContent || notesEl.textContent === 'No notes') && Array.isArray(window.cachedActivityLogs)) {
+    const targetId = String(c.customerId || '').trim().toLowerCase();
+    const targetName = String(c.name || '').trim().toLowerCase();
+    const localMatch = window.cachedActivityLogs.find(a => {
+      const matchId = targetId && a.customerId && String(a.customerId).trim().toLowerCase() === targetId;
+      const matchName = targetName && a.customerName && String(a.customerName).trim().toLowerCase() === targetName;
+      const note = (a.notes || '').trim();
+      return (matchId || matchName) && note && note !== 'No notes' && note !== '—';
+    });
+    if (localMatch && notesEl) {
+      notesEl.textContent = localMatch.notes.trim();
+    }
+  }
+
+  // Asynchronously fetch activity history to guarantee freshest notes and contact date
+  if (c.customerId || c.name) {
+    callBackend('getLeadActivityHistory', { customerId: c.customerId, customerName: c.name }, { skipCache: true }).then(res => {
+      if (res && res.activities && res.activities.length > 0) {
+        // Find most-recent activity entry with genuine notes
+        const entryWithNotes = res.activities.find(a => {
+          const n = (a.notes || '').trim();
+          return n && n !== 'No notes' && n !== '—';
+        });
+        if (entryWithNotes && notesEl && entryWithNotes.notes.trim()) {
+          notesEl.textContent = entryWithNotes.notes.trim();
+        }
+
+        // Update last outcome — always take the freshest from activity log
+        const outcomeEl = document.getElementById('ld-last-outcome');
+        if (outcomeEl) {
+          const freshOutcome = res.activities[0].outcome || '';
+          if (freshOutcome) outcomeEl.textContent = freshOutcome;
+        }
+
+        // Update last contact date with the freshest logged activity date
+        if (lastContactEl) {
+          const dt = res.activities[0].dateTime;
+          const freshDate = dt ? dt.split(' ')[0] : '';
+          if (freshDate) lastContactEl.textContent = freshDate;
+        }
+      }
+    }).catch(err => {
+      console.warn('Could not fetch lead activity history: ' + err.message);
+    });
+  }
 
   const logOutcomeBtn = document.getElementById('ld-log-outcome-btn');
   logOutcomeBtn.onclick = (e) => {
@@ -851,6 +920,16 @@ async function submitCallOutcome() {
     };
 
     const result = await callBackend('logCallOutcome', payload);
+    if (!window.cachedActivityLogs) window.cachedActivityLogs = [];
+    window.cachedActivityLogs.unshift({
+      customerId: customerId,
+      customerName: (document.getElementById('co-client-name') || {}).textContent || '',
+      outcome: selectedOutcomePreset,
+      notes: notes,
+      nextAction: payload.nextAction,
+      nextActionDate: payload.nextActionDate,
+      dateTime: new Date().toISOString()
+    });
     showToast(`Call logged: ${selectedOutcomePreset}! Queue updated.`);
     if (result && result.referralCode) {
       showToast(`🎁 Referral Code: ${result.referralCode} — share with customer!`);
@@ -1126,6 +1205,7 @@ async function loadActivityLog() {
   try {
     const result = await callBackend('getAgentActivityLog', { offset: activityOffset, limit: ACTIVITY_LIMIT });
     activityTotal = result.total;
+    window.cachedActivityLogs = result.data || [];
 
     if (result.data.length === 0) {
       tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-8 text-center text-gray-500 text-xs">No activity logged yet today.</td></tr>`;
