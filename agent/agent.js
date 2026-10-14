@@ -414,8 +414,76 @@ function renderCallbackCards() {
 
 // ── 1-Click Call Outcome Drawer / Modal ──────────────────────
 // ── Lead Detail Panel ──────────────────────────────────────────
+let currentOpenLead = null;
+
+function toggleLeadStatusEdit(show) {
+  const displayEl = document.getElementById('ld-status');
+  const changerEl = document.getElementById('ld-status-changer');
+  const editBtn = document.getElementById('ld-edit-status-btn');
+  if (show) {
+    if (displayEl) displayEl.classList.add('hidden');
+    if (changerEl) {
+      changerEl.classList.remove('hidden');
+      const sel = document.getElementById('ld-status-select');
+      if (sel && currentOpenLead && currentOpenLead.status) {
+        sel.value = currentOpenLead.status;
+      }
+    }
+    if (editBtn) editBtn.classList.add('hidden');
+  } else {
+    if (displayEl) displayEl.classList.remove('hidden');
+    if (changerEl) changerEl.classList.add('hidden');
+    if (editBtn) editBtn.classList.remove('hidden');
+  }
+}
+
+async function saveLeadStatusChange() {
+  if (!currentOpenLead || !currentOpenLead.customerId) return;
+  const sel = document.getElementById('ld-status-select');
+  if (!sel) return;
+  const newStatus = sel.value;
+  const saveBtn = document.getElementById('ld-save-status-btn');
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+  }
+
+  try {
+    const payload = { status: newStatus };
+    if (newStatus === 'Payment Promised') {
+      payload.nextAction = 'Payment Follow-Up';
+      if (currentOpenLead.promisedPaymentDate) {
+        payload.promisedPaymentDate = currentOpenLead.promisedPaymentDate;
+        payload.nextActionDate = currentOpenLead.promisedPaymentDate;
+      }
+    }
+    await callBackend('quickUpdateSalesData', {
+      customerId: currentOpenLead.customerId,
+      data: payload
+    });
+    currentOpenLead.status = newStatus;
+    const displayEl = document.getElementById('ld-status');
+    if (displayEl) displayEl.textContent = newStatus;
+    showToast(`Status updated to "${newStatus}"!`, 'success');
+    toggleLeadStatusEdit(false);
+    refreshDailyData();
+    loadWorklist();
+  } catch (err) {
+    showToast('Failed to update status: ' + err.message, 'error');
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save';
+    }
+  }
+}
+
 function openLeadDetail(cObjStr) {
   const c = JSON.parse(decodeURIComponent(cObjStr));
+  currentOpenLead = c;
+  toggleLeadStatusEdit(false);
+  const statusSel = document.getElementById('ld-status-select');
+  if (statusSel && c.status) statusSel.value = c.status;
   
   const cellRaw = String(c.cellNumber || '').trim();
   const rawPhone = cellRaw ? (cellRaw.startsWith('0') ? cellRaw : '0' + cellRaw) : '';
@@ -629,6 +697,15 @@ function openLeadDetail(cObjStr) {
     );
   };
 
+  // Wire up Quick Edit button
+  const qeBtn = document.getElementById('ld-quick-edit-btn');
+  if (qeBtn) {
+    qeBtn.onclick = (e) => {
+      e.stopPropagation();
+      openQuickEdit(c.customerId, c.name, c.package, c.status, c.nextAction, c.nextActionDate);
+    };
+  }
+
   // Wire up Duplicate button
   const dupBtn = document.getElementById('ld-mark-duplicate-btn');
   if (dupBtn) {
@@ -701,6 +778,8 @@ function openCallOutcomeModal(customerId, name, phone, pkg, isPaymentFollowUp = 
   document.getElementById('co-client-name').textContent = name;
   document.getElementById('co-client-phone').textContent = formattedPhone;
   document.getElementById('co-notes').value = '';
+  const initialCustomStatusEl = document.getElementById('co-custom-status');
+  if (initialCustomStatusEl) initialCustomStatusEl.value = '';
 
   // Wire up WhatsApp button in modal header
   const phoneDigits = formattedPhone.replace(/\D/g, '');
@@ -840,6 +919,39 @@ function selectOutcomePreset(preset) {
     const el = document.getElementById('co-new-promised-pay-date');
     if (el && !el.value) el.value = addDaysToToday(7);
   }
+
+  // Pre-set customer status dropdown based on preset
+  const statusEl = document.getElementById('co-custom-status');
+  if (statusEl) {
+    if (preset === 'Sale Won') {
+      const promDateEl = document.getElementById('co-sale-promised-pay-date');
+      statusEl.value = (promDateEl && promDateEl.value) ? 'Payment Promised' : 'Order Placed';
+    } else if (preset === 'New Payment Date' || preset === 'No Payment - Reschedule') {
+      statusEl.value = 'Payment Promised';
+    } else if (preset === 'Payment Received') {
+      statusEl.value = 'Payment Received';
+    } else if (preset === 'Activated') {
+      statusEl.value = 'Activated';
+    } else if (preset === 'Activation Follow-Up Completed') {
+      statusEl.value = 'After-Sales Completed';
+    } else if (preset === 'Callback Rescheduled') {
+      statusEl.value = 'Contact Attempted';
+    } else if (preset === 'No Answer / Voicemail') {
+      statusEl.value = 'Unable to Reach';
+    } else if (preset === 'Not Interested') {
+      statusEl.value = 'Not Interested';
+    }
+  }
+
+  // If agent edits promised payment date in Sale Won, auto-select Payment Promised
+  const salePromDateEl = document.getElementById('co-sale-promised-pay-date');
+  if (salePromDateEl) {
+    salePromDateEl.onchange = () => {
+      if (statusEl && salePromDateEl.value) {
+        statusEl.value = 'Payment Promised';
+      }
+    };
+  }
 }
 
 function setOutcomeDateOffset(days) {
@@ -859,6 +971,7 @@ async function submitCallOutcome() {
   const payType = document.getElementById('co-payment-type').value;
   const newPromisedPayDate = document.getElementById('co-new-promised-pay-date').value;
   const salePromisedPayDate = document.getElementById('co-sale-promised-pay-date').value;
+  const customStatus = (document.getElementById('co-custom-status') || {}).value || '';
   // NEW: EasyPay number from the Sale Won section
   const easyPayNumberVal = (document.getElementById('co-easypay-number') || {}).value || '';
 
@@ -901,6 +1014,7 @@ async function submitCallOutcome() {
     const payload = {
       customerId: customerId,
       outcome: selectedOutcomePreset,
+      customStatus: customStatus,
       notes: notes,
       nextAction: needsNextDate ? 'Call Back' : (selectedOutcomePreset === 'Payment Received' ? '' : ''),
       nextActionDate: needsNextDate ? nextDate : '',

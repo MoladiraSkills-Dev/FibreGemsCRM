@@ -1091,6 +1091,31 @@
         </div>
       </div>
 
+      <!-- Customer Status Selection -->
+      <div class="mt-4">
+        <div class="flex items-center justify-between mb-1">
+          <label class="field-label text-fiber-300 mb-0">Customer Status</label>
+          <span class="text-[10px] text-gray-400">Can override auto-calculated status</span>
+        </div>
+        <select id="co-custom-status" class="input-field">
+          <option value="">-- Auto-set by outcome --</option>
+          <option value="Payment Promised">Payment Promised (Promised to Pay)</option>
+          <option value="Payment Received">Payment Received</option>
+          <option value="Order Placed">Order Placed (Sale Won)</option>
+          <option value="Payment Pending">Payment Pending</option>
+          <option value="Contacted">Contacted</option>
+          <option value="Contact Attempted">Contact Attempted</option>
+          <option value="Interested">Interested</option>
+          <option value="New Lead">New Lead</option>
+          <option value="Activation Pending">Activation Pending</option>
+          <option value="Activated">Activated</option>
+          <option value="After-Sales Due">After-Sales Due</option>
+          <option value="After-Sales Completed">After-Sales Completed</option>
+          <option value="Unable to Reach">Unable to Reach</option>
+          <option value="Not Interested">Not Interested</option>
+        </select>
+      </div>
+
       <!-- Notes Field -->
       <div class="mt-4">
         <label class="field-label">Call Notes / Discussion Summary</label>
@@ -1316,8 +1341,38 @@
               <p class="ld-field-value mono text-xs" id="ld-cid">—</p>
             </div>
             <div class="ld-field">
-              <p class="ld-field-label">Status</p>
+              <div class="flex items-center justify-between mb-0.5">
+                <p class="ld-field-label mb-0">Status</p>
+                <button type="button" onclick="toggleLeadStatusEdit(true)" id="ld-edit-status-btn"
+                  class="text-[10px] text-fiber-400 hover:text-fiber-300 font-semibold transition-colors cursor-pointer">✏️
+                  Change</button>
+              </div>
               <p class="ld-field-value" id="ld-status">—</p>
+              <div id="ld-status-changer" class="hidden mt-1.5 flex flex-col gap-1.5">
+                <select id="ld-status-select" class="input-field text-xs py-1 px-2">
+                  <option value="Payment Promised">Payment Promised</option>
+                  <option value="Payment Received">Payment Received</option>
+                  <option value="Order Placed">Order Placed</option>
+                  <option value="Payment Pending">Payment Pending</option>
+                  <option value="Contacted">Contacted</option>
+                  <option value="Contact Attempted">Contact Attempted</option>
+                  <option value="Interested">Interested</option>
+                  <option value="New Lead">New Lead</option>
+                  <option value="Activation Pending">Activation Pending</option>
+                  <option value="Activated">Activated</option>
+                  <option value="After-Sales Due">After-Sales Due</option>
+                  <option value="After-Sales Completed">After-Sales Completed</option>
+                  <option value="Unable to Reach">Unable to Reach</option>
+                  <option value="Not Interested">Not Interested</option>
+                  <option value="Cancelled">Cancelled</option>
+                </select>
+                <div class="flex items-center gap-1.5">
+                  <button type="button" onclick="saveLeadStatusChange()" id="ld-save-status-btn"
+                    class="px-2.5 py-1 bg-fiber-500 hover:bg-fiber-600 text-white rounded text-[11px] font-bold transition-all cursor-pointer">Save</button>
+                  <button type="button" onclick="toggleLeadStatusEdit(false)"
+                    class="px-2 py-1 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white rounded text-[11px] transition-all cursor-pointer">Cancel</button>
+                </div>
+              </div>
             </div>
             <div class="ld-field col-span-2">
               <p class="ld-field-label">Package / Product</p>
@@ -1416,6 +1471,7 @@
           </svg>
           ⚡ Log Outcome
         </button>
+
         <button id="ld-mark-duplicate-btn" onclick=""
           title="Mark this customer as a duplicate — it will be hidden from your worklist"
           class="px-3 py-2.5 bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 hover:text-red-300 text-sm font-medium rounded-xl transition-colors flex items-center gap-1.5">
