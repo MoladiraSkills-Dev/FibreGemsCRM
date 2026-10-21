@@ -885,7 +885,7 @@ function selectOutcomePreset(preset) {
   const activeBtn = document.querySelector(`[data-outcome-btn="${preset}"]`);
   if (activeBtn) {
     const ringColor = preset === 'New Payment Date' ? 'ring-purple-400'
-      : preset === 'Payment Received' ? 'ring-emerald-400'
+      : (preset === 'Payment Received' || preset === 'Sale Won' || preset === 'Order Placed') ? 'ring-emerald-400'
       : preset === 'Activated' ? 'ring-blue-400'
       : preset === 'Activation Follow-Up Completed' ? 'ring-teal-400'
       : 'ring-fiber-400';
